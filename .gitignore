@@ -1,1 +1,4 @@
 2026-11-21/sp-bidder.zip
+.env
+.env.*
+*/.env*
