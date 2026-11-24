@@ -1,0 +1,9143 @@
+'use strict';
+
+const express = require('express');
+const path = require('path');
+const crypto = require('crypto');
+const config = require('../config');
+const { AuctionSim } = require('../sim/auctionSim');
+const { MockSuperProcureAdapter } = require('../platform/mockAdapter');
+const { DurableScheduler } = require('../scheduler/durableScheduler');
+const { TargetPriceWatch } = require('../gocomet/targetPriceWatch');
+const { submitTargetRate } = require('../gocomet/targetPriceSubmit');
+const { targetNotBelowQuote } = require('../gocomet/targetPriceDecision');
+const { BidEngine, DEFAULTS: ENGINE_DEFAULTS } = require('../engine/bidEngine');
+const { RealSuperProcureAdapter } = require('../platform/realAdapter');
+const { GoCometAdapter } = require('../platform/gocometAdapter');
+const { buildGoCometStack, capabilityWarnings } = require('../platform/gocometStack');
+const { createStore } = require('../store');
+const { withLaneDisplay, laneEndPins, twoPointFacts } = require('./laneDisplay');
+const { planDimensionRefresh } = require('../pricing/requestDimensions');
+const { PriceRequestStore, armFromRequest, assertBiddingEnabled, assertLadderReachable, normalizeCostByType, publicSeg, tokenFromPath, isPlaceholderClose, effectiveCloseAt, PRUNE_RETENTION_MS, platformOf, ownedBy, isTargetPriceReq } = require('../pricing/priceRequests');
+// plausibleCeiling is the SINGLE source of "is this shipper ceiling real" (engine/pricing, re-exported
+// here). The price page MUST resolve a ceiling through the same function - and floor it the same way -
+// that arm() and the adapter belt do, or the desk is shown a different ceiling from the one the bid
+// path enforces, which is a worse failure than showing none.
+const { MAX_TRANSIT_DAYS, deriveLoadRules, plausibleCeiling, derivePmtVehicleCount, pmtTotalUnitsFor, reconcilePricingMode, assertRulesSupported } = require('../model/loadRules');
+const { pmtBidEnabled } = require('../model/rulesConstants'); // boot-time posture line only (the gate itself is read fresh per call)
+const { redactToken } = require('../util/redactToken');
+const { tokenMatch } = require('../util/tokenMatch');
+const { parseBandForm, validateMargins } = require('../pricing/marginValidate');
+const { ladderNotice, ladderCaveat, ladderShortfall, floorStepRefusal } = require('../pricing/ladderNotice');
+// How long the price page waits for a portal that publishes its minimum bid difference only on the
+// enquiry detail. Past this the page renders on the platform fallback and SAYS it is a fallback; the
+// read itself continues and lands in the adapter's cache, so the next keystroke has the real number.
+const PREVIEW_RULES_TIMEOUT_MS = 2500;
+// ONE ATTEMPT PER LOAD PER MINUTE, whatever the desk types. The preview refires on every keystroke
+// (debounced to 350ms), and the adapter's own detail cache only absorbs the repeat once a read has
+// SUCCEEDED - a read that throws in transport returns null without arming the failure backoff, so an
+// unbounded retry here would put one GET per keystroke against a read budget whose saturation has
+// already produced a silently empty listing. This gate is the bound the budget cannot supply itself.
+const PREVIEW_RULES_RETRY_MS = 60_000;
+const previewRulesAttemptAt = new Map(); // loadId -> ts of the last on-demand rules read
+function previewRulesAttemptAllowed(loadId, now) {
+  for (const [k, at] of previewRulesAttemptAt) if (now - at >= PREVIEW_RULES_RETRY_MS) previewRulesAttemptAt.delete(k);
+  const key = String(loadId);
+  if (previewRulesAttemptAt.has(key)) return false;
+  previewRulesAttemptAt.set(key, now);
+  return true;
+}
+
+/**
+ * The per-truck-type rates off a POST body: cost_type_0, cost_type_1, ... in the order the page
+ * rendered the types in. Contiguous by construction - the first gap ends the list - so a body with
+ * cost_type_0 and cost_type_2 yields one rate and normalizeCostByType then refuses it against the
+ * load's own type count, rather than silently pricing one truck type and blending the other away.
+ * null when the desk gave a single rate, which is every load with one truck type.
+ */
+function readCostByType(body) {
+  if (!body || typeof body !== 'object') return null;
+  const out = [];
+  for (let i = 0; ; i++) {
+    const k = `cost_type_${i}`;
+    if (!(k in body)) break;
+    out.push(body[k]);
+  }
+  return out.length ? out : null;
+}
+// Per-type fields posted with every rate blank: normalizeCostByType reads that as "one rate given",
+// and there is no one rate either.
+function blankTypedCostError(reqDoc) {
+  const n = (reqDoc && reqDoc.load && Array.isArray(reqDoc.load.cargoTypes)) ? reqDoc.load.cargoTypes.length : 0;
+  const e = new Error(n > 1 ? `enter a cost for each of the ${n} truck types on this load` : 'enter a cost for this load');
+  e.code = 'BAD_INPUT';
+  return e;
+}
+const { Notifier } = require('../notify/notifier');
+const { WhatsAppClient } = require('../notify/whatsapp');
+const { SenderFleet } = require('../notify/senderFleet');
+const { notifyEngineEvent } = require('../notify/engineAlerts');
+const { checkTokenExpiry, expiryCheckIntervalMs } = require('../notify/tokenExpiry');
+// raiseAuthConfirming is deliberately NOT imported here: the reconnect announcement is the ledger's
+// own (announceAuthReconnecting), and it moved with it into src/auth/authDeadMarks.js.
+const { raiseAuthRestored } = require('../notify/authAlert');
+const { affectedCustomers } = require('../model/coverage');
+const { createAuthDeadMarks, AUTH_DEAD_MARKS_COLLECTION } = require('../auth/authDeadMarks');
+const { checkScopeChange, ScopeRefresher } = require('../auth/scopeRefresh');
+const accountCoverage = require('../auth/accountCoverage');
+const { startDailyHeartbeat } = require('../notify/heartbeat');
+const serverHealth = require('../notify/serverHealth');
+const { startDailyEodReport } = require('../notify/eodReport');
+const { startDailyDirectorEod } = require('../notify/directorEod');
+const { createFallbackAlert } = require('../notify/alertChannel');
+const { fmtWeight } = require('../notify/waTemplates');
+const { DiscoveryPoller, isOutOfHardCloseScope, isMultiVehicle, isPmtBasis, softAdmitted } = require('../discovery/discovery');
+const { loadAccounts, validateAccount, resolveAccountToken, allowlistOverlapWarning, branchOverlapWarnings, deskCustomerFor, reconnectUserWarning, IMPLICIT_PRIMARY, COLLECTION: ACCOUNTS_COLLECTION } = require('../auth/accounts');
+const { COLLECTION: ACCOUNT_CONTACTS_COLLECTION, EMAIL_RE } = require('../auth/accountContacts');
+const { requestOtp, verifyOtp } = require('../auth/spOtpAuth');
+const { SecretsVault } = require('../store/secretsVault');
+const { BidLogger, summarizeClosed } = require('../logging/bidLogger');
+const { ConfigStore, defaultsFrom, ALERT_KINDS, AD_LIMITS } = require('../admin/configStore');
+const walkTiming = require('../engine/walkTiming');
+const { createWalkTimingRefresher } = require('../engine/walkTimingRefresh');
+const { DEFAULT_WALK, walkLimitsMeta, effectiveSummary, mergeWalk } = require('../engine/walk');
+const { verifyPassword, signSession, verifySession, readCookie, randomSecret } = require('../auth/adminAuth');
+const { recordConfigChange } = require('../admin/auditLog');
+const { toCsv, istStamp } = require('./csv');
+const { makeExporters } = require('./exports');
+const exportModel = require('./exportModel');
+const monthlyFreightValue = require('../reports/monthlyFreightValue');
+const { toXlsx, XLSX_CONTENT_TYPE } = require('./xlsx');
+const { createLogger } = require('../logging/logger');
+const { loadVersionInfo, bootBannerLine } = require('./version');
+// The sender re-link QR handler. It lives under scripts/lib/ with the cron monitor rather than in
+// src/ so the eligibility gate, the /qrCode read and the wrong-handset warning have exactly ONE
+// implementation. The dependency only runs this way (src -> scripts/lib); the monitor still imports
+// nothing from src/, which is what keeps it alerting when the app itself is down.
+const { createRelinkQrHandler, readLastKnownNumber, RELINK_QR_PATH } = require('../../scripts/lib/sender-qr');
+
+// ---- shared state -----------------------------------------------------------
+const authEvents = [];
+const eventLog = [];
+function pushEvent(source, e) {
+  eventLog.push(Object.assign({ source, ts: Date.now() }, e));
+  if (eventLog.length > 300) eventLog.shift();
+}
+// `log` is the composition root's own copy of the ad hoc log callback threaded through
+// most of the app - it keeps feeding the dashboard's live event ring buffer (pushEvent)
+// exactly as before, and now ALSO reaches stdout/stderr through the structured logger so
+// `pm2 logs bid-command` shows the same lines the console's live feed does. Every DI
+// consumer downstream (customerStore, personStore, assignmentStore, the WhatsApp client,
+// the notifier, the discovery poller) is handed this exact object, and several of them
+// call `.debug`/`.warn`/`.error` when present - so `log` needs those methods attached,
+// not just be callable as a bare `(m) => void`, or those call sites silently fall back to
+// the plain info-level line and lose their level/structured-error detail.
+const baseLog = createLogger('server');
+function log(m) { pushEvent('log', { msg: m }); baseLog(m); }
+// debug is console-only (never pushed to the dashboard feed): unlike info/warn/error, it
+// wasn't part of the pre-this-module `log` shape at all, and per-tick/per-action debug
+// lines are exactly the volume the LOG_LEVEL gate exists to keep out of the operator's
+// live view - pushEvent has no LOG_LEVEL gate of its own, so a debug line would otherwise
+// always reach the dashboard regardless of console verbosity, burying real events.
+log.debug = (m, meta) => { baseLog.debug(m, meta); };
+log.info = (m, meta) => { pushEvent('log', { msg: m }); baseLog.info(m, meta); };
+log.warn = (m, meta) => { pushEvent('log', { msg: m }); baseLog.warn(m, meta); };
+log.error = (m, meta) => { pushEvent('log', { msg: m }); baseLog.error(m, meta); };
+// Scoped loggers for the two sub-stores and the SP socket feed, whose own `log` callbacks
+// only ever fed pushEvent and never reached console at all - wired in alongside their
+// existing pushEvent calls below, not replacing them.
+const priceRequestsLog = createLogger('priceRequests');
+const bidLoggerLog = createLogger('bidLogger');
+const socketLog = createLogger('socket');
+
+const REAL = config.mode === 'real';
+
+// Release provenance: what build is this box running? Read once from the version.json that
+// scripts/deploy.sh stamps into the tarball. Absent (dev checkout) -> the 'dev' sentinel; the
+// loader never throws, so a missing/corrupt stamp can't keep the process from booting.
+const versionInfo = loadVersionInfo();
+
+// ---- operator auth gate -----------------------------------------------------
+// On when an admin hash is configured; required in real mode (boot fails closed).
+// Off in mock/dev so the demo + offline tests need no login. A fixed secret keeps
+// sessions valid across restarts; the dev fallback only lives for one process.
+const AUTH_ON = !!config.admin.passHash;
+const SESSION_SECRET = config.admin.sessionSecret || randomSecret();
+const SESSION_COOKIE = 'sp_session';
+const loginThrottle = { fails: 0, until: 0 };
+
+function currentAdmin(req) {
+  if (!AUTH_ON) return { user: 'dev' };
+  const claims = verifySession(readCookie(req.headers.cookie, SESSION_COOKIE), SESSION_SECRET);
+  return claims ? { user: claims.u } : null;
+}
+function setSessionCookie(req, res, token) {
+  const secure = (req.headers['x-forwarded-proto'] || req.protocol) === 'https'; // nginx terminates TLS, so trust the proto header
+  const maxAge = Math.floor(config.admin.sessionTtlMs / 1000);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`);
+}
+
+const store = createStore({ dataDir: config.dataDir, logDir: path.join(config.dataDir, 'logs'), backend: config.storeBackend });
+// Reconnect-minted SuperProcure tokens (phone -> OTP) persist here; overlay onto process.env
+// now (vault wins over a stale .env) so resolveAccountToken sees the latest token at boot.
+const secretsVault = new SecretsVault({ dataDir: config.dataDir });
+{
+  // D010: the vault WINS over .env by design (see the class doc) - that precedence override must
+  // be visible, not just effective. baseLog.force so it survives LOG_LEVEL=error like the other
+  // boot-time capability/posture lines.
+  const overriddenKeys = [];
+  const n = secretsVault.applyToEnv(process.env, { onKey: (k) => overriddenKeys.push(k) });
+  if (n) baseLog.force(`[boot] secrets vault overlaid ${n} token(s) onto process.env (vault wins over .env): ${overriddenKeys.join(', ')}`);
+}
+// ---- unified data model (Phase 2): customers / people / assignments -------------------------
+// Migrated from the legacy config at boot + editable via the Customers / Team / Assignments pages.
+// The MARGIN and ALERT-ROUTING seams now read from it (resolveMargin / toRecipientRows) -
+// golden-equivalent to the legacy marginProfiles + config.recipients on migrated data
+// (scripts/test-model-migration.js). Targets still read the legacy allowlist and swap later. See src/model/.
+const { CustomerStore, slugifyLabel } = require('../model/customerStore');
+const { PersonStore } = require('../model/personStore');
+const { AssignmentStore } = require('../model/assignmentStore');
+const { StaffRoster } = require('../model/staffRoster');
+const { migrateLegacyModel } = require('../model/migrate');
+const { normalizePhoneIN, normalizeRecipient, recipientId, isGroupJid } = require('../model/normalizePhone');
+const { toRecipientRows } = require('../model/project');
+const { resolveTargets, matchCustomer, resolveOwners } = require('../model/resolve');
+const { assertCustomerRulesValid } = require('../model/rulesConfig');
+const customerStore = new CustomerStore({ store, log });
+const personStore = new PersonStore({ store, accountsProvider: () => loadAccounts(store), log });
+const assignmentStore = new AssignmentStore({ store, people: personStore, customers: customerStore, log });
+// The explicit BRL-staff allowlist the daily heartbeat's membership tripwire diffs every customer
+// group against (src/model/staffRoster.js). Operator-editable; empty until configured, which the
+// audit reports as "not being verified" rather than an all-clear.
+const staffRoster = new StaffRoster({ store, log });
+// Cached model snapshot for the SYNC discovery-config getter (resolveTargets is pure; the getter
+// can't await). Refreshed at boot + after every customer/person/assignment write, so derived
+// targets are never stale-empty - but unlike a raw allowlist edit (POST /api/config, which fires
+// an immediate s.discovery.tick()), a model write only updates the cache; the actual reconcile
+// against in-flight awaiting-price asks waits for the next scheduled discovery poll.
+let modelSnapshot = { customers: [], people: [], assignments: [] };
+let modelVersion = 0;
+async function refreshModelSnapshot() {
+  const [customers, people, assignments] = await Promise.all([
+    customerStore.list(), personStore.list(), assignmentStore.list(),
+  ]);
+  modelSnapshot = { customers, people, assignments };
+  modelVersion += 1;
+}
+/**
+ * READ-SIDE PROJECTION ONLY. Resolve a load's raw companyName to the Customer it matches, so the
+ * console can name the entity instead of echoing the platform's string. Uses the SAME matchCustomer
+ * over the SAME cached snapshot the margin path and the discovery getter read, so what an operator
+ * sees is what the engine actually resolved - not a second, drifting match implemented in the UI.
+ *
+ * This never feeds discovery scope, margin, or alert routing. A null result means "no customer
+ * matched", and the UI falls back to the raw company name. Adding or renaming a customer changes
+ * what this returns on the next read; it changes no bidding behaviour by itself.
+ */
+function customerTagFor(companyName) {
+  if (!companyName) return null;
+  const c = matchCustomer(companyName, modelSnapshot.customers);
+  return c ? { customerId: c.customerId, label: c.label } : null;
+}
+// The load's margin band is resolved at createForLoad from the model (customer margin, layered
+// with an assignment override); a per-load bid override still wins on top. Edits take effect on
+// the next discovery tick (no re-wiring), matching how the allowlist behaves.
+const requests = new PriceRequestStore({ store, marginsPct: config.marginsPct, minMarginPct: config.minMarginPct,
+  customersProvider: customerStore, assignmentsProvider: assignmentStore, platformKey: config.platformKey,
+  log: (m) => { pushEvent('price', { msg: m }); priceRequestsLog(m); } });
+const bidLogger = new BidLogger({ store, log: (m) => { pushEvent('log', { msg: m }); bidLoggerLog(m); } });
+const configStore = new ConfigStore({ store, defaults: defaultsFrom(config) });
+// WhatsApp is off until the key/sender are present; notifyMode (live, from Settings) gates the channel.
+const wa = new WhatsAppClient({ ...config.whatsapp, log });
+// PRICE-ASK FAILOVER FLEET (src/notify/senderFleet.js). The ORDERED candidate senders a price ask may
+// go out on when `wa`'s own session is logged out: the primary first, then each phoneId in
+// SP_MAYTAPI_FLEET_PHONE_IDS. Same product + token (one Maytapi account, many linked phones), so a
+// candidate is just a second WhatsAppClient pointed at a different phoneId.
+//
+// The primary is included at position 0 rather than special-cased out, so a sender that recovers
+// mid-outage is simply picked again by the normal health test. Duplicates are dropped so listing the
+// primary in the env var is harmless.
+//
+// UNSET BY DEFAULT: with no fleet ids configured this is a one-element list containing only the
+// primary, no sibling can ever be picked, and price_needed degrades to exactly the skip-and-retry it
+// did before the failover existed. Enabling it is a deliberate operator act, and it is safe to enable
+// before every group has a second member - membership is verified per-group at send time, so a
+// candidate that is not in a group is simply never chosen for it.
+const fleetIds = [config.whatsapp.phoneId, ...config.whatsapp.fleetPhoneIds]
+  .map((v) => (v == null ? '' : String(v).trim())).filter(Boolean)
+  .filter((v, i, a) => a.indexOf(v) === i);
+const senderFleet = new SenderFleet({
+  membershipTtlMs: config.whatsapp.fleetMembershipTtlMs,
+  log,
+  clients: fleetIds.map((id) => (String(id) === String(config.whatsapp.phoneId)
+    ? wa                                                            // reuse the live client (and its health cache)
+    : new WhatsAppClient({ ...config.whatsapp, phoneId: id, log }))),
+});
+// Out-of-band reroute channel for the heartbeat when the sender session is down (src/notify/
+// alertChannel.js): Brevo email + a healthy SIBLING Maytapi phone, NEVER the down sender. The
+// sibling tier reuses the same Maytapi product/token as `wa` and excludes `wa`'s own phoneId (the
+// sender being routed around). All creds are optional - unset -> the channel is a silent no-op and a
+// down-sender heartbeat simply DROPS (still never queued onto the dead sender; the standalone
+// monitor covers sender-down independently).
+const fallbackAlert = createFallbackAlert({
+  maytapi: {
+    endpoint: config.whatsapp.endpoint, productId: config.whatsapp.productId,
+    token: config.whatsapp.token, senderPhoneId: config.whatsapp.phoneId,
+    // C082: the reroute's sibling pick is restricted to this configured fleet, same list
+    // senderFleet.js draws its price-ask failover candidates from - never any active phone on
+    // the product.
+    fleetPhoneIds: config.whatsapp.fleetPhoneIds,
+  },
+  brevo: { apiKey: config.fallbackAlert.brevoApiKey, sender: config.fallbackAlert.brevoSender, to: config.fallbackAlert.emailTo, bcc: config.fallbackAlert.emailBcc },
+  log,
+});
+const notifier = new Notifier({
+  mode: config.notifyMode, baseUrl: config.baseUrl, log, wa, store,
+  // Per-portal channel overrides. Only GoComet declares one today (dashboard-only by default), so
+  // SuperProcure resolves to `mode` exactly as it did before this map existed. Seeded from env
+  // here; applyConfigValues moves it live on a Settings save.
+  platformModes: { [config.gocomet.platformKey]: config.gocomet.notifyMode },
+  targetRateMode: config.gocomet.targetPriceNotifyMode,
+  // Alert routing derives from the model: people x their assignments, projected into the legacy
+  // recipient-row shape the notifier already consumes (scopeMatches unchanged). Golden-equivalent
+  // to the old config.recipients on migrated data. Managed on the Team + Assignments pages.
+  recipientsProvider: async () => {
+    const [customers, people, assignments] = await Promise.all([
+      customerStore.list(), personStore.list(), assignmentStore.list(),
+    ]);
+    return toRecipientRows(customers, people, assignments);
+  },
+  // "previous quotes on this route" for the price ask, from our own closed-bid log.
+  historyProvider: (lane, opts) => bidLogger.routeHistory(lane, opts),
+  // circuit breaker: skip a WhatsApp alert when the sender session is down rather than let Maytapi
+  // queue it into a stale-flood-on-reconnect. Cached inside the client, fail-open.
+  healthProvider: () => wa.sessionHealthy(),
+  // reroute target for the 'reroute' health policy (heartbeat): deliver the body out-of-band when
+  // the sender is down instead of queuing it onto the dead session (see Notifier.sendDirect).
+  fallbackAlert,
+  // ---- price-ask failover (HEALTH_POLICY 'failover') ----
+  senderFleet,
+  // The desk owners of a customer - who to DM when NO controlled sender can post into that
+  // customer's group. This is the first PRODUCTION caller of resolveOwners, which has been built,
+  // tested and dark since M2 (MODULE_3_SCOPE M3.9 records it as zero-caller). Re-resolved per send
+  // from live collections, deliberately, exactly as the resolver's own header requires: a
+  // re-assignment must take effect on in-flight requests, so this must never read a snapshot.
+  ownersProvider: async (companyName) => {
+    const [customers, people, assignments] = await Promise.all([
+      customerStore.list(), personStore.list(), assignmentStore.list(),
+    ]);
+    return resolveOwners({ companyName, customers, people, assignments });
+  },
+});
+
+// D008/D009: a persisted config document silently wins over the env-derived default field by
+// field, and boot applies it whether or not it would still pass validate()'s own rules. Neither
+// fact used to reach anyone. Fired once, the first time boot loads the document (configStore.get(),
+// called from applyConfigValues below) - never on a later cached get() or on save() (validate()
+// already gates that write).
+configStore.onLoad = ({ diverged, valid, error }) => {
+  if (diverged.length) baseLog.force(`[boot] persisted config overrides the env default for: ${diverged.join(', ')}`);
+  if (!valid) {
+    baseLog.force(`[boot] persisted config failed validation but is applied as-is (never blocks boot): ${error}`);
+    notifier.alert('error', { context: 'config',
+      detail: `persisted config is invalid and was applied as-is: ${error}` },
+      { dedupeKey: 'config_invalid_at_boot' }).catch(() => {});
+  }
+};
+
+// D015: every JSON-backed collection alerts on a corrupt file, not only the two callers
+// (DurableScheduler intents, targetPriceWatch) that already pass their own onCorrupt into
+// atomicFile directly. atomicFile has already backed the bad file up and returned the {}
+// fallback by the time this fires - this only makes the loss visible.
+store.onCorrupt = (collection) => {
+  baseLog.force(`[boot] store collection '${collection}' was corrupt on read - backed up and reset to {}`);
+  notifier.alert('error', { context: 'store',
+    detail: `collection '${collection}' was corrupt on read; backed up and reset to {}` },
+    { dedupeKey: `store_corrupt_${collection}` }).catch(() => {});
+};
+
+// ---- accounts + per-account stacks (Phase 2: two-account auth routing) -------
+// The proven single-account stack (adapter + scheduler + engine + discovery +
+// socket) built once PER enabled account. Accounts are DATA (the store's
+// 'accounts' collection, onboarded via scripts/add-account.js); an empty/absent
+// collection yields the one implicit 'primary' account, which reproduces today's
+// exact single-stack wiring: same SP_TOKEN env, same intents file, same API
+// shapes, no account labels anywhere. Cross-account isolation = separate engine
+// instances + namespaced intent files; the request store and notifier are shared.
+const sim = REAL ? null : new AuctionSim({ onEvent: (e) => pushEvent('sim', e) });
+const stacks = []; // [{ account, tag, adapter, scheduler, engine, discovery }]
+const discoveryGate = { chain: Promise.resolve() }; // serializes ticks across pollers (account order)
+// D003 (review correction, 26 Sep): one shared registry so every DiscoveryPoller pinging
+// config.appHealthcheckUrl - every SP account AND the GoComet stack - is checked together; a
+// poller registers itself onto this the moment it is constructed (see DiscoveryPoller's
+// constructor). Passed to both buildRealStack (below) and attachGoCometStack.
+const HEALTHCHECK_PEERS = [];
+
+// SuperProcure ACCOUNTS - the cohort every accounts-shaped reader below means. A second portal's
+// stack is an account of a different portal and belongs in none of them: not the multi-account
+// label rule, not the console's SP account list, not the heartbeat's "how many SP logins are up".
+// `ownedBy` is priceRequests' own predicate, reused rather than re-derived: a stack carries the
+// same `platformKey` field a stored record does, and absent still means config.platformKey - so
+// "which portal owns this row" keeps exactly one definition (MULTI_PLATFORM_ARCHITECTURE.md
+// invariants 2 and 3), and no portal literal appears here.
+const spStacks = () => stacks.filter((s) => ownedBy(s, config.platformKey));
+
+// stack.tag ({accountId, label} | null) is only set when MORE THAN ONE account runs,
+// so single-account events, stored records and messages stay byte-identical to today.
+// D017: applyConfigValues is what normally keeps a running engine's anti-detection cadence
+// current, but it only reaches engines that already exist at the moment it runs. A rebuilt
+// engine (rebuildAccountStack -> buildRealStack -> makeEngine, e.g. after a reconnect) or the
+// GoComet engine (attachGoCometStack -> makeEngine, which runs AFTER boot's one applyConfigValues
+// call) is built later and would otherwise start on BidEngine's own construction defaults
+// (openJitterMs 0, cadenceJitterMs 250) until the next Settings save. Set by applyConfigValues,
+// read here; null until the first save/boot-load runs, which matches today's initial-boot order
+// (stacks are built, THEN applyConfigValues sweeps every engine that exists) so this is a no-op
+// there and changes nothing about that path.
+let lastAppliedAntiDetection = null;
+
+function makeEngine(adapter, scheduler, stackRef) {
+  const engine = new BidEngine(adapter, scheduler, {
+    // The final-window walk (T9) as last saved; applyConfigValues keeps it live on every engine.
+    walk: config.walk,
+    // config.engine carries the timing knobs + the Layer B multiVehicleBid gate. failClosedUnknownBasis
+    // is derived per-mode (not a static config field): only REAL bidding fails closed on an armed load
+    // whose pricing basis was never recorded (a pre-fix intent), so it can't slip out as vcq:-1; the
+    // simulator (units 1-3, no basis) must stay lenient or every mock/demo load would be held.
+    config: Object.assign({}, config.engine, { failClosedUnknownBasis: config.mode === 'real' }),
+    softClose: config.softClose, // L3 per-customer soft-close gating; default OFF (config.js / env)
+    rounding: config.rounding,   // round-figure quoting, per-shipper opt-in; default OFF (config.js / env)
+    onEvent: (e) => {
+      const evt = stackRef.tag ? Object.assign({ account: stackRef.tag }, e) : e;
+      pushEvent('engine', evt);
+      // Notify AFTER the bid-logger has finalized the closed-bids record, so won/lost
+      // enrichment (cost / our bid / attempts) reads a complete record race-free. handle()
+      // never rejects (it logs internally), so the chained notify always runs.
+      // platformOf(stackRef) is the portal this engine bids for - one stack, one portal, so it is
+      // exact rather than inferred, and it is what gates the alert's channel (notifyModeFor). An SP
+      // stack carries no platformKey field and resolves to config.platformKey, the same
+      // absent-means-SuperProcure rule every stored record follows.
+      bidLogger.handle(evt)
+        .then(async () => {
+          if (e.kind === 'reprice_unreachable_ladder' && !(await unshownCorrectionHold(e, platformOf(stackRef)))) return;
+          return notifyEngineEvent(notifier, e, stackRef.tag, (id) => bidLogger.getRecord(id), platformOf(stackRef));
+        })
+        .catch(() => {});
+      if (e.kind === 'tick_fault_handoff') {
+        requests.holdHandedOff(e.auctionId, platformOf(stackRef)).catch((err) => log.error(
+          `load ${e.auctionId} was handed to the desk but its price request could not leave 'armed': ${err && err.message}`));
+      }
+    },
+    // A2: per-tick rank/density telemetry -> the append-only bids jsonl. Separate from onEvent on
+    // purpose (see BidEngine.onSample) so the 200ms cadence never touches the dashboard ring or the
+    // notifier. Tag the account only when multi-account runs, same as onEvent above.
+    onSample: (s) => bidLogger.sampleRank(stackRef.tag ? Object.assign({ account: stackRef.tag }, s) : s),
+  });
+  if (walkTimingNow) engine.setWalkTiming(walkTimingNow);
+  if (lastAppliedAntiDetection) engine.setAntiDetection(lastAppliedAntiDetection);
+  return engine;
+}
+
+// ---- the walk's measured step times (T9) ----------------------------------------------------------
+// Computed from the P6 stamps on closedBids at boot and hourly, saved to data/walkTiming.json, and
+// handed to every engine. A failed computation leaves the engines on their last values - the saved
+// file's, or the manual step time when there is none.
+let walkTimingNow = null;
+let walkTimingTimer = null;
+const walkTimingLog = createLogger('walkTiming');
+const WALK_TIMING_REFRESH_MS = 3_600_000;
+
+function applyWalkTiming(doc) {
+  walkTimingNow = doc || null;
+  for (const e of allEngines()) e.setWalkTiming(walkTimingNow);
+}
+
+const walkTimingRefresher = createWalkTimingRefresher({
+  listClosedSplit: (q) => bidLogger.listClosedSplit(q),
+  platformKeys: () => ({ sp: config.platformKey, gocomet: config.gocomet.platformKey }),
+  walk: () => config.walk || DEFAULT_WALK,
+  save: (doc) => walkTiming.saveWalkTiming(store, doc),
+  apply: applyWalkTiming,
+  busy: () => allEngines().some((e) => e.hasMonitorInFinalWindow()),
+  log: walkTimingLog,
+  onError: (e) => {
+    walkTimingLog.error('walk step times could not be computed; the walk keeps its last values', { err: e });
+    pushEvent('walk', { level: 'error', detail: `walk step times could not be computed: ${(e && e.message) || e}` });
+  },
+});
+
+function refreshWalkTimingLogged() {
+  return walkTimingRefresher.request();
+}
+
+async function startWalkTiming() {
+  applyWalkTiming(await walkTiming.loadWalkTiming(store, walkTimingLog));
+  await refreshWalkTimingLogged();
+  if (!walkTimingTimer) {
+    walkTimingTimer = setInterval(refreshWalkTimingLogged, WALK_TIMING_REFRESH_MS);
+    if (walkTimingTimer.unref) walkTimingTimer.unref();
+  }
+}
+
+// Discovery config view. Getters, so a console save that mutates `config` (applyConfigValues) or a
+// model write (refreshModelSnapshot) is picked up without re-wiring the poller.
+function discoveryConfigFor(account) {
+  return {
+    // ADDITIVE targets: the account/global allowlist is the BASE; enabled assignments ADD their
+    // customers' aliases on top (resolveTargets). An empty base is FAIL-CLOSED (matches nothing, in
+    // lockstep with discovery.matchesAllowlist), so an account scoping purely through assignments
+    // bids exactly those customers and an empty-everything account bids nothing - never the old
+    // accidental match-all. discovery.matchesAllowlist consumes the {shippers,lanes,hardCloseOnly}
+    // shape unchanged.
+    get allowlist() {
+      const base = (account && account.allowlist) || config.allowlist;
+      return resolveTargets({
+        account, fallbackAllowlist: base,
+        customers: modelSnapshot.customers, people: modelSnapshot.people, assignments: modelSnapshot.assignments,
+      });
+    },
+    get priceDeadlineLeadMs() { return config.priceDeadlineLeadMs; },
+    get reminderLeadMs() { return config.reminderLeadMs; },
+    get discoveryIntervalMs() { return config.discoveryIntervalMs; },
+    // L3: the soft-close opt-in policy discovery.matchesAllowlist reads to admit a verified soft load
+    // for an enabled shipper. Getter so a live Settings save (applyConfigValues) is picked up.
+    get softClose() { return config.softClose; },
+  };
+}
+
+// THE EPISODE HANDOVER LEDGER, one instance for this process. It lives in src/auth/authDeadMarks.js
+// - a store-backed, account-keyed, persisted per-account tracker, the same kind of thing as
+// scopeRefresh.js next door - and that file carries the reasoning for why the mark is persisted while
+// the latch deliberately is not. Destructured here so every existing call site (and the exports at
+// the foot of this file, which the episode-handover tests drive) reads exactly as it did inline.
+const {
+  noteAuthDeadMark, openAuthEpisodeFor, clearAuthDeadMark, loadAuthDeadMarks, announceAuthReconnecting,
+  raiseAuthDeadOnce,
+} = createAuthDeadMarks({ store, notifier, log });
+
+/**
+ * Which customers will actually go unbid because `deadAccountId` just died - the fact the
+ * auth-dead alert names (see waTemplates account_auth_dead / account_auth_expired).
+ *
+ * "Live" here is every OTHER account this process currently runs a stack for AND has no open
+ * outage on, per the SAME episode ledger this file already reads (`openAuthEpisodeFor`) - not a
+ * separately-tracked list. That is enough to make a simultaneous multi-account outage resolve
+ * correctly without enumerating every dead account explicitly: `deadAccountIds` only ever needs
+ * the one account raising this alert, because a customer whose OTHER carrier is also dead is
+ * excluded from `liveAccountIds` here and so still reads as affected, exactly as it should.
+ *
+ * Never throws - the caller is on the alert path, which must never block a bid/read path, and a
+ * best-effort empty list degrades to the pre-existing "no customer names" wording rather than
+ * failing the alert outright.
+ *
+ * Scoped to `config.platformKey` (SuperProcure) on both reads: raiseAuthDead only ever fires for
+ * an SP account (this hook and the boot loop are both SP-only call sites), so a GoComet row could
+ * only ever be noise here, never a real carrier of an SP account's customer.
+ *
+ * Reads through `bidLogger.listClosed` (CLOSED bids only), not a raw store.listDocs of the whole
+ * collection - test-shared-reader-platform-scope.js's gate caps how many unscoped cross-platform
+ * reads server.js may hold, and this is the one call shape it exempts outright when platformKey is
+ * passed. The tradeoff: coverage.js's window logic is written to also catch a still-OPEN armed bid
+ * (armedAt, not closedAt), but this caller only ever hands it closed rows, so a customer whose ONLY
+ * evidence on the dying account is one still-open auction (no prior closed history at all inside
+ * the window) will not yet read as carried. In practice that only matters for a customer's first
+ * ever load on the account; anything with a real history already has closed rows to carry it.
+ */
+async function computeAffectedCustomers(deadAccountId) {
+  try {
+    const [customers, closedBids, priceRequests] = await Promise.all([
+      customerStore.list(),
+      bidLogger.listClosed({ platformKey: config.platformKey }),
+      requests.listFor(config.platformKey),
+    ]);
+    const liveAccountIds = stacks
+      .map((s) => s.account && s.account.accountId)
+      .filter((id) => id && id !== deadAccountId && openAuthEpisodeFor(id) == null);
+    return affectedCustomers({ deadAccountIds: [deadAccountId], liveAccountIds, priceRequests, closedBids, customers });
+  } catch (e) {
+    log.error('could not work out which customers a logged-out account affects', { accountId: deadAccountId, err: e });
+    return null;
+  }
+}
+
+/**
+ * Had this account's token ALREADY LAPSED when boot tried to use it?
+ *
+ * The boot-path counterpart of the adapter's `_tokenPhase() === 'expired'`, and deliberately the same
+ * arithmetic on the same field: RealSuperProcureAdapter.jwtExp is static, so this needs no instance -
+ * which matters, because the instance that failed has been torn down by the time the alert is built.
+ *
+ * It exists because boot fails inside `login()`, and login() is the one auth path that never reaches
+ * ensureSession and therefore never stamps an `authReason`. Without this the desk gets the revocation
+ * copy ("reconnect the account") for a token that needs a fresh OTP instead - the wrong remedy, on
+ * exactly the restart-mid-outage path the persisted episode ledger was built to make matter.
+ *
+ * Fails to FALSE on anything it cannot read (an unparseable token, no `exp` claim, a missing token
+ * slot), which degrades to the generic copy - true of every cause from the reader's side, where the
+ * expiry copy would be a specific claim we could not support.
+ */
+function bootTokenExpired(account, now = Date.now()) {
+  try {
+    const token = resolveAccountToken(account);
+    if (!token) return false;
+    const exp = RealSuperProcureAdapter.jwtExp(token);
+    return Number.isFinite(exp) && now >= exp;
+  } catch (_) { return false; }
+}
+
+function buildRealStack(account, tag) {
+  const stack = { account, tag };
+  // THE EPISODE THIS STACK INHERITS, read ONCE and snapshotted onto the stack. Everything downstream
+  // - the adapter's seed and activateRealStack's provisional message - uses this one value rather
+  // than re-reading the ledger, so the message the desk gets and the episode the adapter is actually
+  // carrying cannot describe different outages. The ledger is READ, never consumed: it is cleared
+  // only when the episode genuinely closes.
+  stack.inheritedEpisodeSince = openAuthEpisodeFor(account.accountId);
+  // Real adapter; the engine always places real bids. The price-request loop
+  // discovers loads -> a human captures the cost -> arm().
+  // accountId/accountLabel are passed UNCONDITIONALLY, off the account record rather than the stack
+  // tag: the tag is null on a single-account box, and the session-death alarm has to name the account
+  // even when only one runs. onAuthDead/onAuthRestored are the adapter's edge-triggered hooks - each
+  // fires once per latch transition, so one outage on one account is exactly one "down" message and
+  // (once it clears on a proven write) exactly one "back" message, no matter how many loads were
+  // armed in between.
+  //
+  // `|| undefined` on every tenant knob is load-bearing, NOT noise: validateAccount
+  // normalises an absent field to `null`, and a destructuring default fires only on
+  // `undefined`. Passing a bare `account.apiBaseUrl` would hand the adapter `null`,
+  // bypass its default, and point every existing live account at 'null/sp/loads/v4'.
+  // Coercing null -> undefined here is what keeps SP-main accounts on SP main.
+  stack.adapter = new RealSuperProcureAdapter({
+    token: resolveAccountToken(account), headers: config.capturedHeaders,
+    accountId: account.accountId, accountLabel: account.label || account.accountId,
+    apiBaseUrl: account.apiBaseUrl || undefined,
+    webOrigin: account.webOrigin || undefined,
+    socketUrl: account.socketUrl || undefined,
+    socketPath: account.socketPath || undefined,
+    // THE HANDOVER. If this account is mid-outage - a boot failure, or a console Reconnect during a
+    // revocation - the fresh adapter INHERITS that open episode rather than starting a blank one. It
+    // does not inherit a latch: the token is new and nothing has refused it, so writes flow and
+    // discovery runs. What it inherits is the obligation to close the outage properly, which it does
+    // by getting a bid accepted. Without this the reconnect forgets the outage and the desk is never
+    // told to stop hand-quoting - see the ledger docblock for what that costs.
+    inheritedEpisodeSince: stack.inheritedEpisodeSince,
+    // async is safe here: _raiseDown already unwraps a returned promise fire-and-forget
+    // (`p.catch(() => {})`), which is exactly what an awaited customer lookup needs.
+    onAuthDead: async (p) => {
+      noteAuthDeadMark(p);
+      await raiseAuthDeadOnce(p, () => computeAffectedCustomers(p.accountId));
+    },
+    // The ONLY all-clear site in the process. The adapter reaches it only after an accepted bid has
+    // held the account CLEAR for the whole settle window, so the mark and the episode close together.
+    // deskCustomer is threaded from the account record, not from the adapter payload: the adapter
+    // knows the login, the composition root knows which customer that login bids for. It carries
+    // the customer-channel retraction of tokenExpiry's disconnect notice - see raiseAuthRestored.
+    onAuthRestored: (p) => {
+      clearAuthDeadMark(p.accountId);
+      raiseAuthRestored(notifier, Object.assign({}, p, { deskCustomer: deskCustomerFor(account) }));
+    },
+  });
+  stack.scheduler = new DurableScheduler(config.intentsFileFor(account.accountId));
+  stack.engine = makeEngine(stack.adapter, stack.scheduler, stack);
+  stack.discovery = new DiscoveryPoller({
+    adapter: stack.adapter, requests, notifier,
+    config: discoveryConfigFor(account),
+    account: tag, gate: discoveryGate,
+    platformKey: config.platformKey,
+    log,
+    onExpire: (r) => pushEvent('discovery', { expired: r.loadId }),
+    healthcheckUrl: config.appHealthcheckUrl, healthcheckPeers: HEALTHCHECK_PEERS, // D003
+    engine: stack.engine, // D012
+  });
+  return stack;
+}
+
+// ---- reconnect: mint a fresh token via OTP + rebuild ONE account's stack in-process --------
+// Pending OTP sessions (SP's data.id), keyed by accountId, short-lived. In-memory by design:
+// an OTP is used within minutes; a restart just means the operator re-requests the code.
+const otpSessions = new Map();
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+// The mobile that signed a branch login in, plus (optionally) an email for the same branch -
+// persisted purely for operator visibility - "who do I call/email to reconnect Ahmedabad" - and
+// NEVER as a routing target: alert recipients derive only from People + Assignments, so a
+// number/address that received alerts from outside that graph would be invisible on the Team
+// and Assignments pages that are meant to be the whole truth.
+//
+// It lives in its OWN collection rather than on the account record. `loadAccounts` returns an
+// IMPLICIT primary when the accounts collection is empty, so putting a doc there to hold a phone
+// would quietly promote that implicit account to an explicit one - a config change nobody asked for.
+// Phone and email are independent - passing one must never clobber the other's already-stored
+// value, since the OTP reconnect flow only ever supplies a phone and the manual contact-set
+// endpoint may be called with just one field at a time. patchDoc merges onto whatever's on file.
+/**
+ * The tenant an account authenticates against, or null for SuperProcure main. Read at the START
+ * of the OTP flow and carried on the pending session so both legs - and the identity probe that
+ * follows them - land on the same deployment as the SMS did.
+ *
+ * An id with no record yet is the connect-a-NEW-account flow, which is SP main by definition:
+ * there is nowhere to have configured a tenant for an account that does not exist. Deliberately
+ * NOT filtered by `enabled` - a disabled or boot-dropped tenant account still has to reconnect to
+ * its own host, and sending its OTP to SP main would leak a tenant credential to a third party.
+ *
+ * THROWS rather than returning null when the account list cannot be read. `null` here means "this
+ * account is SuperProcure main", and a failed read is not evidence of that - it is the absence of
+ * evidence. Collapsing the two fails OPEN in the one direction this function exists to prevent:
+ * `loadAccounts` throws on ANY malformed record in the collection, not just this account's, and
+ * the store path is reached precisely when an account is boot-dropped or disabled, which is the
+ * state that prompts an operator to reconnect in the first place. accounts.js makes the same call
+ * for the same reason ("failing a boot loudly beats silently dropping a bidding account").
+ */
+async function tenantAuthFor(accountId) {
+  // C079: SuperProcure-only, by construction - a bare accountId search across ALL stacks would
+  // also match the GoComet stack (which carries its own platformKey; every SP stack carries none),
+  // and this function's whole job is deciding which HOST an SP credential is sent to.
+  const live = stacks.find((s) => s.account.accountId === accountId && !s.platformKey);
+  const account = live ? live.account
+    : (await loadAccounts(store)).find((x) => x.accountId === accountId) || null;
+  if (!account) return null;
+  const tenant = {
+    authBaseUrl: account.authBaseUrl || null,
+    webOrigin: account.webOrigin || null,
+    apiBaseUrl: account.apiBaseUrl || null,
+    socketUrl: account.socketUrl || null,
+    socketPath: account.socketPath || null,
+  };
+  return Object.values(tenant).some(Boolean) ? tenant : null;
+}
+
+/**
+ * Why this account must not be sent through the OTP flow, or null if it may be. Separated from the
+ * route because the route's tenant branch is REAL-mode-only and cannot be reached offline, and a
+ * guard against handing a customer's credential to the wrong host is not something to leave
+ * untested - a mutation check confirmed the route-level form was invisible to the suite.
+ *
+ * Both fields are required together because different legs of one flow consume them, and either
+ * one alone routes a credential somewhere it must never go:
+ *   - no authBaseUrl: the OTP is requested from SuperProcure MAIN for an account that lives on a
+ *     customer's own host. At best the number is unknown there; at worst it mints a MAIN token
+ *     that is then written into this tenant account's token slot.
+ *   - no apiBaseUrl: the OTP correctly mints a TENANT token, and the identity probe then sends
+ *     that live credential to api.superprocure.com, because the adapter's default fires on the
+ *     absent value. accounts.js names this exact harm.
+ * validateAccount accepts any subset of the five tenant fields, so neither shape is caught
+ * upstream, and the carrier-id check on verify is a backstop rather than a licence to allow it.
+ */
+function tenantConfigError(accountId, tenant) {
+  if (!tenant) return null;
+  const missing = [!tenant.authBaseUrl && 'authBaseUrl', !tenant.apiBaseUrl && 'apiBaseUrl'].filter(Boolean);
+  if (!missing.length) return null;
+  const names = missing.join(' and ');
+  return `Account '${accountId}' is configured for a white-label tenant but has no ${names}, so its credential could be sent to the wrong portal. Set ${names} on the account record.`;
+}
+
+async function rememberAccountContact(accountId, { phone, email } = {}) {
+  const patch = { accountId, updatedAt: Date.now() };
+  if (phone) {
+    try { patch.phone = normalizePhoneIN(phone); } catch { /* an unusable number is simply not remembered */ }
+  }
+  if (email) {
+    const trimmed = String(email).trim();
+    if (EMAIL_RE.test(trimmed)) patch.email = trimmed.toLowerCase();
+  }
+  if (!patch.phone && !patch.email) return;
+  await store.patchDoc(ACCOUNT_CONTACTS_COLLECTION, accountId, patch)
+    .catch((e) => log(`[reconnect] could not store the login contact for ${accountId}: ${e && e.message}`));
+}
+
+/** Cache the login-DERIVED identity (never the token) back onto the account record, so boot
+ * advisories (branchOverlapWarnings) and /api/accounts read current data. Implicit primary has
+ * no record to patch - writing one would promote it to an explicit account (see loadAccounts). */
+async function cacheAccountIdentity(stack, acct) {
+  if (stack.account.implicit) return;
+  await store.patchDoc(ACCOUNTS_COLLECTION, stack.account.accountId, {
+    carrierId: acct.carrierId, branchIds: acct.branchIds, lastLoginAt: Date.now(),
+  }).catch(() => {});
+  // Branch NAMES and their customers, beside the ids. Same hook so it lands on boot AND on every
+  // scope refresh; best-effort, never fails the login.
+  await accountCoverage.saveBranches(store, stack.account.accountId, acct.branches, baseLog);
+}
+
+/**
+ * A login result's token lifetime. `exp - iat` when the token carries `iat` (both SuperProcure
+ * main and the known white-label tenant do).
+ *
+ * When `iat` is absent, MEASURE instead of giving up. A null here silently reverts to the day
+ * ladder and the 24h cadence, which on an hours-long token is exactly the pair of defects the
+ * short-lived path exists to fix - and nothing in the logs would distinguish that from the feature
+ * working. `exp - now` is accurate to within seconds at activation, which is the only place this
+ * is called, and it errs short (an inherited token measures as less life than it was born with),
+ * so the failure direction is a warning that arrives early rather than one that never arrives.
+ */
+function tokenLifetimeOf(acct, now = Date.now()) {
+  if (!acct || !acct.tokenExp) return null;
+  if (acct.tokenIat) {
+    const life = acct.tokenExp - acct.tokenIat;
+    if (life > 0) return life;
+  }
+  const remaining = acct.tokenExp - now;
+  return remaining > 0 ? remaining : null;
+}
+
+/**
+ * Bring a freshly-built REAL stack online: login, cache the DERIVED identity (never the token),
+ * check the branch-scope fingerprint (the 2026-07-16 silent-scope-growth incident), wire the
+ * daily token-expiry check + the scope refresher (handles stored on the stack so a reconnect can
+ * clear them - fixes a per-reconnect setInterval leak), connect the socket, rehydrate live
+ * auctions, start discovery. Shared by boot() and rebuildAccountStack so the sequence never
+ * drifts. Returns the rehydrate count.
+ */
+async function activateRealStack(stack) {
+  const prefix = stack.tag ? `[real:${stack.account.accountId}]` : '[real]';
+  const acct = await stack.adapter.login();
+  log(`${prefix} logged in: ${acct.user} | carrier ${acct.carrierId} | ${acct.branchIds.length} branches | token exp ${new Date(acct.tokenExp).toISOString().slice(0, 10)}`);
+  await cacheAccountIdentity(stack, acct);
+  // Boot/reconnect-time scope check: a restart is ALSO a fresh login, so a branch mapping that
+  // landed while the process was down (or blind - the incident) alerts here, not just on the
+  // periodic refresh. First login just records the baseline. Never throws (best-effort).
+  await checkScopeChange({ store, notifier, accountId: stack.account.accountId,
+    accountLabel: stack.account.label, branchIds: acct.branchIds });
+  // Token LIFETIME, not just its expiry: a white-label tenant issues sessions measured in hours,
+  // and the day-based warning ladder cannot lead an expiry that arrives before its smallest rung.
+  // The cadence follows for the same reason - a 24h tick on an 8h token means the check at
+  // activation is the only one that ever runs, so no pre-expiry warning could be delivered at all.
+  const tokenLifeMs = tokenLifetimeOf(acct);
+  // The customer whose own WhatsApp group hears that bidding stopped on this account, or null when
+  // no single customer maps to it - in which case only the admin channel is told. Resolved from the
+  // account record rather than from the account LABEL: the label is an internal identifier, and
+  // routing a customer notice on it is both meaningless in that group and unroutable when the
+  // group's configured scope token differs from it.
+  const deskCustomer = deskCustomerFor(stack.account);
+  checkTokenExpiry({ tokenExp: acct.tokenExp, notifier, accountLabel: stack.account.label, tokenLifetimeMs: tokenLifeMs, deskCustomer }).catch(() => {});
+  stack.tokenExpiryTimer = setInterval(() => {
+    const live = stack.adapter.account;
+    checkTokenExpiry({ tokenExp: live && live.tokenExp, notifier, accountLabel: stack.account.label, tokenLifetimeMs: tokenLifetimeOf(live), deskCustomer }).catch(() => {});
+  }, expiryCheckIntervalMs(tokenLifeMs));
+  if (stack.tokenExpiryTimer.unref) stack.tokenExpiryTimer.unref();
+  // Scope-refresh guard: periodic re-login (same token - two GETs, mints nothing) so branch
+  // mappings SuperProcure adds server-side flow into discovery WITHOUT a pm2 restart. Defers
+  // itself while any auction is armed on this account; a failed pass keeps the working session
+  // and pages a human on a failure streak. Manual: POST /api/accounts/:accountId/refresh-scope.
+  stack.scopeRefresher = new ScopeRefresher({
+    adapter: stack.adapter, engine: stack.engine, store, notifier,
+    accountId: stack.account.accountId, accountLabel: stack.account.label,
+    intervalMs: config.scopeRefresh.intervalMs, deferMs: config.scopeRefresh.deferMs,
+    failureAlertThreshold: config.scopeRefresh.failureAlertThreshold,
+    onRefreshed: async (freshAcct, scope) => {
+      await cacheAccountIdentity(stack, freshAcct);
+      pushEvent('accounts', { scopeRefreshed: stack.account.accountId,
+        branches: freshAcct.branchIds.length, scopeChanged: !!(scope && scope.changed) });
+    },
+  });
+  // enabled=0 disables only the CADENCE; the refresher object stays wired so the manual
+  // console/API trigger keeps working (an operator can always force a scope pick-up).
+  if (config.scopeRefresh.enabled) stack.scopeRefresher.start();
+  await stack.adapter.connectSocket({ onLog: (m) => {
+    pushEvent('sock', stack.tag ? { msg: m, account: stack.tag } : { msg: m });
+    socketLog(m, stack.tag ? { account: stack.tag } : undefined);
+  } });
+  const n = await rehydrateOwnedStack(stack);
+  stack.discovery.start(config.discoveryIntervalMs);
+  // NOT AN ALL-CLEAR. Every step above is a READ - login is two GETs, the identity cache and scope
+  // check are reads of what login returned, connectSocket and rehydrate and discovery.start are all
+  // read paths - and on this platform write scope is separately revocable, so none of it is evidence
+  // that a bid would be accepted. Declaring recovery from here told the desk to stop hand-quoting an
+  // account that might still be unable to bid.
+  //
+  // What this DOES say is the true and useful thing: somebody reconnected, we are confirming, keep
+  // quoting by hand. The episode stays open, the fresh adapter is already carrying it, and the real
+  // all-clear goes out when a bid of ours is accepted. Sent LAST, after discovery is running, so if
+  // any step above throws the desk hears nothing at all and keeps hand-quoting - the safe direction
+  // to fail in.
+  //
+  // Announced off the STACK'S OWN snapshot rather than a fresh ledger read - everything between the
+  // build and this line is a live network step the ledger can move under; see announceAuthReconnecting.
+  announceAuthReconnecting(stack.account.accountId, stack.account.label, stack.inheritedEpisodeSince);
+  return n;
+}
+
+// Old releases could save an intent under a sibling account. Its durable file is not ownership proof.
+async function rehydrateOwnedStack(stack) {
+  for (const intent of stack.scheduler.activeIntents()) {
+    const request = await requests.getByLoad(intent.auctionId, platformOf(stack));
+    const owner = request && request.account && request.account.accountId;
+    if (!owner || owner === stack.account.accountId) continue;
+    stack.scheduler.update(intent.auctionId, { status: 'stopped', heldReason: 'account_owner_mismatch' });
+    const correctStack = stackForRequest(request);
+    const correctIntent = correctStack && correctStack.scheduler.get(intent.auctionId);
+    const hasCorrectIntent = correctIntent && !['closed', 'stopped'].includes(correctIntent.status);
+    if (!hasCorrectIntent && request.status === 'armed') {
+      try { await requests.holdUnbiddable(request.id, 'account_owner_mismatch', { expectedStatus: 'armed' }); }
+      catch (e) { if (e.code !== 'NOT_OPEN') throw e; }
+    }
+    log.warn('saved bid state belonged to another account and was stopped before restart', {
+      auctionId: intent.auctionId, savedAccount: stack.account.accountId, owner });
+    await notifier.alert('error', { context: `Load ${intent.auctionId}`, platformKey: platformOf(stack),
+      detail: hasCorrectIntent
+        ? 'Saved bidding state on another account was stopped. The correct account still holds this load.'
+        : 'Saved bidding state belonged to another account. This load is paused with its cost kept. Check its account and re-arm it, or quote it by hand.' },
+    { dedupeKey: `${intent.auctionId}_account_owner_mismatch_${stack.account.accountId}` }).catch((e) => {
+      log.error('could not deliver the account ownership warning', { auctionId: intent.auctionId, error: e.message });
+    });
+  }
+  return stack.engine.rehydrate();
+}
+
+/** Quiesce a stack we are discarding: stop discovery, halt every monitor timer, close the socket, clear the expiry + scope-refresh timers. */
+function teardownStack(stack) {
+  try { if (stack.discovery) stack.discovery.stop(); } catch (_) {}
+  stack.engine.discard();
+  try { for (const m of stack.engine.snapshot()) stack.engine.stop(m.auctionId); } catch (_) {}
+  // A priced load whose window has not opened has no monitor, only a wake, and snapshot() cannot see
+  // it. Left armed, the wake fires on this discarded engine while the replacement plans its own.
+  try { for (const r of stack.engine.scheduledSnapshot()) stack.engine.stop(r.auctionId); } catch (_) {}
+  try { if (stack.adapter && stack.adapter.sock) stack.adapter.sock.close(); } catch (_) {}
+  // THE DISCARD CHOKEPOINT. One call, and every auth entry point on that adapter goes inert.
+  //
+  // Stopping the probe alone was not enough and the gap was not theoretical: a bid WRITE can still be
+  // in flight when teardown runs, and when it resolves it calls back into the adapter. A 401 landing
+  // there would re-latch and re-arm a probe on an instance nobody holds a reference to any more, and
+  // - because the alert bookkeeping is keyed per account rather than per adapter - would write into
+  // the bookkeeping of the NEWER outage the replacement adapter now owns. A 201 landing there would
+  // emit an all-clear for a stack that no longer exists. discard() closes both, and cancels any
+  // pending settle-window all-clear the discarded adapter had armed.
+  //
+  // ...and it hands back any episode the adapter still owns, which is RE-PARKED on the ledger here.
+  // Normally that is a no-op - the mark was written when the down-alert was raised and noteAuthDeadMark
+  // never overwrites - so this is a belt against the one shape that loses an outage silently: an
+  // adapter carrying an open episode that the ledger does not hold (a hook wired without the mark, a
+  // mark cleared underneath a live outage). Without it the replacement stack inherits nothing and the
+  // outage is lost silently. The teardown of a HEALTHY stack hands back null and writes nothing.
+  try {
+    if (stack.adapter && typeof stack.adapter.discard === 'function') {
+      const discarded = stack.adapter.discard() || {};
+      if (discarded.episodeSince != null) {
+        noteAuthDeadMark({
+          accountId: stack.account && stack.account.accountId,
+          accountLabel: (stack.account && stack.account.label) || (stack.account && stack.account.accountId),
+          since: discarded.episodeSince,
+        });
+      }
+    }
+  } catch (_) {}
+  if (stack.tokenExpiryTimer) { clearInterval(stack.tokenExpiryTimer); stack.tokenExpiryTimer = null; }
+  try { if (stack.scopeRefresher) { stack.scopeRefresher.stop(); stack.scopeRefresher = null; } } catch (_) {}
+}
+
+/**
+ * Account labels tag events/rows only when >1 SuperProcure account runs (single-account output
+ * stays byte-identical). Counted over the SP cohort only: a GoComet stack is not a second SP
+ * account, and counting it would silently start labelling every SP event and stored record on a
+ * one-account box. Its own tag is unconditional and set at construction, so it is left alone here.
+ */
+function retagStacks() {
+  const sp = spStacks();
+  const multi = sp.length > 1;
+  for (const s of sp) s.tag = multi ? { accountId: s.account.accountId, label: s.account.label } : null;
+}
+
+/**
+ * Rebuild ONE account's stack in-process on a fresh token (reconnect / connect-new). Inherits the
+ * GLOBAL live/kill state (all engines run in lockstep) so a reconnect NEVER flips an account live.
+ * oldStack null = a brand-new account (pushed). Returns the fresh stack.
+ */
+async function rebuildAccountStack(account, oldStack) {
+  const ref = oldStack || stacks[0] || null; // lockstep global state
+  const prev = ref ? { killed: ref.engine.killed, killReason: ref.engine.killReason }
+    : { killed: false, killReason: null };
+  if (oldStack) teardownStack(oldStack);
+  const willBeMulti = oldStack ? spStacks().length > 1 : spStacks().length + 1 > 1;
+  const tag = willBeMulti ? { accountId: account.accountId, label: account.label } : null;
+  const fresh = buildRealStack(account, tag);
+  // inherit the global kill state BEFORE arming, so a killed account stays killed across a reconnect.
+  if (prev.killed) fresh.engine.kill(prev.killReason || 'reconnect (inherited)');
+  // A throw anywhere after activateRealStack arms the expiry interval leaves `fresh` referenced by
+  // nothing except its own live timer - it is never pushed into `stacks`, so teardownStack is
+  // never reached and the interval runs until the process dies. boot() has always torn its own
+  // stack down on this path; the reconnect path did not, and the short-token work is what gives
+  // that orphan a voice: it now ticks every 5 minutes instead of every 24 hours, and its dedupe
+  // key carries its own frozen tokenExp, so nothing the live stack sends can suppress it. The
+  // symptom is expiry alerts to the Director about a token nobody is using.
+  try {
+    await activateRealStack(fresh);
+  } catch (e) {
+    teardownStack(fresh);
+    throw e;
+  }
+  const idx = stacks.findIndex((s) => s.account.accountId === account.accountId);
+  if (idx >= 0) stacks[idx] = fresh; else stacks.push(fresh);
+  await rearmParkedRequests(platformOf(fresh));
+  return fresh;
+}
+
+/**
+ * Arm the rows the capture seam parked because no stack could bid them ('stopped' /
+ * platform_stack_unavailable), now that one can - the desk was told its price would be used as soon as
+ * the portal can bid (ruling 47). Runs when a rebuilt stack goes live and once at boot. Every other
+ * stopped row is left alone: an operator stop, a desk hand-off, a portal with bidding switched off.
+ * Same sequence as the Re-arm button. A closed load is left for finalizeClosed; any other refusal
+ * reaches a person and the row keeps saying why it is not bidding.
+ */
+async function rearmParkedRequests(portal = null) {
+  let parked = [];
+  try {
+    // Only a portal with a live stack can bid a parked row, so those are the portals worth reading.
+    for (const p of portal == null ? new Set(stacks.map(platformOf)) : [portal]) {
+      parked.push(...(await requests.listFor(p)).filter((r) => r.status === 'stopped'
+        && r.heldReason === 'platform_stack_unavailable'));
+    }
+  } catch (e) {
+    log(`[rearm-parked] could not read the parked loads: ${e.message}`);
+    notifier.alert('error', { context: 'Re-arm after reconnect', detail: 'Could not check for loads priced while this portal was offline. Check the Price Requests page and re-arm them by hand.' },
+      { dedupeKey: `rearm_parked_read_failed_${Date.now()}` }).catch(() => {});
+    return;
+  }
+  for (const doc of parked) {
+    let stack;
+    try { stack = requireStackForRequest(doc); } catch (_) { continue; } // still no live stack for it
+    let updated;
+    try {
+      updated = await requests.rearm(doc.id);
+    } catch (e) {
+      if (e.code === 'GONE' || e.code === 'NOT_OPEN') continue; // closed, or no longer parked
+      log(`[rearm-parked] load ${doc.loadId} was not re-armed: ${e.message}`);
+      notifier.alert('error', { context: `Load ${doc.loadId}`, detail: `Priced while this portal was offline, and could not be re-armed now that it is back (${e.message}). Bid it by hand if the auction is still open.` },
+        { dedupeKey: `${doc.loadId}_rearm_parked_failed` }).catch(() => {});
+      continue;
+    }
+    try {
+      armFromRequest(stack.engine, updated, { requests });
+      log(`[rearm-parked] load ${doc.loadId} re-armed on the live stack`);
+    } catch (e) {
+      // rearm() cleared the reason on the way in; put the row back exactly as it was parked.
+      const reason = e.code === 'PLATFORM_BIDDING_DISABLED' ? 'platform_bidding_disabled' : 'platform_stack_unavailable';
+      await requests.holdUnbiddable(updated.id, reason).catch(() => {});
+      if (e.code === 'PLATFORM_BIDDING_DISABLED' || e.code === 'PLATFORM_STACK_UNAVAILABLE') continue;
+      log(`[rearm-parked] load ${doc.loadId} could not be armed: ${e.message}`);
+      notifier.alert('error', { context: `Load ${doc.loadId}`, detail: `Priced while this portal was offline, and could not be armed now that it is back (${e.message}). Bid it by hand if the auction is still open.` },
+        { dedupeKey: `${doc.loadId}_rearm_parked_failed` }).catch(() => {});
+    }
+  }
+}
+
+/** Next free SP_TOKEN_n across existing account records (mirrors scripts/add-account.js). */
+function nextTokenEnv(existingDocs) {
+  const taken = new Set(['SP_TOKEN', ...existingDocs.map((d) => d && d.tokenEnv).filter(Boolean)]);
+  for (let n = 2; ; n++) if (!taken.has(`SP_TOKEN_${n}`)) return `SP_TOKEN_${n}`;
+}
+
+const maskPhone = (p) => { const d = String(p).replace(/\D/g, ''); return d.length >= 4 ? `+91 XXXXXX${d.slice(-4)}` : '+91 ******'; };
+const maskEmail = (e) => { const [u, d] = String(e).split('@'); return d ? `${u.slice(0, 2)}***@${d}` : '***'; };
+// What to remember about the login that just worked: the email for an email login, else the mobile.
+const sessionContact = (s) => (s.email ? { email: s.email } : { phone: s.phone });
+function summarizeAccount(a) {
+  return a ? {
+    user: a.user || null, company: a.company || null,
+    carrierId: a.carrierId != null ? a.carrierId : null,
+    branches: Array.isArray(a.branchIds) ? a.branchIds.length : null,
+    tokenExp: a.tokenExp || null,
+  } : null;
+}
+
+if (!REAL) {
+  // mock mode bids the simulator (the demo) -> live; built at module level so tests
+  // can require {app, engine} without booting. Extra mock accounts (if configured)
+  // are stacked in boot(), where the async store read is possible.
+  const stack = { account: Object.assign({}, IMPLICIT_PRIMARY), tag: null };
+  stack.adapter = new MockSuperProcureAdapter(sim, {
+    onAuthEvent: (e) => { authEvents.push(Object.assign({ ts: Date.now() }, e)); if (authEvents.length > 50) authEvents.shift(); pushEvent('auth', e); },
+  });
+  stack.scheduler = new DurableScheduler(config.intentsFile);
+  stack.engine = makeEngine(stack.adapter, stack.scheduler, stack);
+  stack.discovery = null;
+  stacks.push(stack);
+}
+// real mode: stacks are built in boot() - the accounts collection is a store read (async).
+
+// aggregation helpers: operator controls apply GLOBALLY (one kill stops everything);
+// state endpoints concatenate every engine's rows, account-tagged when multi.
+const allEngines = () => stacks.map((s) => s.engine);
+const primaryEngine = () => (stacks[0] ? stacks[0].engine : null);
+// An engine-snapshot row carries no portal of its own, so it is stamped from the stack that owns
+// it, through the one definition of that fact (priceRequests.platformOf - absent means
+// config.platformKey, so an untagged legacy stack reads as SuperProcure).
+//
+// UNCONDITIONAL, unlike the account tag. The account tag is suppressed on a single-account box to
+// keep output byte-identical; the portal must not be, because a row that is neither scoped nor
+// labelled is the one wrong answer (MULTI_PLATFORM_ARCHITECTURE.md invariant 5) and it is what the
+// Live Bids page was working around - inferring each row's portal by joining back to its price
+// request, which reads as SuperProcure for any armed row whose request has gone. `platformKey` is
+// the field name every sibling reader on this surface already emits (/api/state price requests,
+// /api/price-requests, /api/closed-bids).
+const tagRows = (stack, rows) => {
+  const base = stack.tag ? { account: stack.tag, platformKey: platformOf(stack) } : { platformKey: platformOf(stack) };
+  return rows.map((m) => Object.assign({}, base, m));
+};
+// Account ownership is a bidding boundary: sibling logins can serve different tenants or loads.
+// Only untagged legacy requests may use an implicit Primary or the portal's sole active account.
+const stackForRequest = (reqDoc) => {
+  const owner = reqDoc && reqDoc.account && reqDoc.account.accountId;
+  const portal = platformOf(reqDoc);
+  // A torn-down stack stays in `stacks` while its replacement activates, and for good if that fails.
+  // Its engine is discarded and never ticks, so an arm resolved onto it would read 'armed' and never bid.
+  const onPortal = stacks.filter((s) => platformOf(s) === portal && !(s.engine && s.engine.discarded));
+  if (owner) return onPortal.find((s) => s.account.accountId === owner);
+  return onPortal.find((s) => s.account.accountId === 'primary')
+    || (onPortal.length === 1 ? onPortal[0] : undefined);
+};
+// The arm path's entry point: resolve or refuse, never proceed on a guess. PLATFORM_STACK_UNAVAILABLE
+// is handled exactly like PLATFORM_BIDDING_DISABLED at the capture seam - the desk's cost is kept and
+// the row parked - because both mean "this number is good, nothing is bidding it right now", and the
+// rollback that reopens the row would file the desk's own work as desk non-response.
+function requireStackForRequest(reqDoc) {
+  const stack = stackForRequest(reqDoc);
+  if (!stack) {
+    const owner = reqDoc && reqDoc.account;
+    const label = owner && (owner.label || owner.accountId);
+    const e = new Error(label
+      ? `the ${label} account on ${platformOf(reqDoc)} is unavailable, so this load cannot be armed`
+      : `the ${platformOf(reqDoc)} portal has no available account for this load, so it cannot be armed`);
+    e.code = 'PLATFORM_STACK_UNAVAILABLE';
+    throw e;
+  }
+  return stack;
+}
+// What this load already has standing on the portal - { price, minDecrement }, or null when nothing
+// does. Read off the LIVE monitor, i.e. before a re-price stops it and rebuilds the ladder, which is
+// the only moment the old price is still in memory. Null is the correct answer for a load that has
+// never landed a bid, and it makes the reachability gate a no-op there.
+const standingBidFor = (reqDoc) => {
+  const stack = stackForRequest(reqDoc);
+  if (!stack || !stack.engine || typeof stack.engine.standingBid !== 'function') return null;
+  return stack.engine.standingBid(reqDoc.loadId);
+};
+// NO RE-PRICE ROUTE REFUSES ON REACHABILITY ANY MORE, and the three call sites pass null here
+// rather than the standing price to say so. Two different things were being refused and only one of
+// them is impossible: the corrected BID cannot go on the wire, and the corrected COST as a recorded
+// fact never had a problem. Refusing the write is also the money-losing direction - the correction
+// vanished, reArmWithNewBand never ran, and the live monitor kept descending on the superseded
+// ladder, which on load 260908LD2Z's own numbers left MORE exposure than accepting it.
+//
+// assertLadderReachable is unchanged and still runs, through standingBidHeld below - as the
+// DETECTOR that decides whether a saved plan is held, never as the refuser of the save.
+const NO_REACHABILITY_REFUSAL = null;
+// The floor the ENGINE would arm for this cost and band - not the bare band's, which the
+// round-figure grid can leave a step below it. Read through planPreview for the same reason
+// ceilingDeadPlan does: it runs arm()'s own gates, so the gate and the arm cannot disagree.
+// Null whenever a preview cannot be built; the caller then judges the band alone, as before.
+//
+// A floor that could not be COMPUTED is not the same fact as a floor that was not NEEDED, and
+// collapsing both to null took two protections out with one throw: the gate silently fell back to
+// judging the bare band, and standingBidHeld's `floor == null` line suppressed the held message, so
+// the page confirmed "Saved - bidding off the new cost and margins now" on a load that will never
+// bid again. _planFor genuinely throws (a non-finite or non-positive floor is one of its own
+// refusals), so the catch is reachable rather than decorative.
+const FLOOR_UNAVAILABLE = 'floor_unavailable';
+const armedFloorFor = (reqDoc, cost, band) => {
+  const stack = stackForRequest(reqDoc);
+  if (!stack || !stack.engine || typeof stack.engine.planPreview !== 'function') return null; // nothing to ask
+  const c = Number(cost);
+  if (!Number.isFinite(c) || !(c > 0)) return null;                                            // nothing to judge
+  try {
+    const load = reqDoc.load || {};
+    const preview = stack.engine.planPreview(
+      { id: load.id || null, rules: load.rules || null, companyName: load.companyName || null },
+      { cost: c, marginsPct: band && band.marginsPct, minMarginPct: band && band.minMarginPct });
+    const floor = preview ? Number(preview.floor) : NaN;
+    return Number.isFinite(floor) ? floor : FLOOR_UNAVAILABLE;
+  } catch (_) { return FLOOR_UNAVAILABLE; }
+};
+// The GATE's reading of the same call. A floor we asked for and could not work out fails CLOSED at
+// submit - where the desk can still act and the load is still bidding its existing ladder - rather
+// than quietly downgrading the check to the bare band and saving anyway.
+const requireArmedFloor = (reqDoc, cost, band) => {
+  const floor = armedFloorFor(reqDoc, cost, band);
+  if (floor !== FLOOR_UNAVAILABLE) return floor;
+  const e = new Error('cannot re-price: the lowest price this cost and these margins would bid could not be '
+    + 'worked out, so this change was not saved. Check the cost and the margins and try again.');
+  e.code = 'BAD_INPUT';
+  throw e;
+};
+// After the save: can this load still not be bid? Returns the same UNREACHABLE error the gate used
+// to raise, or null.
+//
+// Decided from the SAVED plan, through the very function the pre-save floor check uses, so a
+// correction that turns out to be reachable still confirms normally. It is the detector behind
+// recordAndHold: a save that will not bid must never be confirmed with "bidding off the new cost and
+// margins now" - that sentence is the product defect this workstream exists to remove, and the
+// shipper-ceiling gate one screen over already refuses to say it for exactly this reason.
+const standingBidHeld = (reqDoc, standingBid, cost, band) => {
+  if (!standingBid) return null;
+  const floor = armedFloorFor(reqDoc, cost, band);
+  // Fail closed, for the same reason the gate does. A bid IS standing and we cannot work out whether
+  // the saved band can beat it, so the one thing this must not do is let the page confirm bidding.
+  // A floor that could not even be ASKED for (no engine capability, no usable cost) is the same
+  // fact from here as one that was asked for and THREW: a bid IS standing and we cannot tell
+  // whether the saved band beats it, so both fail closed identically rather than only the
+  // thrown case letting the confirmation through.
+  if (floor === FLOOR_UNAVAILABLE || floor == null) return { reason: 'floor_not_computable', standingBidPrice: standingBid.price, floor: null };
+  try { assertLadderReachable({ floor }, standingBid); } catch (e) { if (e.code === 'UNREACHABLE') return e; }
+  return null;
+};
+// ---- CW-225: record the correction, hold the load ---------------------------------------------
+/**
+ * Everything the desk is told about a held load, worded ONCE.
+ *
+ * The page panel and the JSON client both read this, so the two cannot tell two versions of one
+ * load - which is the state this replaces, where a toast said one thing and the preview block above
+ * it asserted the plan that had just been refused.
+ *
+ * COPY CONSTRAINTS, from evidence and not taste. No "band", no "floor", no "your lowest price", no
+ * percentages: the one person who sets that field had to be told in the room what it does, so those
+ * words carry nothing to the reader they are aimed at. Rupees with the separator the rest of the
+ * page uses. No em dashes - this text is also read on a phone beside WhatsApp copy.
+ *
+ * `closed` is the same panel after the auction ended. It claims nothing about the outcome, because
+ * at this surface there is none to claim: "if this load comes to us" is true whether it won, lost,
+ * or is still being allotted. The win or loss is the receipt's job.
+ */
+function holdCopy(state, { closed = false } = {}) {
+  const rs = (n) => `Rs ${rsFmt(n)}`;
+  const bid = Number(state.standingBidPrice);
+  const corrected = Number(state.correctedCost);
+  const resumeCost = Number(state.resume && state.resume.cost);
+  const canResume = Number.isFinite(resumeCost) && resumeCost >= 1;
+  // Same two-numbers rule the WhatsApp notice follows (waTemplates.repriceUnreachableBody). The
+  // corrected cost is only "under our rate" when our bid is actually the lower of the two; when it
+  // is not, the hold is the margin clearing the board bid, and `corrected - bid` subtracts a cost
+  // from a bid and renders negative. 260916V9D7 put "Rs -1,000 under your rate" on this strip.
+  const under = (Number.isFinite(bid) && Number.isFinite(corrected) && corrected > bid)
+    ? Math.round(corrected - bid) : null;
+  const floor = Number(state.floor);
+  const marginHeld = under == null && Number.isFinite(floor) && floor >= 1;
+  return {
+    pill: closed ? 'Was on hold' : 'On hold',
+    rows: [
+      [rs(bid), 'our bid on the board'],
+      // Carries the corrected cost AND the save confirmation in one row, which is what let 03d's
+      // separate "Saved." headline row go.
+      [rs(corrected), 'your rate, saved'],
+      // Third row only where the rate alone does not explain the hold: it is the figure that cleared
+      // the board bid, and without it the two rows above look like they should have been biddable.
+      ...(marginHeld ? [[rs(floor), 'lowest we can bid with margin']] : []),
+    ],
+    gap: under != null ? rs(under) : (marginHeld ? rs(floor) : null),
+    // The resting line's half of the old label. It has to survive the close unchanged, which is why
+    // it stops before the clause that does not: "if we win" and "if this load comes to us" are the
+    // two tenses, and neither belongs on a line that stays put while the auction ends under it.
+    gapShort: under != null ? 'under your rate' : 'lowest we can bid with margin',
+    // Two words say the load is paused; five more say the safe way out. After the close the second
+    // half is false - no cost lowers a bid on an auction that has ended - so it is withdrawn rather
+    // than left pointing at an action that cannot work.
+    act: closed ? 'Bidding stopped. This auction has closed.'
+      : 'Bidding stopped. Lower the cost to bid again.',
+    // The way OUT of the hold, carrying its figure because the figure IS the decision. Null when the
+    // pre-correction cost is not on the record (a hold written before it was stored), and the panel
+    // then renders without the button rather than offering a resume that would refuse.
+    resumeCta: canResume ? `Resume bidding at ${rs(resumeCost)}` : null,
+    // The confirm, which REPLACES the three lines above rather than adding to them. Resume discards
+    // the correction the desk just made - the consequence they will not otherwise expect - and the
+    // second row says what resume actually does: the next bid is below the standing bid, not at it.
+    confirmRows: canResume ? [
+      [rs(resumeCost), `replaces your ${rs(corrected)}`],
+      [rs(bid), 'we keep bidding down from here'],
+    ] : null,
+    confirmYes: 'Resume bidding',
+    confirmNo: 'Keep on hold',
+    // The one sentence C7/G8 says cannot be lost: on the one load where a person went to the portal
+    // to fix what a message had told him, it burned 2 of 3 revision attempts on a bid that was
+    // already correct. It is rendered on the struck ladder box, which is the thing it is ABOUT, and
+    // not inside the panel - the panel's copy budget is three lines and hiding this behind a tap
+    // puts it behind a tap the operator has no reason to make.
+    dontHead: 'Do not change this on the portal by hand.',
+    dontBody: 'It will not lower the bid and it uses up attempts.',
+  };
+}
+
+const ICON_NO = '<svg class="dico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>';
+
+/**
+ * The held state, as a one-line status strip that opens in place.
+ *
+ * A settled state gets a status, not an essay. The save happened, the bidding stopped, there is
+ * nothing here to decide and no button to press - and the cost of printing an explanation on a
+ * settled screen is that it reads as though something went wrong. What the strip shows at rest is
+ * the state and the one figure that is bad; the page under it already carries the rest of the truth
+ * (the struck ladder, ON RECORD on the cost field, a Re-price button demoted out of green), so the
+ * strip does not repeat any of it.
+ *
+ * One tap opens all four things that have to stay reachable: the outcome, the three-figure ledger,
+ * the portal warning with BOTH its claims, and the reverse-auction why. The warning's second claim
+ * is what answers the operator's actual motive for opening the portal, so it is never the half that
+ * gets cut to save a line.
+ *
+ * Sticky by construction: the desk is on a phone with a money decision on the screen, and the
+ * surface this replaces auto-dismissed in 3.5 seconds. Rendered from the durable hold record on
+ * every later visit too, so a reload cannot change it.
+ *
+ * The after-close wording rides along in data attributes rather than needing a second fetch: the
+ * page's own close handler swaps them in when the auction ends, so the strip and the countdown flip
+ * together and nothing on screen is left in the present tense after the fact. The resting line is
+ * deliberately not among them - `gapShort` reads the same in both tenses, so the line the desk is
+ * looking at does not move under it when the auction ends.
+ */
+function renderHoldPanel(state) {
+  const c = holdCopy(state);
+  const d = holdCopy(state, { closed: true });
+  const led = (pairs) => `<div class="led">${pairs.map(([fig, lab]) =>
+    `<div class="lrow"><span class="lv">${esc(fig)}</span><span class="llab">${esc(lab)}</span></div>`).join('')}</div>`;
+  const resumeBlock = c.resumeCta
+    ? `<div class="acts" id="hResumeActs"><button class="rbtn" type="button" id="askResume">${esc(c.resumeCta)}</button></div>`
+    : '';
+  const confirmBody = c.confirmRows
+    ? `<div class="hbody" id="confirmState" hidden>`
+      + led(c.confirmRows)
+      + `<div class="acts">`
+      +   `<button class="rbtn" type="button" id="doResume">${esc(c.confirmYes)}</button>`
+      +   `<button class="rlink" type="button" id="cancelResume">${esc(c.confirmNo)}</button>`
+      + `</div>`
+      + `</div>`
+    : '';
+  return `<details class="hstrip" id="holdPanel"`
+    + ` data-c-pill="${esc(d.pill)}" data-c-act="${esc(d.act)}">`
+    + `<summary>`
+    +   `<span class="hpill">${ICON_PAUSE}<span id="hPill">${esc(c.pill)}</span></span>`
+    +   (c.gap ? `<span class="sgap">${esc(c.gap)} <span class="u">${esc(c.gapShort)}</span></span>` : '')
+    +   `<span class="hchev" aria-hidden="true"></span>`
+    + `</summary>`
+    + `<div class="hbody" id="holdState">`
+    +   led(c.rows)
+    +   `<p class="hact" id="hAct">${esc(c.act)}</p>`
+    +   resumeBlock
+    + `</div>`
+    + confirmBody
+    + `</details>`;
+}
+
+/**
+ * The portal warning, on the struck ladder box it is about.
+ *
+ * It lived inside the panel until the panel's expanded state was cut to three lines. Moving it here
+ * costs the strip nothing and puts it where the operator is actually looking when they reach for the
+ * portal: at the prices that are not going out.
+ */
+function renderPortalWarning(state) {
+  const c = holdCopy(state);
+  return `<div class="dontb" id="mDont">${ICON_NO}`
+    + `<p class="dtx"><b>${esc(c.dontHead)}</b> <span>${esc(c.dontBody)}</span></p></div>`;
+}
+
+/**
+ * Take the held path: record the correction, then stand the load down.
+ *
+ * Called AFTER the write and the re-arm, and it re-derives the held verdict from the SAVED plan
+ * rather than from whatever the caller decided before the write - so a correction that turns out to
+ * be reachable confirms normally, and no route can claim a hold the numbers do not support.
+ *
+ * The hold itself belongs to the engine: _holdAboveStandingBid latches at _decide, before the wire,
+ * so a held load spends no revision attempt. What this adds is the durable record the page reads
+ * back and the correction on the close-time record. Returns null when nothing is held.
+ */
+/**
+ * The plan to put back if the desk resumes this load - the one that was live before the correction.
+ *
+ * Snapshotted from the PRE-WRITE doc, and only where that doc already had a cost: a hold on a load
+ * with nothing priced before it has nothing to resume to, and an invented default would be a rupee
+ * figure nobody typed going onto a live auction.
+ */
+const resumePlanFrom = (priorDoc) => {
+  const cost = Number(priorDoc && priorDoc.price && priorDoc.price.cost);
+  if (!Number.isFinite(cost) || !(cost >= 1)) return null;
+  const plan = { cost, marginsPct: priorDoc.marginsPct, minMarginPct: priorDoc.minMarginPct,
+    marginSource: priorDoc.marginSource || null, marginOverride: priorDoc.marginOverride || null,
+    bidVehicleCount: priorDoc.price.bidVehicleCount != null ? priorDoc.price.bidVehicleCount : null };
+  if (priorDoc.price.costByType) plan.costByType = priorDoc.price.costByType;
+  return plan;
+};
+
+async function recordAndHold(token, updated, standingBefore, priorCost, priorDoc) {
+  const held = standingBidHeld(updated, standingBefore,
+    updated.price && updated.price.cost,
+    { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct });
+  if (!held) {
+    // A cost brought back DOWN under a standing bid is a correction too: the trail holding only the
+    // raise would drop the withdrawal and leave the live override naming a cost no longer on the plan.
+    const newCost = Number(updated.price && updated.price.cost);
+    if (standingBefore && priorCost != null && Number.isFinite(newCost) && newCost < priorCost) {
+      await bidLogger.noteCostCorrection(updated.loadId,
+        { from: priorCost, to: newCost, standingBidPrice: standingBefore.price });
+    }
+    return null;
+  }
+  // `reason` is carried rather than assumed: standingBidHeld also fails closed with
+  // 'floor_not_computable', and relabelling that as the ordinary above-standing-bid hold would put a
+  // certainty on the record the numbers do not support.
+  const state = { kind: 'standing', reason: held.reason, standingBidPrice: held.standingBidPrice,
+    correctedCost: Number(updated.price && updated.price.cost), floor: held.floor,
+    repriceEpoch: Number.isInteger(updated.repriceEpoch) ? updated.repriceEpoch : 0 };
+  // CARRIED FORWARD ACROSS REPEAT CORRECTIONS, not recomputed. A second correction on an already-held
+  // load has the FIRST correction as its prior plan, and resuming to that would put back a cost that
+  // was itself never biddable - so an existing resume target always wins over this write's own.
+  const resume = (priorDoc && priorDoc.hold) ? (priorDoc.hold.resume || null) : resumePlanFrom(priorDoc);
+  if (resume) state.resume = resume;
+  // The correction on the CLOSE-TIME record, so a post-mortem on a below-cost win reads the desk's
+  // own number instead of a clean margin against a cost nobody was bidding. Only when the cost
+  // actually moved: a margin-only re-price corrected nothing.
+  if (priorCost != null && Number.isFinite(state.correctedCost) && priorCost !== state.correctedCost) {
+    // reason: 'hold_entered' marks this as a GENUINE hold-lifecycle event, not just any cost
+    // correction - B112's hold-undercut classifier keys on it, since an ordinary (unheld) downward
+    // re-price also writes a costCorrections entry and must not be mistaken for a hold.
+    await bidLogger.noteCostCorrection(updated.loadId,
+      { from: priorCost, to: state.correctedCost, standingBidPrice: state.standingBidPrice, reason: 'hold_entered' });
+  }
+  let request;
+  try { request = await requests.holdBidding(token, state); }
+  catch (e) {
+    // A Stop that landed after the save ended bidding; a hold on it would offer a Resume that refuses.
+    if (e.code === 'NOT_OPEN' && e.actual === 'stopped') throw stoppedMidSave();
+    throw e;
+  }
+  return { state, request };
+}
+
+// The engine's unreachable-ladder hold goes to WhatsApp only for a desk correction the page did NOT
+// show as held (owner ruling 26 Sep). That is a correction saved while the old monitor's bid was
+// still on the wire: the save read no standing bid, the page said bidding, and the bid then landed
+// under the new band (the 260908LD2Z shape). Not sent when the load already carries a standing hold,
+// nor when no correction built the monitor (epoch 0) or our own floor is what stands (floor not
+// above the standing bid): that is a ladder that ended, and on 2609269ZYK it read as a false
+// "New rate saved". When it is sent the hold is recorded too, so the page stops saying bidding.
+async function unshownCorrectionHold(e, platformKey) {
+  const epoch = Number(e.repriceEpoch);
+  if (!(Number.isInteger(epoch) && epoch > 0)) return false;
+  if (!(Number(e.floor) > Number(e.standingBidPrice))) return false;
+  let doc;
+  // A failed read sends the notice: a duplicate of the page is the safe side of silence.
+  try { doc = await requests.getByLoad(e.auctionId, platformKey); }
+  catch (err) { log.error(`[hold] could not read the price request for load ${e.auctionId}: ${err && err.message}`); return true; }
+  // An event from an older correction never speaks for the one now saved.
+  if (doc && doc.repriceEpoch !== epoch) return false;
+  // Any standing hold, including one written before holds carried an epoch, is already on the page;
+  // a restart re-raises the hold because the engine's latch is in memory.
+  if (doc && doc.hold && doc.hold.kind === 'standing') return false;
+  if (doc && doc.status === 'armed') {
+    await requests.holdBidding(doc.id, { kind: 'standing', reason: 'new_floor_above_standing_bid',
+      standingBidPrice: e.standingBidPrice, correctedCost: e.correctedCost, floor: e.floor,
+      repriceEpoch: epoch, source: 'engine' })
+      .catch((err) => log.error(`[hold] load ${e.auctionId} is held by the engine but the hold could not be recorded: ${err && err.message}`));
+  }
+  return true;
+}
+
+// The held half of every route's response, so the console, the AJAX client and the token page are
+// handed one description of one load rather than three. `panel` is built server-side because the
+// copy is money copy and it exists in exactly one place.
+const heldResponse = (state) => ({
+  reason: state.reason || 'new_floor_above_standing_bid',
+  standingBidPrice: state.standingBidPrice,
+  correctedCost: state.correctedCost,
+  // Null rather than a negative: the subtraction only describes something when the corrected rate is
+  // above our standing bid. Below it, `floor` is the figure that decided the hold - see holdCopy.
+  gap: (Number(state.correctedCost) > Number(state.standingBidPrice))
+    ? Math.round(Number(state.correctedCost) - Number(state.standingBidPrice)) : null,
+  // ADDITIVE. The rate with margin on it, so a client can state the margin-driven hold without
+  // re-deriving it from the band.
+  floor: (Number.isFinite(Number(state.floor)) && Number(state.floor) >= 1) ? Number(state.floor) : null,
+  panel: renderHoldPanel(state),
+  // ADDITIVE. The cost a resume would put back, null when this hold has none on record - a client
+  // can offer the way out without parsing it back out of the panel string.
+  resumeCost: (state.resume && Number(state.resume.cost) >= 1) ? Number(state.resume.cost) : null,
+  // ADDITIVE, and built here for the same reason `panel` is: the AJAX submit draws the held page
+  // without a reload, so the warning has to reach it from its one author rather than be re-typed in
+  // the inline script.
+  portalWarning: renderPortalWarning(state),
+});
+
+// ---- HTTP -------------------------------------------------------------------
+const publicDir = path.join(__dirname, '..', '..', 'public');                  // legacy vanilla dashboard + worklist/price assets
+const consoleDistDir = path.join(__dirname, '..', '..', 'dashboard', 'dist');  // React "Bidder Console" build (Vite)
+const app = express();
+// AUTH-CRITICAL: make route matching case-SENSITIVE so it agrees with the case-sensitive
+// `req.path.startsWith('/api/')` prefix tests the auth gate, the CSRF guard and the SPA
+// fallback all use. Express defaults this OFF, which compiled `/api/x` into a case-INSENSITIVE
+// regex: `GET /API/x` then MATCHED the route while FAILING the gate's prefix test, so the gate
+// called next() without checking for a session and the handler ran unauthenticated. Verified
+// live on prod 2026-07-25 (`/api/state` -> 401, `/API/state` -> 200 with engine state). The
+// prefix tests below are ALSO normalised, so the two layers now fail closed independently.
+app.set('case sensitive routing', true);
+// AUDIT-CRITICAL: read the real client address out of the headers nginx already sets.
+//
+// In production the app binds 127.0.0.1:4103 and nginx is the only front door, proxying loopback ->
+// loopback (deploy/nginx/bidder.conf: `upstream sp_bidder { server 127.0.0.1:4103; }` behind
+// `location /`). With `trust proxy` unset - which it was - Express's req.ip returns the socket peer,
+// so EVERY audit record this app has ever written stored the constant "127.0.0.1". That silently
+// hollowed out seven streams at once: the margin audit, the four accountReconnect records, the
+// config-change record, the engine audit, and now the senderQr record on the pairing-credential
+// serve, whose own comment promises an incident can be reconstructed "who, when, from where". The
+// vhost has been setting X-Real-IP and X-Forwarded-For all along (bidder.conf:73-74); nothing was
+// reading them.
+//
+// 'loopback' rather than `true` on purpose. It trusts exactly one hop - our own nginx, the only
+// thing that can reach the port - and then takes the rightmost address that is NOT loopback. nginx
+// uses $proxy_add_x_forwarded_for, so a client that forges `X-Forwarded-For: 1.2.3.4` gets its real
+// address appended after the forgery, and Express reads that appended one. `true` would trust the
+// whole chain and hand an attacker control of the field that identifies them in the audit trail -
+// which is worse than the constant it replaces.
+app.set('trust proxy', 'loopback');
+
+// ---- request logging ---------------------------------------------------------
+// One structured line per completed request: method, path, status, latency. Mounted
+// before every route/static handler so it wraps the whole pipeline; reads off res's
+// 'finish' event rather than logging up front, so the status code and duration reflect
+// what was actually sent. Deliberately logs nothing beyond method/path/status/duration -
+// cookies and the Authorization header carry session/bearer secrets and must never reach
+// a log line at any level, and are not read here at all.
+const httpLog = createLogger('http');
+// The public /price/<token> and /track/<token> capture-link routes carry a capability
+// token as a URL segment (that unguessable token IS the auth for those routes - see
+// priceRequests.js), so the raw path can't go straight into a log line. Truncates the
+// token-bearing segment to a short, non-reconstructable prefix; the slug/token split
+// itself (tokenFromPath) doesn't matter here since the whole segment is redacted either
+// way, whether it carries a cosmetic slug prefix or is a bare legacy token.
+//
+// The SAME token also rides as the :id segment on the admin worklist routes
+// (/api/price-requests/:id/dismiss|restore|notify|margin|margin/clear - see
+// requests.getByToken in priceRequests.js, which resolves :id directly against docs
+// keyed by the token). Those routes start with /api/, so they need their own match
+// rather than falling through this function's price/track-only regex.
+function redactCapturePath(p) {
+  const cap = /^(\/(?:price|track)\/)([^/]+)(\/.*)?$/.exec(p);
+  if (cap) return `${cap[1]}${redactToken(cap[2])}${cap[3] || ''}`;
+  const admin = /^(\/api\/price-requests\/)([^/]+)(\/.*)?$/.exec(p);
+  if (admin) return `${admin[1]}${redactToken(admin[2])}${admin[3] || ''}`;
+  return p;
+}
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    httpLog(`${req.method} ${redactCapturePath(req.path)} ${res.statusCode} ${Date.now() - startedAt}ms`);
+  });
+  next();
+});
+
+app.use(express.json());
+// urlencoded mounted route-level (priceForm), not globally: the JSON API must not parse a
+// cross-site HTML form body (a form can't send application/json without a preflight).
+const priceForm = express.urlencoded({ extended: false });
+// React console is the operator UI at "/"; its build is served first so it wins the
+// root. Harmless when the build is absent (dev) — the request falls through to public/.
+app.use(express.static(consoleDistDir));
+app.use(express.static(publicDir));
+
+// Is this request on the /api surface? Case-INSENSITIVE on purpose: it decides whether the
+// CSRF guard and the operator-session gate below engage, so it must treat every casing the
+// router could ever match as "API". Answering case-sensitively is what let `/API/...` slip
+// both guards (see the note at app.set('case sensitive routing') above). Belt to that brace:
+// with the router now case-sensitive a varied-case path 404s, and if that setting is ever
+// removed this helper still forces the guards on.
+function apiPath(req) {
+  return String(req.path || '').toLowerCase().startsWith('/api/');
+}
+
+// CSRF guard: nginx Basic auth is auto-replayed cross-site, so it doesn't stop CSRF.
+// Mutating /api POSTs must carry a same-host Origin/Referer (a cross-site page can't forge
+// it). Public tokenized /price POST is exempt — the unguessable link is its auth.
+app.use((req, res, next) => {
+  if (req.method !== 'POST' || !apiPath(req)) return next();
+  const src = req.get('origin') || req.get('referer');
+//////added13102026
+console.log('[CSRF DEBUG]', {
+  method: req.method,
+  path: req.path,
+  origin: req.get('origin'),
+  referer: req.get('referer'),
+  host: req.get('host'),
+  forwardedHost: req.get('x-forwarded-host'),
+  forwardedProto: req.get('x-forwarded-proto')
+});
+  if (!src) return res.status(403).json({ error: 'cross-site request blocked (missing origin)' });
+  let srcHost;
+  try { srcHost = new URL(src).host; } catch { return res.status(403).json({ error: 'cross-site request blocked (bad origin)' }); }
+  
+const remoteAddress = req.socket?.remoteAddress || '';
+const isTrustedLocalProxy = [
+  '127.0.0.1',
+  '::1',
+  '::ffff:127.0.0.1'
+].includes(remoteAddress);
+
+const forwardedHost = isTrustedLocalProxy
+  ? req.get('x-forwarded-host')
+  : undefined;
+
+const expectedHost = forwardedHost || req.get('host');
+
+if (
+  !expectedHost ||
+  srcHost.toLowerCase() !== expectedHost.toLowerCase()
+) {
+  return res.status(403).json({ error: 'cross-site request blocked' });
+}
+
+  next();
+});
+
+// ---- auth surface (public: reachable without a session) ----------------------
+app.post('/api/login', (req, res) => {
+  if (!AUTH_ON) return res.json({ ok: true, user: 'dev', authRequired: false });
+  if (loginThrottle.until > Date.now()) return res.status(429).json({ error: 'Too many attempts - wait a moment and try again.' });
+  const { user, password } = req.body || {};
+  // verify the hash regardless of the username so a wrong user and a wrong password cost the same
+  const ok = String(user || '') === config.admin.user && verifyPassword(String(password || ''), config.admin.passHash, user);
+  if (!ok) {
+    loginThrottle.fails += 1;
+    if (loginThrottle.fails >= 5) { loginThrottle.until = Date.now() + 30_000; loginThrottle.fails = 0; }
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+  loginThrottle.fails = 0; loginThrottle.until = 0;
+  setSessionCookie(req, res, signSession(config.admin.user, SESSION_SECRET, config.admin.sessionTtlMs));
+  res.json({ ok: true, user: config.admin.user });
+});
+app.post('/api/logout', (req, res) => {
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+  res.json({ ok: true });
+});
+app.get('/api/session', (req, res) => {
+  const admin = currentAdmin(req);
+  res.json({ authenticated: !!admin, user: admin ? admin.user : null, authRequired: AUTH_ON });
+});
+
+// Every /api caller is XHR from the console, so an un-sessioned arrival is answered with a JSON
+// 401 - a redirect would only confuse fetch(). The ONE exception is a human landing on the
+// re-link QR PAGE from a WhatsApp alert, on a phone that has no session cookie: that is a
+// top-level HTML navigation, and `{"error":"Not authenticated."}` dead-ends the exact emergency
+// workflow the page exists to replace (they fall back to the Maytapi console, which is what this
+// feature was built to eliminate). Those get bounced to the console login with a ?next= hand-off.
+//
+// Deliberately narrow, and every clause is load-bearing after #103:
+//   - the path is compared EXACTLY, not case-insensitively. `/API/wa/relink-qr` gets the plain
+//     JSON 401 like any other varied-case probe; broadening what the auth boundary treats
+//     specially is precisely how the last bypass appeared.
+//   - `accepts(['json','html']) === 'html'` requires an EXPLICIT html preference. A bare
+//     `Accept: */*` (curl, most XHR) resolves to 'json' and is refused normally.
+//   - the `?img=1` leg is excluded: it is an <img> sub-resource, never a navigation.
+// The redirect target is built from req.originalUrl, which on this branch can only ever be this
+// one same-origin path - there is no attacker-supplied URL in it to open-redirect with.
+function relinkQrNavigation(req) {
+  if (req.method !== 'GET') return false;
+  if (String(req.path || '') !== RELINK_QR_PATH) return false;
+  if (req.query && req.query.img) return false;
+  return req.accepts(['json', 'html']) === 'html';
+}
+function refuseUnauthenticated(req, res) {
+  if (relinkQrNavigation(req)) return res.redirect(302, `/?next=${encodeURIComponent(req.originalUrl)}`);
+  return res.status(401).json({ error: 'Not authenticated.' });
+}
+
+// ---- gate: every other /api route needs a session (the static SPA + /price stay public) ----
+app.use((req, res, next) => {
+  if (!apiPath(req)) return next();
+  const admin = currentAdmin(req);
+  if (!admin) return refuseUnauthenticated(req, res);
+  req.admin = admin;
+  next();
+});
+
+// full state for the dashboard
+app.get('/api/state', async (req, res) => {
+  if (REAL) {
+    return res.json({
+      mode: config.mode,
+      capabilities: stacks[0].adapter.capabilities(),
+      serverTime: Date.now(),
+      auctions: stacks.flatMap((s) => tagRows(s, s.engine.snapshot())),
+      // Deliberately CROSS-PLATFORM: one operator desk works both portals from this one screen, so
+      // filtering rows out here would be wrong, not just incomplete. platformKey is added to every
+      // row (normalizing an absent tag via platformOf, same as every other reader) so the console
+      // can badge/filter by portal client-side once GoComet rows exist.
+      priceRequests: (await requests.listAll()).map((r) => ({ ...r, platformKey: platformOf(r) })),
+      events: eventLog.slice(-80).reverse(),
+    });
+  }
+  const engine = primaryEngine(), adapter = stacks[0].adapter; // mock demo view = the primary stack
+  const monitors = new Map(engine.snapshot().map((m) => [m.auctionId, m]));
+  const auctions = sim.detailAll().map((d) => {
+    const m = monitors.get(d.id);
+    return Object.assign({}, d, {
+      armed: !!m,
+      bot: m ? {
+        status: m.status, myRank: m.myRank, ladder: m.ladder, floor: m.floor,
+        currentRungIndex: m.currentRungIndex, firedRungs: m.firedRungs,
+        lastBidPrice: m.lastBidPrice, revisionsLeft: m.revisionsLeft,
+        stoodDown: m.stoodDown, won: m.won, finalized: m.finalized,
+      } : null,
+    });
+  }).sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
+    return a.closesInMs - b.closesInMs;
+  });
+  res.json({
+    mode: config.mode,
+    capabilities: adapter.capabilities(),
+    serverTime: Date.now(),
+    auctions,
+    events: eventLog.slice(-80).reverse(),
+    auth: { loginCount: adapter.loginCount, session: adapter.session ? {
+      expiresAt: adapter.session.expiresAt, expiresInMs: adapter.session.expiresAt - Date.now() } : null },
+  });
+});
+
+// running-build provenance for the operator (authed - it sits below the /api gate above, the
+// same operator-session wall as /api/state and every other admin endpoint; the public /price
+// token pages never expose it). Ground truth is version.json shipped in the deploy tarball;
+// a dev checkout with no stamp reports version:"dev".
+app.get('/api/version', (req, res) => {
+  res.json(versionInfo);
+});
+
+// ---- price-request loop (human-in-the-loop pricing intake) ------------------
+
+// worklist: every price request (the dashboard-worklist notifier surfaces these). Deliberately
+// CROSS-PLATFORM like /api/state above - the pricing desk works both portals from this one
+// worklist - so platformKey is added per row (never filtered) for the same badge/filter reason.
+app.get('/api/price-requests', async (req, res) => {
+  const all = await requests.listAll();
+  all.sort((a, b) => (a.deadlineAt || 0) - (b.deadlineAt || 0));
+  // pathSeg = the pretty "<slug>-<token>" segment; the console builds its link from it so the
+  // slug lives in ONE place (server-side), not re-derived in the client.
+  res.json({
+    requests: all.map((r) => ({
+      ...r, pathSeg: publicSeg(r), customer: customerTagFor(r.load && r.load.companyName), platformKey: platformOf(r),
+      // The Lane column and the address rows beneath it are composed HERE, not in the console:
+      // one rule for both portals, and no second implementation of it on the client. Derived on
+      // read and never written back - see src/web/laneDisplay.js.
+      // closesAt is the EFFECTIVE close every server gate reads, not the discovery snapshot: an
+      // extended auction otherwise left the worklist while the server still took a cost (T1 D11).
+      load: { ...loadFor(r), closesAt: effectiveCloseAt(r.load) },
+    })),
+    baseUrl: config.baseUrl,
+  });
+});
+
+// operator declines a load -> sticky 'dismissed' (won't be re-created by discovery)
+app.post('/api/price-requests/:id/dismiss', async (req, res) => {
+  try {
+    const updated = await requests.dismiss(req.params.id);
+    pushEvent('price', { dismissed: updated.loadId });
+    res.json({ ok: true, request: updated });
+  } catch (e) {
+    res.status(e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_OPEN' ? 409 : 500).json({ error: e.message });
+  }
+});
+
+// operator un-dismisses a load -> back to awaiting_price (if still biddable)
+app.post('/api/price-requests/:id/restore', async (req, res) => {
+  try {
+    const updated = await requests.restore(req.params.id);
+    pushEvent('price', { restored: updated.loadId });
+    res.json({ ok: true, request: updated });
+  } catch (e) {
+    const code = e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_OPEN' ? 409 : e.code === 'GONE' ? 410 : e.code === 'NO_VALID_CLOSE' ? 410 : 500;
+    res.status(code).json({ error: e.message });
+  }
+});
+
+// operator "Alert again" -> re-send the price-needed ping (force past the dedupe)
+app.post('/api/price-requests/:id/notify', async (req, res) => {
+  const r = await requests.getByToken(req.params.id);
+  if (!r) return res.status(404).json({ error: 'unknown price request' });
+  if (r.status !== 'awaiting_price') return res.status(409).json({ error: `not awaiting a price (status=${r.status})` });
+  await notifier.requestPrice(r, { force: true });
+  res.json({ ok: true });
+});
+
+// Re-price an ARMED load with a new band: stop the current monitor (keeps the durable
+// intent + already-fired rungs) and re-arm from the updated request so the ladder is
+// rebuilt off the new band. Real money, hence the endpoint's confirm gate.
+//
+// Fired rungs carry over BY PRICE, not by index (bidEngine.remapFiredRungs) - this comment used to
+// claim the opposite, and the claim was load-bearing and false. A genuine cost change moves every
+// price, so the remap correctly matches nothing and the re-armed monitor starts with an EMPTY
+// firedRungs at currentRungIndex -1. What actually stops the rebuilt ladder from re-offering a
+// price the portal has already taken is the standing bid, which now survives the re-arm on the
+// durable intent (landedBidPrice) - see the establish branch in bidEngine._decide.
+//
+// The caller checks reachability BEFORE writing anything: a band whose lowest price is not below
+// what this load already has standing is refused at setBidOverride, not re-armed here.
+// Resolves its own stack rather than taking one, so the three re-price routes cannot each repeat an
+// unguarded lookup: this stops a LIVE monitor before it re-arms, and doing that on a stack the
+// record does not belong to would kill the real bid and rebuild the ladder somewhere it can never
+// fire.
+//
+// A Stop that ran between the caller's write and this re-arm stopped the OLD monitor, so the one
+// armed here would bid under a record reading 'stopped' (T1 D9). Arm, then check: a Stop whose
+// record write lands before the check is caught here, one that lands after it by the stop route's
+// second engine stop.
+async function reArmWithNewBand(updatedReq) {
+  let stack;
+  try { stack = requireStackForRequest(updatedReq); }
+  catch (e) {
+    if (e.code === 'PLATFORM_STACK_UNAVAILABLE') {
+      try { await requests.holdUnbiddable(updatedReq.id, 'platform_stack_unavailable', { expectedStatus: 'armed' }); }
+      catch (holdError) {
+        if (holdError.code === 'NOT_OPEN') throw stoppedMidSave();
+        throw holdError;
+      }
+    }
+    throw e;
+  }
+  const loadId = String(updatedReq.loadId);
+  stack.engine.stop(loadId);              // drop the live monitor; the intent (firedRungs) survives
+  const armed = armFromRequest(stack.engine, updatedReq, { requests }); // rebuild the ladder from the new band; restore fired rungs
+  const now = await requests.getByToken(updatedReq.id);
+  if (!now || now.status !== 'armed') {
+    stopBidding(stack, loadId);
+    throw stoppedMidSave();
+  }
+  return armed;
+}
+function stoppedMidSave() {
+  const e = new Error('Saved, but this load was stopped at the same moment, so it is not bidding.');
+  e.code = 'NOT_OPEN';
+  return e;
+}
+
+// A re-price or revert whose re-arm threw after its write, handled the way the resume route handles
+// its own: the prior plan is put back and re-armed, and the desk is told nothing changed. If that
+// re-arm throws too, the load is parked on its prior cost - never left reading armed with nothing
+// bidding - and an error alert names it. Returns the refusal to answer with.
+async function undoFailedReprice(token, priorDoc, err) {
+  const priorCost = `Rs ${fmtRs(priorDoc.price && priorDoc.price.cost)}`;
+  const stopped = () => {
+    const s = new Error('Not changed. This load was stopped at the same moment, so it is not bidding.');
+    s.code = 'NOT_OPEN';
+    return s;
+  };
+  let restored;
+  try { restored = await requests.undoReprice(token, priorDoc); }
+  catch (ue) {
+    if (ue.code === 'NOT_OPEN' && ue.actual === 'stopped') return stopped();
+    log.error(`[price] re-price on load ${priorDoc.loadId} could not be put back after its re-arm failed (${err && err.message}): ${ue && ue.message}`);
+    await parkUnbiddable(token, priorDoc, ue);
+    // The put-back failed, so the new cost is what the record holds: this one must not say "Not saved".
+    return notBiddingNow({ saved: true });
+  }
+  try {
+    await reArmWithNewBand(restored);
+    log.error(`[price] re-price on load ${priorDoc.loadId} rolled back, its re-arm failed: ${err && err.message}`);
+    const w = new Error(`Not changed. This load is still bidding at ${priorCost}, as before. Try again.`);
+    w.code = 'NOT_REPRICED';
+    return w;
+  } catch (e2) {
+    if (e2.code === 'NOT_OPEN') return stopped();
+    log.error(`[price] re-price undone on load ${priorDoc.loadId} but its monitor could not be re-armed (${err && err.message}): ${e2 && e2.message}`);
+    await parkUnbiddable(token, priorDoc, e2);
+    return notBiddingNow();
+  }
+}
+
+// The causes are in the log lines above; the desk gets the one thing it has to act on.
+function notBiddingNow({ saved = false } = {}) {
+  const w = new Error(`${saved ? '' : 'Not saved. '}This load isn't bidding now. Re-arm it or bid by hand.`);
+  w.code = 'NOT_REPRICED';
+  w.saved = saved;
+  return w;
+}
+
+// A load a failed re-price left with nothing bidding: the desk alert goes FIRST, so no later write
+// failure can make the outcome silent; then the intent is stopped and the record parked, not armed.
+async function parkUnbiddable(token, priorDoc, cause) {
+  const stack = stackForRequest(priorDoc);
+  const loadId = String(priorDoc.loadId);
+  if (stack) {
+    const L = priorDoc.load || {};
+    stack.engine.emit({ type: 'alert', level: 'error', kind: 'reprice_arm_failed', auctionId: loadId, episode: Date.now(),
+      lane: L.lane || null, companyName: L.companyName || null, branchName: L.branchName || null,
+      detail: 'Not bidding this load: a price change could not restart bidding on it. Re-arm it from the console, or bid it by hand if the auction is still open.' });
+    try { stopBidding(stack, loadId); } catch (se) { log.error(`[price] could not stop the intent for load ${loadId}: ${se && se.message}`); }
+  }
+  await requests.holdUnbiddable(token, cause && cause.code === 'PLATFORM_BIDDING_DISABLED' ? 'platform_bidding_disabled'
+    : cause && cause.code === 'PLATFORM_STACK_UNAVAILABLE' ? 'platform_stack_unavailable' : 'reprice_rearm_failed')
+    .catch((he) => log.error(`[price] could not park load ${loadId} after a failed re-price: ${he && he.message}`));
+}
+
+// A portal whose write gate is shut is refused BEFORE a re-price writes, as the resume route does:
+// found only at the re-arm, it came after the live monitor had been stopped. So is a load the engine
+// refuses outright, which the capture path refuses the same way.
+// The engine has booked this load's outcome, even though the request may still read armed until its
+// posted close. A re-arm here would stop the finalized monitor and build a fresh one on a dead
+// auction (25829357). A close the engine never saw (closedWhileDown) is not an outcome: the desk is
+// sent to re-price exactly those.
+const AUCTION_CLOSED_NOTHING_SAVED = 'Auction closed. Nothing saved.';
+
+async function auctionIsFinal(reqDoc) {
+  const id = String(reqDoc.loadId);
+  const stack = stackForRequest(reqDoc);
+  const m = stack && stack.engine && stack.engine.monitors ? stack.engine.monitors.get(id) : null;
+  // _finalize sets `won` (null when unsettled); a monitor retired as unreadable never does.
+  if (m && m.finalized && m.won !== undefined) return true;
+  let rec;
+  try { rec = await store.getDoc('closedBids', id); }
+  catch (e) {
+    log.warn(`[price] could not read the closed record for load ${id}: ${e.message}`);
+    const err = new Error('Could not check this load. Try again.');
+    err.code = 'CHECK_FAILED';
+    throw err;
+  }
+  return !!(rec && rec.status === 'closed' && rec.closedWhileDown !== true);
+}
+
+function bookedError() {
+  const e = new Error(AUCTION_CLOSED_NOTHING_SAVED);
+  e.code = 'BOOKED';
+  return e;
+}
+
+function assertRepriceCanArm(reqDoc) {
+  const stack = stackForRequest(reqDoc);
+  if (stack) assertBiddingEnabled(stack.engine);
+  const wontBid = loadWillNotBid(reqDoc);
+  if (wontBid && !wontBid.keepsCost) { const e = new Error(wontBid.body); e.code = 'CANNOT_BID'; throw e; }
+}
+
+// Cancel the live monitor and mark the durable intent, so a restart's rehydrate() does not resurrect
+// the load. The intent is KEPT (firedRungs and all) so a later re-arm resumes without re-firing a rung.
+function stopBidding(stack, loadId) {
+  stack.engine.stop(loadId);
+  if (stack.scheduler.get(loadId)) stack.scheduler.update(loadId, { status: 'stopped' });
+}
+
+// Append a money-path audit entry to the same stream the config trail uses, so a
+// margin override / profile edit shows in Settings > Recent changes with who/when.
+//
+// `before` used to be the literal null on every row this function has ever written. That is not
+// "there was no prior value" - it is no information at all, and during the 2026-09-08 forensics it
+// was read as the former, a conclusion that then had to be retracted. So the prior value is now
+// caller-supplied, and `beforeKnown` records whether the caller resolved one: false says the row
+// never carried the prior state, which is the one thing the old literal could not say about itself.
+//
+// `origin` is the seam that drove the write ('pricing' for the desk link, 'console' for a
+// session route). The re-price call site was already passing it as a fifth argument to a
+// four-parameter function, where it was silently dropped.
+function recordMarginAudit(req, action, changed, after, opts) {
+  const { before, origin = null } = opts || {};
+  // The public /price link carries no session by design, so req.admin is absent on every desk
+  // write and the row read 'unknown' - indistinguishable from a console action whose session had
+  // lapsed. 'pricing' is the seam label this codebase already uses for that link (setBidOverride's
+  // setBy, recordCostFloorRefusal's actor); `via` states which seam so 'pricing' is never read as
+  // a person. Naming the person behind a tokenized link needs a login on it, which this does not add.
+  const admin = req && req.admin ? req.admin.user : null;
+  store.appendEvent('configChanges', {
+    action, actor: admin || 'pricing', via: admin ? 'console' : 'price-link',
+    origin, ip: (req && req.ip) || null,
+    changed: [changed],
+    changes: [{ field: changed, before: before === undefined ? null : before, after, beforeKnown: before !== undefined }],
+  }).catch((e) => log(`[audit] ${action} log failed: ${e && e.message}`));
+}
+
+// The pricing state an audit row's `before` has to carry: the cost the standing ladder was built
+// from, and the band it was built with. Read off the request doc BEFORE the write - priceRequests
+// replaces price.cost in place, so that call is the last moment the prior value exists anywhere.
+function pricedState(reqDoc) {
+  if (!reqDoc) return null;
+  return {
+    cost: (reqDoc.price && reqDoc.price.cost != null) ? reqDoc.price.cost : null,
+    marginsPct: reqDoc.marginsPct || null,
+    minMarginPct: reqDoc.minMarginPct != null ? reqDoc.minMarginPct : null,
+    marginSource: reqDoc.marginSource || null,
+  };
+}
+
+// operator sets a bid-level margin override on one load (tier 1). awaiting -> rides through
+// capture; armed -> re-price now (confirm-gated, real money). Body: { marginsPct, minMarginPct,
+// cost, confirm, low_cost_ack }. cost is optional - only applies to an armed request (rebuilds the
+// whole ladder off the new cost, not just the margin) - and when present it goes through the SAME
+// TWO-BAND cost guard the desk's /price submit uses, in the same order: first the HARD clerical-error
+// floor, which NOTHING bypasses (low_cost_ack does not open it, and neither does confirm), then the
+// soft plausibility band, which low_cost_ack does confirm through. Anyone wiring a cost field into
+// the console margin editor gets a Confirm button that works for the soft band only - a cost under
+// the hard floor has to be re-entered, there is no ack path.
+app.post('/api/price-requests/:id/margin', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const reqDoc = await requests.getByToken(req.params.id);
+    if (!reqDoc) return res.status(404).json({ error: 'unknown price request' });
+    if ((reqDoc.status === 'armed' || reqDoc.status === 'awaiting_price') && await auctionIsFinal(reqDoc)) {
+      return res.status(410).json({ error: AUCTION_CLOSED_NOTHING_SAVED });
+    }
+    const wasArmed = reqDoc.status === 'armed';
+    const before = pricedState(reqDoc);
+    if (wasArmed && body.confirm !== true) {
+      return res.status(428).json({ error: 'Re-pricing an already-armed load. Confirm to proceed.', needConfirm: true });
+    }
+    // This route WRITES A COST (body.cost -> setBidOverride -> reArmWithNewBand rebuilds the whole
+    // ladder on a live auction), which makes it a cost-entry path exactly like the desk's /price
+    // submit - and it was the only one with no plausibility floor whatsoever. setBidOverride's own
+    // check is Rs >= 1, so a fat-fingered Rs 2 sails through and the engine re-prices off it.
+    //
+    // Guarded with the SAME helper the /price submit uses rather than a second implementation, so the
+    // two cost-entry paths cannot drift: an implausibly low cost is refused unless the body carries
+    // the explicit low_cost_ack. Only fires when a cost is actually present - a margin-only call
+    // (the shape the console sends today: marginsPct + minMarginPct + confirm, no cost) is untouched.
+    // Checked on ANY status, not just armed: setBidOverride happens to persist a cost only on an
+    // armed request today, but silently discarding a number an operator typed is its own failure, and
+    // the guard should not quietly stop covering this route if that condition ever widens.
+    //
+    // HARD clerical-error floor (see hardCostFloorViolation): checked BEFORE the soft band below,
+    // the same ordering the /price capture path uses, so low_cost_ack can never open this gate.
+    // Reuses enforceHardCostFloor - the one enforcement point both submit paths already call
+    // (check, record, throw) - rather than a second implementation or a second error code; LOW_COST
+    // maps to 400 in the error map below either way. Gated on cost != null exactly like the soft
+    // check, so cost:null and a margin-only call (no cost field at all) both stay untouched.
+    if (body.cost != null) enforceHardCostFloor(body.cost, reqDoc, { source: 'margin-route', req });
+    if (body.cost != null && lowCostNeedsConfirm(body.cost, body)) throw lowCostError(body.cost);
+    // SHIPPER CEILING, via the SAME helper the /price submit uses so the two cost-entry paths cannot
+    // drift (the identical reasoning that put the low-cost guard on this route). This is the route
+    // the desk's own re-price form posts to, so without it the entry-time control would hold on a
+    // first capture and quietly not on a re-price - and a re-price is exactly when a ceiling that
+    // moved after capture gets discovered. Judged against the band being SAVED (body.marginsPct when
+    // present, else the request's current one), and only when a cost is actually present - a
+    // margin-only call is untouched.
+    // A margin-only call keeps the cost on record, so it is judged on that cost.
+    const costForCheck = body.cost != null ? body.cost : (reqDoc.price && reqDoc.price.cost);
+    if (costForCheck != null) {
+      const band = Array.isArray(body.marginsPct)
+        ? { marginsPct: body.marginsPct, minMarginPct: body.minMarginPct }
+        : { marginsPct: reqDoc.marginsPct, minMarginPct: reqDoc.minMarginPct };
+      const ownerStack = stackForRequest(reqDoc);
+      const deadPlan = ceilingDeadPlan(ownerStack && ownerStack.engine, reqDoc.load, costForCheck, band);
+      if (ceilingNeedsConfirm(deadPlan, body)) throw ceilingDeadError(deadPlan);
+    }
+    // The same below-minimum confirmation the /price routes require (M0-F2).
+    const below = await belowMinimumFor(reqDoc, { marginsPct: body.marginsPct, minMarginPct: body.minMarginPct });
+    if (below && !belowMinAcked(body)) throw belowMinimumError(below);
+    // Read BEFORE the write: standingBidFor is the live monitor's price, and reArmWithNewBand
+    // replaces that monitor a few lines down. The post-save verdict needs the number that was
+    // standing when the desk pressed save.
+    if (wasArmed) assertRepriceCanArm(reqDoc);
+    const standingBefore = standingBidFor(reqDoc);
+    const priorCost = (reqDoc.price && reqDoc.price.cost != null) ? Number(reqDoc.price.cost) : null;
+    const updated = await requests.setBidOverride(
+      req.params.id,
+      { marginsPct: body.marginsPct, minMarginPct: body.minMarginPct, cost: body.cost },
+      { setBy: req.admin ? req.admin.user : 'operator',
+        standingBid: NO_REACHABILITY_REFUSAL,
+        planFloor: requireArmedFloor(reqDoc, body.cost != null ? body.cost : (reqDoc.price && reqDoc.price.cost),
+          { marginsPct: body.marginsPct, minMarginPct: body.minMarginPct }) });
+    let rearmRefusal = null;
+    if (wasArmed) {
+      try { await reArmWithNewBand(updated); }
+      catch (e) {
+        if (e.code === 'NOT_OPEN' || e.code === 'PLATFORM_STACK_UNAVAILABLE') rearmRefusal = e;
+        else return res.status(409).json({ error: (await undoFailedReprice(req.params.id, reqDoc, e)).message });
+      }
+    }
+    recordMarginAudit(req, 'margin_override_set', `bid margin: load ${updated.loadId}`,
+      { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct, cost: updated.price && updated.price.cost },
+      { before, origin: 'console' });
+    pushEvent('price', { marginOverride: updated.loadId, source: updated.marginSource });
+    if (rearmRefusal) return res.status(409).json({ error: rearmRefusal.code === 'NOT_OPEN'
+      ? rearmRefusal.message : `Override saved, but ${rearmRefusal.message}` });
+    const held = await recordAndHold(req.params.id, updated, standingBefore, priorCost, reqDoc);
+    res.json({ ok: true, request: held ? held.request : updated, held: held ? heldResponse(held.state) : null });
+  } catch (e) {
+    // LOW_COST maps to 400, the same status the /price submit returns for it. Without this entry a
+    // refusal here would fall through to the 500 default and read as a server fault rather than as
+    // the deliberate rejection it is.
+    const code = e.code === 'BAD_INPUT' ? 400 : e.code === 'LOW_COST' ? 400 : e.code === 'CEILING_DEAD' ? 400 : e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_OPEN' ? 409 : e.code === 'BELOW_MINIMUM' ? 409 : e.code === 'PLATFORM_BIDDING_DISABLED' ? 409 : e.code === 'CANNOT_BID' ? 409 : e.code === 'GONE' ? 410 : e.code === 'CHECK_FAILED' ? 503 : 500;
+    if (e.code === 'BELOW_MINIMUM') return res.status(code).json({ error: e.message, code: e.code, belowMinimum: e.belowMinimum });
+    res.status(code).json({ error: e.message });
+  }
+});
+
+// operator clears a bid-level override -> revert to the inherited (customer/default) band.
+app.post('/api/price-requests/:id/margin/clear', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const reqDoc = await requests.getByToken(req.params.id);
+    if (!reqDoc) return res.status(404).json({ error: 'unknown price request' });
+    if ((reqDoc.status === 'armed' || reqDoc.status === 'awaiting_price') && await auctionIsFinal(reqDoc)) {
+      return res.status(410).json({ error: AUCTION_CLOSED_NOTHING_SAVED });
+    }
+    const wasArmed = reqDoc.status === 'armed';
+    if (wasArmed && body.confirm !== true) {
+      return res.status(428).json({ error: 'Re-pricing an already-armed load. Confirm to proceed.', needConfirm: true });
+    }
+    const inherited = await requests.resolveInherited(reqDoc.load || {}, reqDoc.platformKey);
+    // ZERO MARGIN, checked BEFORE anything is cleared. This is the console mirror of the /price
+    // revert button and carries the same hazard: clearBidOverride restores the INHERITED band
+    // verbatim - zero included - and reArmWithNewBand rebuilds the ladder off it, so a desk override
+    // that made a zero-margin customer biddable is undone into a load bidding at cost under a green
+    // ok:true. Bucket 1 of the price-page gate: knowable at submit, so it is refused here.
+    if (wasArmed) {
+      const storedCost = reqDoc.price && reqDoc.price.cost;
+      if (bidsAtCost(storedCost, inherited)) throw revertAtCostError(storedCost, inherited);
+    }
+    if (wasArmed) assertRepriceCanArm(reqDoc);
+    const standingBefore = standingBidFor(reqDoc);
+    const before = pricedState(reqDoc);
+    const updated = await requests.clearBidOverride(req.params.id, {
+      standingBid: NO_REACHABILITY_REFUSAL,
+      planFloor: requireArmedFloor(reqDoc, reqDoc.price && reqDoc.price.cost, inherited) });
+    let rearmRefusal = null;
+    if (wasArmed) {
+      try { await reArmWithNewBand(updated); }
+      catch (e) {
+        if (e.code === 'NOT_OPEN' || e.code === 'PLATFORM_STACK_UNAVAILABLE') rearmRefusal = e;
+        else return res.status(409).json({ error: (await undoFailedReprice(req.params.id, reqDoc, e)).message });
+      }
+    }
+    recordMarginAudit(req, 'margin_override_clear', `bid margin cleared: load ${updated.loadId}`,
+      { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct, cost: updated.price && updated.price.cost, source: updated.marginSource },
+      { before, origin: 'console' });
+    if (rearmRefusal) return res.status(409).json({ error: rearmRefusal.code === 'NOT_OPEN'
+      ? rearmRefusal.message : `Override cleared, but ${rearmRefusal.message}` });
+    // A revert corrects no cost - the band moved, not the rate - so no correction is recorded on the
+    // close-time record. It can still land the load in the held state, and does so with nobody
+    // having typed a number, which is what makes it the case most likely to surprise the desk.
+    const held = await recordAndHold(req.params.id, updated, standingBefore, null, reqDoc);
+    res.json({ ok: true, request: held ? held.request : updated, held: held ? heldResponse(held.state) : null });
+  } catch (e) {
+    // BAD_INPUT and ZERO_MARGIN both map to 400: each is a deliberate refusal the desk can act on,
+    // not a server fault, and a 500 would read as one and invite a retry.
+    const code = e.code === 'BAD_INPUT' ? 400 : e.code === 'ZERO_MARGIN' ? 400 : e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_OPEN' ? 409 : e.code === 'UNREACHABLE' ? 409 : e.code === 'PLATFORM_BIDDING_DISABLED' ? 409 : e.code === 'CANNOT_BID' ? 409 : e.code === 'GONE' ? 410 : e.code === 'CHECK_FAILED' ? 503 : 500;
+    // Plain body: this change DELETES the unreachableBody helper along with the unreachable-ladder
+    // mechanism the hold panel replaces. Calling it here would throw inside the catch, so no
+    // response is ever sent and the request hangs.
+    res.status(code).json({ error: e.message });
+  }
+});
+
+// ---- customer margin profiles (compat shim over the unified Customer model) ------------------
+// The margin field now lives on the Customer (src/model). This legacy surface is projected onto
+// customers so the existing Margins editor keeps writing to the SAME source the engine now reads:
+//   GET    lists margin-bearing customers in the old profile shape.
+//   POST   sets a customer's margin band, PRESERVING its aliases/auction/enabled (a bare label edit
+//          never narrows the match set).
+//   delete CLEARS the margin (reverts to the default band) without removing the customer, so its
+//          targeting/routing survive. New edits should prefer /api/customers.
+function customerToProfile(c) {
+  return {
+    platformKey: config.platformKey,
+    customerKey: c.customerId,
+    customerLabel: c.label,
+    marginsPct: c.margin.marginsPct,
+    minMarginPct: c.margin.minMarginPct,
+    enabled: c.enabled !== false,
+    updatedAt: c.updatedAt || null,
+    updatedBy: c.updatedBy || null,
+  };
+}
+app.get('/api/margin-profiles', async (req, res) => {
+  const customers = await customerStore.list();
+  const profiles = customers.filter((c) => c && c.enabled !== false && c.margin).map(customerToProfile);
+  profiles.sort((a, b) => String(a.customerLabel).localeCompare(String(b.customerLabel)));
+  res.json({ profiles, platformKey: config.platformKey });
+});
+app.post('/api/margin-profiles', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const label = String(body.customer ?? body.customerLabel ?? '').trim();
+    if (!label) { const e = new Error('customer name is required'); e.code = 'BAD_INPUT'; throw e; }
+    const derivedId = slugifyLabel(label);
+    if (!derivedId) { const e = new Error('customer name must contain a letter or number'); e.code = 'BAD_INPUT'; throw e; }
+    // getByAnyId, not get: if the label's derived slug was RENAMED (previousIds, written by
+    // scripts/migrate-customer-slugs.js), write the margin onto the renamed customer instead
+    // of resurrecting the retired slug as a brand-new duplicate that splits routing + margin.
+    const existing = await customerStore.getByAnyId(derivedId);
+    const customerId = existing ? existing.customerId : derivedId;
+    const c = await customerStore.upsert({
+      ...(existing || {}),
+      customerId,
+      label: existing ? existing.label : label,
+      aliases: existing ? existing.aliases : [label],
+      auction: existing ? existing.auction : null,
+      enabled: existing ? existing.enabled : true,
+      margin: { marginsPct: body.marginsPct, minMarginPct: body.minMarginPct },
+      updatedBy: req.admin ? req.admin.user : 'unknown',
+    });
+    recordMarginAudit(req, 'margin_profile_save', `margin profile: ${c.label}`,
+      { platform: config.platformKey, marginsPct: c.margin.marginsPct, minMarginPct: c.margin.minMarginPct });
+    await requests.resnapshotOpenBands();
+    res.json({ ok: true, profile: customerToProfile(c) });
+  } catch (e) {
+    res.status(e.code === 'BAD_INPUT' ? 400 : 500).json({ error: e.message });
+  }
+});
+app.post('/api/margin-profiles/:platform/:customerKey/delete', async (req, res) => {
+  // getByAnyId: a stale Margins editor may still hold a pre-rename customerKey (see
+  // /api/customers/:customerId/delete for the rationale); the clear writes by current id.
+  const existing = await customerStore.getByAnyId(String(req.params.customerKey));
+  if (!existing || !existing.margin) return res.status(404).json({ error: 'no such margin profile' });
+  await customerStore.upsert({ ...existing, margin: null, updatedBy: req.admin ? req.admin.user : 'unknown' });
+  recordMarginAudit(req, 'margin_profile_delete', `margin cleared: ${existing.label}`, null);
+  await requests.resnapshotOpenBands();
+  res.json({ ok: true });
+});
+
+// ---- unified data model CRUD (Phase 2): customers / people / assignments --------------------
+// Admin-gated (global /api gate) + POST CSRF guard. Every write is audited to the same
+// configChanges stream as margins/config. The model these edit is not yet read by the live
+// seams - it becomes the source of truth as each domain's editor is rebuilt on top of it.
+/**
+ * Both stores upsert by a DERIVED natural key (customerId = slug(label); personId = 'p' + phone
+ * digits), so an "Add" whose key collides with an existing record silently OVERWRITES it. That was
+ * survivable while the console only wrote the record itself. It stopped being survivable once the
+ * Team and Customers pages began reconciling coverage right after the save: a NEW draft carries an
+ * empty covers set, the reconcile diffs it against the EXISTING record's assignments, and deletes
+ * every one of them - dropping that customer out of the branch's additive bidding targets and out
+ * of alert routing, behind a success message.
+ *
+ * So a create has to announce itself. `expectNew` makes the write fail closed on a collision rather
+ * than overwrite, and the console never reaches the reconcile. Enforced HERE rather than only in the
+ * UI because a second console tab, or a stale client cache, races any client-side check.
+ */
+const conflict = (res, message) => res.status(409).json({ error: message });
+
+app.get('/api/customers', async (req, res) => res.json({ customers: await customerStore.list() }));
+app.post('/api/customers', async (req, res) => {
+  try {
+    if (req.body && req.body.expectNew) {
+      const id = String(req.body.customerId || slugifyLabel(req.body.label || ''));
+      const clash = id && await customerStore.get(id);
+      if (clash) return conflict(res, `"${clash.label}" already exists. Edit it from the list instead of adding it again.`);
+    }
+    const body = { ...(req.body || {}) };
+    // The console's customer form does not edit the per-plant round cap, so a save that omits it
+    // keeps the stored one instead of silently returning GoComet plants to the default.
+    // Nor the per-portal bands, which the same rule keeps.
+    if (body.customerId && (!('roundPolicy' in body) || !('marginByPlatform' in body))) {
+      const existing = await customerStore.get(String(body.customerId));
+      if (!('roundPolicy' in body) && existing && existing.roundPolicy) body.roundPolicy = existing.roundPolicy;
+      if (!('marginByPlatform' in body) && existing && existing.marginByPlatform) body.marginByPlatform = existing.marginByPlatform;
+    }
+    // Nor does it edit the walk's pre-emptive switch (T9 W9): off for every customer, set on a record by hand.
+    if (!('preEmptiveFloorAtRankOne' in body) && body.customerId) {
+      const existing = await customerStore.get(String(body.customerId));
+      if (existing && existing.preEmptiveFloorAtRankOne === true) body.preEmptiveFloorAtRankOne = true;
+    }
+    const c = await customerStore.upsert({ ...body, updatedBy: req.admin ? req.admin.user : 'unknown' });
+    recordMarginAudit(req, 'customer_save', `customer: ${c.label}`,
+      c.marginByPlatform ? { customerId: c.customerId, margin: c.margin, marginByPlatform: c.marginByPlatform }
+        : { customerId: c.customerId, margin: c.margin });
+    await refreshModelSnapshot();
+    await requests.resnapshotOpenBands();
+    res.json({ ok: true, customer: c });
+  } catch (e) { res.status(e.code === 'BAD_INPUT' ? 400 : 500).json({ error: e.message }); }
+});
+app.post('/api/customers/:customerId/delete', async (req, res) => {
+  // getByAnyId, not get: resolve a RETIRED slug too (previousIds, written by
+  // scripts/migrate-customer-slugs.js) so a console tab opened before a rename deploy
+  // doesn't 404 its delete against the old id. The remove still keys off the CURRENT id.
+  const target = await customerStore.getByAnyId(req.params.customerId);
+  const removed = target ? await customerStore.remove(target.customerId) : false;
+  if (!removed) return res.status(404).json({ error: 'no such customer' });
+  // Its assignments go with it: left behind, they point every covering group at nothing. The
+  // customer is already gone, so whatever happens below the snapshot must be refreshed, or
+  // discovery keeps bidding the deleted customer off the cached model.
+  const removedAssignments = [];
+  let failure = null;
+  try {
+    const orphaned = (await assignmentStore.list()).filter((a) => a && a.customerId === target.customerId);
+    for (const a of orphaned) { await assignmentStore.remove(a.assignmentId); removedAssignments.push(a.assignmentId); }
+  } catch (e) { failure = e; }
+  recordMarginAudit(req, 'customer_delete', `customer removed: ${target.customerId}`,
+    failure ? { removedAssignments, assignmentCleanupError: failure.message } : { removedAssignments });
+  try {
+    await refreshModelSnapshot();
+    await requests.resnapshotOpenBands();
+  } catch (e) { failure = failure || e; }
+  if (failure) {
+    return res.status(500).json({
+      error: `${target.label || target.customerId} was deleted, but cleaning up after it failed (${failure.message}). `
+        + 'Its leftover assignments send nothing. Reload the page before making more changes.',
+    });
+  }
+  res.json({ ok: true, removedAssignments: removedAssignments.length });
+});
+
+app.get('/api/people', async (req, res) => res.json({ people: await personStore.list() }));
+app.post('/api/people', async (req, res) => {
+  try {
+    const body = req.body || {};
+    let phone = null;
+    // A recipient is a mobile OR a WhatsApp group JID (a per-customer group is modelled as a
+    // Person whose "phone" is the group). Both flow through the same uniqueness checks below.
+    try { phone = normalizeRecipient(body.phone); } catch (_) { /* leave it to upsert's BAD_INPUT */ }
+    if (phone) {
+      const derivedId = String(body.personId || recipientId(phone));
+      const existing = await personStore.get(derivedId);
+      // A recipient must never change KIND. Re-pointing an existing group at a mobile (or a person
+      // at a group) is never a legitimate edit, and it is exactly the shape of a real, quiet
+      // hazard: the console's phone field digit-strips whatever it is shown, so re-saving a group
+      // row turned '120363428871199271@g.us' into the perfectly valid mobile '+918871199271' - a
+      // stranger - while keeping the group's record. That write would silently re-point a
+      // customer's entire alert stream, price-capture link included, with a 200 and a green tick.
+      // The console is fixed too; this is the invariant that makes the corruption unrepresentable
+      // whichever client (console, curl, a future script) sends the write. Keyed off the STORED
+      // record rather than the id prefix, so a group with a readable personId is still legal.
+      if (existing && existing.phone && isGroupJid(existing.phone) !== isGroupJid(phone)) {
+        return res.status(400).json({
+          error: isGroupJid(existing.phone)
+            ? 'That recipient is a WhatsApp group. Its group id cannot be replaced with a mobile number.'
+            : 'That recipient is a person. Their mobile cannot be replaced with a WhatsApp group id.',
+        });
+      }
+      if (body.expectNew && existing) {
+        return conflict(res, `${existing.name || 'Someone'} already uses this number. Edit them from the list instead of adding them again.`);
+      }
+      // One number belongs to one recipient. The model says so, and alert routing depends on it -
+      // toRecipientRows dedupes recipients BY PHONE, so a second person on the same number would
+      // simply never be sent anything, silently. Same hazard for a group: two rows on one group id
+      // would mean one of them is a ghost. Reject the write instead of creating it.
+      const owner = (await personStore.list()).find((p) => p && p.phone === phone && p.personId !== derivedId);
+      if (owner) return conflict(res, `That number already belongs to ${owner.name || 'another recipient'}. One number can only belong to one recipient.`);
+    }
+    const p = await personStore.upsert(body);
+    recordMarginAudit(req, 'person_save', `person: ${p.name || p.phone}`, { personId: p.personId, accountId: p.accountId });
+    await refreshModelSnapshot();
+    res.json({ ok: true, person: p });
+  } catch (e) { res.status(e.code === 'BAD_INPUT' ? 400 : 500).json({ error: e.message }); }
+});
+app.post('/api/people/:personId/delete', async (req, res) => {
+  const removed = await personStore.remove(req.params.personId);
+  if (!removed) return res.status(404).json({ error: 'no such person' });
+  recordMarginAudit(req, 'person_delete', `person removed: ${req.params.personId}`, null);
+  await refreshModelSnapshot();
+  res.json({ ok: true });
+});
+
+app.get('/api/assignments', async (req, res) => res.json({ assignments: await assignmentStore.list() }));
+app.post('/api/assignments', async (req, res) => {
+  try {
+    const a = await assignmentStore.upsert(req.body || {});
+    recordMarginAudit(req, 'assignment_save', `assignment: ${a.assignmentId}`, { marginOverride: a.marginOverride, alertKinds: a.alertKinds });
+    await refreshModelSnapshot();
+    await requests.resnapshotOpenBands();
+    res.json({ ok: true, assignment: a });
+  } catch (e) { res.status(e.code === 'BAD_INPUT' ? 400 : 500).json({ error: e.message }); }
+});
+app.post('/api/assignments/:assignmentId/delete', async (req, res) => {
+  const removed = await assignmentStore.remove(req.params.assignmentId);
+  if (!removed) return res.status(404).json({ error: 'no such assignment' });
+  recordMarginAudit(req, 'assignment_delete', `assignment removed: ${req.params.assignmentId}`, null);
+  await refreshModelSnapshot();
+  await requests.resnapshotOpenBands();
+  res.json({ ok: true });
+});
+
+// The load a console Stop / Re-arm acts on, keyed on (portal, id): the console names the portal
+// (?platform=). Without one, the id resolves only when a single portal holds it - store order must
+// never decide whose auction an operator's button hits.
+async function operatorLoad(loadId, req) {
+  const named = (req.query && req.query.platform) || (req.body && req.body.platformKey) || null;
+  if (named) return { platform: String(named), reqDoc: await requests.getByLoad(loadId, String(named)) };
+  const rows = await requests.listByLoad(loadId);
+  const portals = [...new Set(rows.map((r) => platformOf(r)))];
+  if (portals.length > 1) {
+    const e = new Error(`Load ${loadId} is on more than one portal (${portals.join(', ')}), so nothing was changed. Reload the page and use the button on its row.`);
+    e.code = 'AMBIGUOUS';
+    throw e;
+  }
+  return { platform: portals[0] || null, reqDoc: rows[0] || null };
+}
+
+// operator stops the bot on one live/armed load (from Live Bids or the worklist). Halts bidding
+// on that load only and keeps its captured cost for a re-arm; the durable intent is marked so a
+// restart won't resurrect it. It does NOT retract a bid already placed on SuperProcure.
+app.post('/api/auctions/:loadId/stop', async (req, res) => {
+  const loadId = String(req.params.loadId);
+  let found;
+  try { found = await operatorLoad(loadId, req); } catch (e) { return res.status(409).json({ error: e.message }); }
+  const { reqDoc, platform } = found;
+  const onPortal = platform ? stacks.filter((s) => platformOf(s) === platform) : stacks;
+  const stack = (reqDoc && stackForRequest(reqDoc)) || onPortal.find((s) => s.engine.snapshot().some((m) => String(m.auctionId) === loadId));
+  const hasMonitor = !!(stack && stack.engine.snapshot().some((m) => String(m.auctionId) === loadId && !m.finalized));
+  if (!hasMonitor && !(reqDoc && reqDoc.status === 'armed')) {
+    return res.status(404).json({ error: 'no active bidding to stop for that load' });
+  }
+  if (stack) stopBidding(stack, loadId); // cancel the live monitor + any pending pre-start wake
+  if (reqDoc && reqDoc.status === 'armed') {
+    await requests.stop(reqDoc.id).catch((e) => log(`[stop] request status update failed for ${loadId}: ${e.message}`));
+    // A re-price that re-armed while this record write was in flight armed its monitor after the
+    // engine stop above and checked the record before 'stopped' landed (T1 D9).
+    if (stack) stopBidding(stack, loadId);
+  }
+  await auditEngine(req, 'load_stop', { loadId });
+  pushEvent('engine', { stopped: loadId });
+  res.json({ ok: true });
+});
+
+// operator re-arms a stopped load from its kept cost (re-creates the monitor; the engine keeps
+// already-fired rungs, so it resumes where it left off and never re-spends a rung).
+app.post('/api/auctions/:loadId/rearm', async (req, res) => {
+  const loadId = String(req.params.loadId);
+  let reqDoc;
+  try { reqDoc = (await operatorLoad(loadId, req)).reqDoc; } catch (e) { return res.status(409).json({ error: e.message }); }
+  if (!reqDoc) return res.status(404).json({ error: 'no price request for that load' });
+  try { if (await auctionIsFinal(reqDoc)) return res.status(410).json({ error: AUCTION_CLOSED_NOTHING_SAVED }); }
+  catch (e) { return res.status(503).json({ error: e.message }); }
+  // Resolved BEFORE rearm() flips the status, so a portal that is not running refuses without
+  // moving the record off 'stopped' - where its kept cost and this same button are waiting for the
+  // portal to come back. This is the console's one-click Re-arm on the Price Requests page and it
+  // carries no scope backstop of its own, so it is the widest door onto the arm path.
+  let stack;
+  try { stack = requireStackForRequest(reqDoc); }
+  catch (e) { return res.status(409).json({ error: e.message }); }
+  // The kept figures were judged against the minimum in force when they were entered; the console
+  // setting can have raised it since, so they are judged again before the load leaves 'stopped'.
+  const kept = reqDoc.price || {};
+  const keptByType = kept.costByType && Array.isArray(kept.costByType.types) ? kept.costByType : null;
+  try { enforceHardCostFloorOnEntry(kept.cost, keptByType, reqDoc, { source: 'rearm', req }); }
+  catch (floorErr) {
+    const minimum = `Rs ${fmtRs(hardCostFloorFor(reqDoc.load).floor)}`;
+    const low = keptByType && keptByType.types.find((t) => hardCostFloorViolation(t.cost, reqDoc.load));
+    return res.status(400).json({ error: low
+      ? `Not re-armed. The rate kept for ${low.label}, Rs ${fmtRs(low.cost)}, is below the minimum for this load, ${minimum}. It stays stopped.`
+      : `Not re-armed. The cost kept on this load, Rs ${fmtRs(kept.cost)}, is below the minimum for this load, ${minimum}. It stays stopped.` });
+  }
+  let updated;
+  try {
+    updated = await requests.rearm(reqDoc.id); // stopped -> armed (validates + close guard)
+  } catch (e) {
+    const code = e.code === 'GONE' ? 410 : e.code === 'NO_VALID_CLOSE' ? 410 : e.code === 'NOT_OPEN' ? 409 : e.code === 'NOT_FOUND' ? 404 : 500;
+    return res.status(code).json({ error: e.message });
+  }
+  try {
+    armFromRequest(stack.engine, updated, { requests });
+  } catch (e) {
+    // rearm() cleared heldReason on the way in and stop() cannot write one back, so a portal that
+    // still cannot bid has to be re-parked WITH its reason - otherwise the row returns as an
+    // operator pause no operator made. Same two codes, same split, as the capture seam at :2708.
+    if (e.code === 'PLATFORM_BIDDING_DISABLED' || e.code === 'PLATFORM_STACK_UNAVAILABLE') {
+      await requests.holdUnbiddable(updated.id, e.code === 'PLATFORM_STACK_UNAVAILABLE' ? 'platform_stack_unavailable' : 'platform_bidding_disabled').catch(() => {});
+    } else {
+      await requests.stop(updated.id).catch(() => {}); // roll the status back to stopped
+    }
+    // A portal that cannot bid is not a 500. The rollback above preserved the kept cost and the
+    // reason, so the row is back exactly where it was; say why rather than reading as a broken button.
+    if (e.code === 'PLATFORM_BIDDING_DISABLED') return res.status(409).json({ error: e.message });
+    return res.status(500).json({ error: `could not re-arm this load (${e.message})` });
+  }
+  await auditEngine(req, 'load_rearm', { loadId });
+  pushEvent('engine', { rearmed: loadId });
+  res.json({ ok: true });
+});
+
+// the operator worklist page (the dashboard-worklist notifier surface)
+app.get('/worklist', (req, res) => res.sendFile(path.join(publicDir, 'worklist.html')));
+// '/' -> operator console. In prod the static-dist middleware matches '/' first and this never
+// runs; in dev (no dist build) it redirects here since the console runs on the Vite dev server.
+app.get('/', (_req, res) => res.redirect('http://localhost:4330/'));
+
+// ---- console base panels: live bids, history, config -----------------------
+
+// live bids = every engine's active monitors (in-memory, real-time), PLUS the loads it has
+// priced and scheduled but not yet armed (window announced, not open - no monitor exists until
+// the wake fires; see BidEngine.scheduledSnapshot). Without those, a priced not-yet-open load
+// appears on no tab at all: the worklist filters it out as 'armed' and there is no monitor for
+// this endpoint to return, so the operator gets no confirmation the bot has it. They carry
+// scheduled:true so the console can render them apart from an actively-bidding row.
+// Rows are account-tagged only when >1 account runs (the console gates its Account column on that).
+app.get('/api/auctions', (req, res) => {
+  const active = stacks
+    .flatMap((s) => tagRows(s, [
+      ...s.engine.snapshot().filter((m) => !m.finalized),
+      ...s.engine.scheduledSnapshot(),
+    ]))
+    .map((a) => ({ ...a, customer: customerTagFor(a.companyName) }));
+  res.json({ mode: config.mode, serverTime: Date.now(), auctions: active });
+});
+
+// the configured SP accounts + their live connection state (never the tokens - only
+// the env-var NAMES). One implicit 'primary' row when no accounts are configured.
+app.get('/api/accounts', async (req, res) => {
+  // The login contact lives in its own collection (see rememberAccountContact), so join it here.
+  // Express 4 does not catch a rejected async handler - it would hang the request - and a missing
+  // contact is cosmetic, so a read failure degrades to "no contact" rather than taking the page down.
+  const contactDocs = await store.listDocs(ACCOUNT_CONTACTS_COLLECTION).catch(() => []);
+  const contacts = new Map((contactDocs || []).map((c) => [c.accountId, c]));
+  // SP stacks only. This endpoint's rows are SuperProcure ACCOUNTS - every field on them
+  // (carrierId, branches, tokenEnv, the Reconnect action the console renders from them) is
+  // SuperProcure vocabulary, and its OTP reconnect route would send another portal's account
+  // through SuperProcure's login. Scoped rather than labelled, per MULTI_PLATFORM_ARCHITECTURE.md
+  // "scoped or labelled": the row would not merely be mixed in, it would offer a wrong action.
+  const live = spStacks().map((s) => {
+    const acct = s.adapter && s.adapter.account; // real adapter after login(); absent on mock
+    const contact = contacts.get(s.account.accountId);
+    return {
+      loginPhone: (contact && contact.phone) || null,
+      loginEmail: (contact && contact.email) || null,
+      accountId: s.account.accountId,
+      label: s.account.label,
+      enabled: s.account.enabled !== false,
+      implicit: !!s.account.implicit,
+      connected: REAL ? !!acct : true,
+      // `connected` answers "did login() ever succeed on this adapter" - it is write-once and
+      // never falls back to false, so on its own it reports a dead session as healthy. Token
+      // expiry is still visible to the dashboard through tokenExp, but a REVOKED session (the
+      // adapter's write latch, token not yet expired) had no field at all and read as green while
+      // the engine had already stopped bidding. Feature-detected because mock/sim adapters have
+      // no auth state machine.
+      authDead: !!(s.adapter && typeof s.adapter.isAuthDead === 'function' && s.adapter.isAuthDead()),
+      carrierId: acct && acct.carrierId != null ? acct.carrierId : (s.account.carrierId != null ? s.account.carrierId : null),
+      branches: acct && Array.isArray(acct.branchIds) ? acct.branchIds.length
+        : (Array.isArray(s.account.branchIds) ? s.account.branchIds.length : null),
+      user: (acct && acct.user) || null,
+      company: (acct && acct.company) || null,
+      tokenExp: (acct && acct.tokenExp) || null,
+      // How long this token lives, not just when it dies. Without it the console can only measure
+      // the remaining life in whole days, which is 0 for the entire life of an 8-hour white-label
+      // session - so a perfectly healthy tenant account would read "Expires soon (0d)" from the
+      // moment it reconnected, and the badge would carry no information for the one account class
+      // that most needs it.
+      tokenLifetimeMs: tokenLifetimeOf(acct),
+      tokenEnv: s.account.tokenEnv || null,
+      allowlist: s.account.allowlist || null,
+    };
+  });
+  // A boot-time login failure drops an account from `stacks` (see boot()'s per-account
+  // try/catch) while its record survives untouched in the store - reconcile against the
+  // full persisted list so a dropped-but-enabled account still shows up here as "Not
+  // connected" (Reconnect-able) instead of silently vanishing from the dashboard's only
+  // account-visibility surface, which is the one place an operator would ever notice.
+  const liveIds = new Set(live.map((a) => a.accountId));
+  const persisted = REAL ? await loadAccounts(store).catch(() => []) : [];
+  const dropped = persisted
+    .filter((a) => a.enabled !== false && !liveIds.has(a.accountId))
+    .map((a) => {
+      const contact = contacts.get(a.accountId);
+      return {
+        loginPhone: (contact && contact.phone) || null,
+        loginEmail: (contact && contact.email) || null,
+        accountId: a.accountId,
+        label: a.label,
+        enabled: true,
+        implicit: false,
+        connected: false,
+        // A dropped account has no adapter to ask; it failed to come up, so it is dead by
+        // definition. Kept on the row so both branches of this endpoint have one key set.
+        authDead: true,
+        carrierId: a.carrierId != null ? a.carrierId : null,
+        branches: Array.isArray(a.branchIds) ? a.branchIds.length : null,
+        user: null,
+        company: null,
+        tokenExp: null,
+        tokenLifetimeMs: null,
+        tokenEnv: a.tokenEnv || null,
+        allowlist: a.allowlist || null,
+      };
+    });
+  // Branch-scope reading for the card, taken from the SAME doc the panel lists so the header can
+  // never disagree with the rows. Degrades to null rather than taking the page down: this is
+  // diagnostic, and an account list that fails to render is worse than one without it.
+  const rows = [...live, ...dropped];
+  const branchDocs = new Map((await store.listDocs(accountCoverage.BRANCHES_COLLECTION).catch(() => []) || [])
+    .map((d) => [d.accountId, d]));
+  for (const r of rows) r.scope = accountCoverage.scopeFor(branchDocs.get(r.accountId));
+  res.json({ accounts: rows });
+});
+
+// One account's branch list. A second endpoint rather than a field on /api/accounts because that
+// route polls every 60s and a 259-branch account is ~23KB per poll for a list the console keeps
+// collapsed by default.
+app.get('/api/accounts/:accountId/branches', async (req, res) => {
+  const accountId = String(req.params.accountId || '').trim();
+  const branches = await accountCoverage.loadBranches(store, accountId).catch(() => []);
+  res.json({ branches });
+});
+
+// ---- self-serve reconnect: re-auth a branch login (or add a new one) via phone -> OTP -------
+// Admin-gated (the global /api gate above); the POST CSRF guard applies. Real mode only - mock
+// has no SP auth. The OTP flow runs SERVER-SIDE (spOtpAuth) so the minted token never reaches
+// the browser: it lands in the chmod-600 vault + process.env and the account's stack is rebuilt
+// in-process (no restart). A reconnect never flips the engine live (state inherited).
+app.post('/api/accounts/:accountId/reconnect/start', async (req, res) => {
+  const accountId = String(req.params.accountId || '').trim();
+  // Recognise-and-remove, not truncate: `.slice(0, 10)` on a country-coded paste ('919...') keeps
+  // the '91' and drops the last two digits, yielding a DIFFERENT valid mobile - and requestOtp
+  // forwards it to SuperProcure, so an OTP for a branch login could be SMS'd to a stranger. This
+  // was the last surface still carrying that pattern after the rest of the branch moved to the
+  // one canonical rule; normalizePhoneIN returns +91XXXXXXXXXX, so strip the prefix back to the
+  // bare 10 digits the OTP flow (and the mock preview below) expects.
+  // Some SuperProcure logins are email + an emailed code rather than mobile + SMS.
+  const email = String((req.body && req.body.email) || '').trim();
+  let phone = '';
+  if (email) {
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  } else {
+    try { phone = normalizePhoneIN((req.body && req.body.phone) || '').replace(/^\+91/, ''); }
+    catch { return res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' }); }
+  }
+  if (!REAL) { // mock preview: no SuperProcure to reach, so simulate the round-trip for the demo
+    otpSessions.set(accountId, { id: 'mock', phone, email, expiresAt: Date.now() + OTP_TTL_MS, mock: true, tenant: null });
+    return res.json(email ? { ok: true, maskedEmail: maskEmail(email) } : { ok: true, maskedPhone: maskPhone(phone) });
+  }
+  // Which deployment this account lives on, resolved BEFORE the SMS goes out and then pinned to
+  // the session, so verify and the identity probe cannot drift onto a different host than the one
+  // that issued the code.
+  let tenant;
+  try { tenant = await tenantAuthFor(accountId); }
+  catch (e) {
+    log(`[reconnect] start refused for ${accountId}: could not resolve the account's tenant: ${e && e.message}`);
+    return res.status(502).json({ error: "Could not read the account configuration, so there is no way to tell which portal to send the code to. Fix the accounts record and try again." });
+  }
+  const configError = tenantConfigError(accountId, tenant);
+  if (configError) {
+    log(`[reconnect] start refused for ${accountId}: ${configError}`);
+    return res.status(409).json({ error: configError });
+  }
+  try {
+    const { sessionId } = await requestOtp({
+      phone, email: email || null, countryCode: (req.body && req.body.countryCode) || '+91',
+      authBaseUrl: tenant && tenant.authBaseUrl, webOrigin: tenant && tenant.webOrigin,
+    });
+    otpSessions.set(accountId, { id: sessionId, phone, email, expiresAt: Date.now() + OTP_TTL_MS, tenant });
+    res.json(email ? { ok: true, maskedEmail: maskEmail(email) } : { ok: true, maskedPhone: maskPhone(phone) });
+  } catch (e) {
+    // Logged BEFORE the PHONE_NOT_FOUND return, not after it. With the return first, the one
+    // failure an operator is most likely to hit - and the one a mistyped tenant authBaseUrl can
+    // masquerade as - was the single reconnect outcome that left no server-side trace at all.
+    log(`[reconnect] start failed for ${accountId}: ${(e && e.code) || 'ERR'}: ${e && e.message}`);
+    if (e && (e.code === 'PHONE_NOT_FOUND' || e.code === 'EMAIL_NOT_FOUND')) return res.status(404).json({ error: e.message });
+    res.status(502).json({ error: (e && e.message) || 'Could not send the code. Try again.' });
+  }
+});
+
+app.post('/api/accounts/:accountId/reconnect/verify', async (req, res) => {
+  const accountId = String(req.params.accountId || '').trim();
+  const otp = String((req.body && req.body.otp) || '').replace(/\D/g, '');
+  const sess = otpSessions.get(accountId);
+  if (!sess || sess.expiresAt < Date.now()) { otpSessions.delete(accountId); return res.status(410).json({ error: 'The code expired. Request a new one.' }); }
+  // Second leg of an account-picker login: the operator chose one of the accounts the first verify offered.
+  const pickIdx = req.body && Number.isInteger(req.body.pick) ? req.body.pick : -1;
+  const picked = pickIdx >= 0 && Array.isArray(sess.picker) ? sess.picker[pickIdx] : null;
+  if (pickIdx >= 0 && !picked) return res.status(400).json({ error: 'Choose one of the listed accounts.' });
+  if (!picked && !/^\d{4,8}$/.test(otp)) return res.status(400).json({ error: sess.email ? 'Enter the code from the email.' : 'Enter the code from the SMS.' });
+
+  if (!REAL) {
+    // mock preview: accept any code and simulate a connected account so the flow is demoable.
+    // A new accountId gets a lightweight mock stack so a card appears; nothing is persisted.
+    otpSessions.delete(accountId);
+    await rememberAccountContact(accountId, sessionContact(sess));
+    const demo = { user: 'Demo Operator', company: 'Demo Transport Co', carrierId: 2668, branches: 2, tokenExp: Date.now() + 300 * 86_400_000 };
+    if (!stacks.find((s) => s.account.accountId === accountId) && /^[a-z0-9][a-z0-9_-]{0,31}$/.test(accountId)) {
+      const label = String((req.body && req.body.label) || '').trim() || accountId;
+      const account = { accountId, label, tokenEnv: 'MOCK_TOKEN', enabled: true, carrierId: 2668, branchIds: [1, 2] };
+      const stack = { account, tag: { accountId, label } };
+      stack.adapter = new MockSuperProcureAdapter(sim, {});
+      stack.scheduler = new DurableScheduler(config.intentsFileFor(accountId));
+      stack.engine = makeEngine(stack.adapter, stack.scheduler, stack);
+      stack.discovery = null;
+      stacks.push(stack); retagStacks();
+    }
+    return res.json({ ok: true, account: demo });
+  }
+
+  // The deployment the code was issued by, pinned at /start. Null means SuperProcure main.
+  const tenant = sess.tenant || null;
+
+  // 1. verify the OTP with SuperProcure -> a fresh token (never returned to the client)
+  let token;
+  try {
+    const out = await verifyOtp({
+      sessionId: sess.id, otp: picked ? sess.otp : otp, selection: picked ? picked.selection : null,
+      allowPicker: !picked,
+      authBaseUrl: tenant && tenant.authBaseUrl, webOrigin: tenant && tenant.webOrigin,
+    });
+    if (out.picker) {
+      // The code was right but this login maps to several accounts: keep the session, let the operator choose.
+      sess.picker = out.picker; sess.otp = otp; sess.expiresAt = Date.now() + OTP_TTL_MS;
+      return res.json({ ok: true, needsSelection: true, accounts: out.picker.map((a, i) => ({ pick: i, username: a.username, description: a.description })) });
+    }
+    token = out.token;
+  } catch (e) {
+    if (e && e.code === 'OTP_INCORRECT' && picked) { otpSessions.delete(accountId); return res.status(410).json({ error: 'That account choice expired. Request a new code.' }); }
+    if (e && e.code === 'OTP_INCORRECT') return res.status(401).json({ error: 'OTP is incorrect.' });
+    // The code was right; the portal wants an account chosen. Nothing the operator can retry here,
+    // so it is a 409 rather than the 502 a transport failure gets.
+    if (e && e.code === 'OTP_ACCOUNT_PICKER') {
+      log(`[reconnect] verify refused for ${accountId}: the portal returned an account picker (mobile maps to several accounts)`);
+      otpSessions.delete(accountId);
+      return res.status(409).json({ error: e.message });
+    }
+    log(`[reconnect] verify failed for ${accountId}: ${e && e.message}`);
+    return res.status(502).json({ error: (e && e.message) || 'Could not verify the OTP.' });
+  }
+
+  // 2. derive identity with a throwaway adapter (proves the token is live).
+  // The tenant knobs are load-bearing, not tidiness: a white-label token probed against
+  // api.superprocure.com is a live customer credential sent to a third-party host, and it would
+  // fail in a way that reads as "the code was accepted but login failed". `|| undefined` for the
+  // same reason as buildRealStack - the adapter's defaults fire on undefined, not on null.
+  let ident;
+  try {
+    ident = await new RealSuperProcureAdapter({
+      token, headers: config.capturedHeaders,
+      apiBaseUrl: (tenant && tenant.apiBaseUrl) || undefined,
+      webOrigin: (tenant && tenant.webOrigin) || undefined,
+      socketUrl: (tenant && tenant.socketUrl) || undefined,
+      socketPath: (tenant && tenant.socketPath) || undefined,
+    }).login();
+  } catch (e) {
+    log(`[reconnect] identity login failed for ${accountId}: ${e && e.message}`);
+    return res.status(502).json({ error: 'The code was accepted but the SuperProcure login failed. Try again.' });
+  }
+
+  otpSessions.delete(accountId);
+  // C079: SuperProcure-only, by construction - this route just verified an SP OTP and minted an
+  // SP bearer token. Searching ALL stacks would also match the GoComet stack on a colliding
+  // accountId (e.g. 'gocomet'), which would write a live SP token into GoComet's tokenEnv and
+  // tear its whole stack down to rebuild it as an SP one.
+  const existing = stacks.find((s) => s.account.accountId === accountId && !s.platformKey);
+  // A boot-time login failure drops an account from `stacks` (see boot()) while its record
+  // survives untouched in the store - without this, the branch below would fall through to
+  // "3b. connect a NEW account" for a dropped account, minting it a FRESH tokenEnv slot and
+  // overwriting its stored record instead of reconnecting the one it already has.
+  // NOT filtered by enabled: any existing record for this accountId (dropped OR
+  // deliberately disabled) must route through the EXISTING-account reconnect below, never
+  // fall through to "3b. connect a NEW account" - that branch has no accountId-collision
+  // guard and would silently overwrite the record with a brand-new tokenEnv either way.
+  const droppedRecord = !existing
+    ? await loadAccounts(store).then((accts) => accts.find((a) => a.accountId === accountId)).catch(() => null)
+    : null;
+  try {
+    if (existing || droppedRecord) {
+      // 3a. reconnect an EXISTING account (live, or boot-dropped-but-still-persisted) - refuse
+      // a token that belongs to a DIFFERENT SP account. A dropped account has no live adapter
+      // to fall back on, so it's checked against its persisted carrierId only.
+      const account = existing ? existing.account : droppedRecord;
+      const known = account.carrierId != null ? account.carrierId
+        : (existing && existing.adapter.account && existing.adapter.account.carrierId);
+      if (known != null && ident.carrierId != null && known !== ident.carrierId) {
+        if (sess.picker) otpSessions.set(accountId, sess); // wrong pick: let the operator choose another without a new code
+        return res.status(409).json({ error: `This code is for a different SuperProcure account (carrier ${ident.carrierId}), not ${account.label} (carrier ${known}). Reconnect from that account's row.` });
+      }
+      // D013: a DIFFERENT USER reconnecting on the SAME carrier (a role change, a shared login,
+      // someone else's phone) is unusual but not wrong - it must warn ops, never refuse the desk a
+      // working reconnect. Only checkable against a LIVE stack (a dropped record carries no prior
+      // user). Compared on userId, not the display name (review correction, 26 Sep) - a shared or
+      // generic login label can mask a real identity change, and a display-name rename alone must
+      // never manufacture one; knownUser/identUser still decide what the alert SHOWS.
+      const knownUser = existing && existing.adapter && existing.adapter.account && existing.adapter.account.user;
+      const knownUserId = existing && existing.adapter && existing.adapter.account && existing.adapter.account.userId;
+      const userWarning = reconnectUserWarning({
+        label: account.label, knownUser, identUser: ident.user, knownUserId, identUserId: ident.userId,
+      });
+      if (userWarning) {
+        baseLog.force(`[reconnect] ${accountId}: ${userWarning}`);
+        notifier.alert('error', { context: 'accounts', detail: userWarning },
+          { dedupeKey: `reconnect_user_changed_${accountId}_${stableSuffix(ident.userId != null ? ident.userId : ident.user)}` }).catch(() => {});
+      }
+      secretsVault.set(account.tokenEnv, token);
+      process.env[account.tokenEnv] = token;
+      await rememberAccountContact(accountId, sessionContact(sess));
+      const fresh = await rebuildAccountStack(account, existing || null);
+      if (!existing) retagStacks(); // a dropped account rejoining changes the multi/single-account tag, same as 3b below
+      await store.appendEvent('accountReconnect', { accountId, actor: req.admin ? req.admin.user : 'unknown', ip: req.ip || null, carrierId: ident.carrierId, mode: 'reconnect' }).catch(() => {});
+      pushEvent('accounts', { reconnected: accountId });
+      return res.json({ ok: true, account: summarizeAccount(fresh.adapter.account) });
+    }
+    // 3b. connect a NEW account (replaces add-account.js + SSH for onboarding a branch login)
+    if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(accountId)) return res.status(400).json({ error: 'Account id must be a short slug (a-z, 0-9, -, _).' });
+    const label = String((req.body && req.body.label) || '').trim() || ident.company || ident.user || accountId;
+    const existingDocs = await store.listDocs(ACCOUNTS_COLLECTION);
+    // first explicit account: materialize the until-now-implicit primary too (mirrors add-account.js)
+    if (existingDocs.length === 0 && process.env.SP_TOKEN) {
+      await store.putDoc(ACCOUNTS_COLLECTION, 'primary', { accountId: 'primary', label: 'Primary', tokenEnv: 'SP_TOKEN', enabled: true, createdAt: Date.now() - 1 });
+    }
+    const tokenEnv = nextTokenEnv(existingDocs);
+    const record = validateAccount({ accountId, label, tokenEnv, enabled: true, carrierId: ident.carrierId, branchIds: ident.branchIds, createdAt: Date.now() });
+    secretsVault.set(tokenEnv, token);
+    process.env[tokenEnv] = token;
+    await store.putDoc(ACCOUNTS_COLLECTION, accountId, record);
+    await rememberAccountContact(accountId, sessionContact(sess));
+    const fresh = await rebuildAccountStack(record, null);
+    retagStacks();
+    await store.appendEvent('accountReconnect', { accountId, actor: req.admin ? req.admin.user : 'unknown', ip: req.ip || null, carrierId: ident.carrierId, mode: 'connect-new' }).catch(() => {});
+    pushEvent('accounts', { connected: accountId });
+    return res.json({ ok: true, account: summarizeAccount(fresh.adapter.account) });
+  } catch (e) {
+    log(`[reconnect] rebuild failed for ${accountId}: ${(e && e.stack) || e}`);
+    return res.status(500).json({ error: `Signed in, but bringing the account online failed (${e && e.message}). It will recover on the next restart.` });
+  }
+});
+
+// Manual set/update of an account's login contact - no OTP, no token touched. Covers accounts
+// connected before self-serve reconnect existed (add-account.js / direct token grant), which
+// never went through reconnect/verify so rememberAccountContact was never called for them.
+// Phone and email are each optional but at least one is required; either can be set alone
+// without disturbing the other (rememberAccountContact merges, never clobbers). Both fields are
+// validated before either error is returned, so two fat-fingered fields get both complaints in
+// one round trip instead of one-at-a-time.
+// Admin-gated (the global /api gate above); the POST CSRF guard applies.
+app.post('/api/accounts/:accountId/contact', async (req, res) => {
+  const accountId = String(req.params.accountId || '').trim();
+  if (!stacks.find((s) => s.account.accountId === accountId)) return res.status(404).json({ error: 'no such account' });
+  const phoneRaw = req.body && req.body.phone;
+  const emailRaw = req.body && req.body.email;
+  // Delegate to normalizePhoneIN (the one canonical phone rule, shared with the Person/recipient
+  // validator) rather than re-implementing the digit-strip-and-slice here - a second inline copy
+  // is exactly what let this endpoint drift from it before (slice(0, 10) on the FIRST 10 digits,
+  // which silently keeps a leading 91 country-code prefix instead of the real local number).
+  let phone = '';
+  const errors = [];
+  if (phoneRaw) {
+    try { phone = normalizePhoneIN(phoneRaw); }
+    catch { errors.push('Enter a valid 10-digit mobile number.'); }
+  }
+  const email = emailRaw ? String(emailRaw).trim() : '';
+  if (emailRaw && !EMAIL_RE.test(email)) errors.push('Enter a valid email address.');
+  if (errors.length) return res.status(400).json({ error: errors.join(' ') });
+  if (!phone && !email) return res.status(400).json({ error: 'Enter a phone number or an email address.' });
+  // The contact write and the audit-log append touch unrelated files - run them concurrently.
+  await Promise.all([
+    rememberAccountContact(accountId, { phone: phone || undefined, email: email || undefined }),
+    store.appendEvent('accountReconnect', { accountId, actor: req.admin ? req.admin.user : 'unknown', ip: req.ip || null, mode: 'contact-set' }).catch(() => {}),
+  ]);
+  pushEvent('accounts', { contactUpdated: accountId });
+  res.json({ ok: true });
+});
+
+// Operator "Refresh scope": re-run the SuperProcure login for ONE account NOW, so branch
+// mappings added on SuperProcure's side flow into discovery without waiting for the scheduled
+// cadence or a pm2 restart (2026-07-16 incident: +27 branches server-side, a live Tata auction
+// invisible to the 18h-old session while a fresh login with the SAME token saw it). Same token,
+// no OTP - this re-reads identity, it does not mint a credential (that's Reconnect's job).
+// Refuses (409) while any auction is armed on the account - a refresh never races live bidding -
+// and a failed re-login keeps the current working session (502, nothing torn down).
+// Admin-gated (the global /api gate above); the POST CSRF guard applies.
+app.post('/api/accounts/:accountId/refresh-scope', async (req, res) => {
+  const accountId = String(req.params.accountId || '').trim();
+  const stack = stacks.find((s) => s.account.accountId === accountId);
+  if (!stack) return res.status(404).json({ error: 'no such account' });
+  // built only by activateRealStack - absent on mock stacks and on accounts that never came online.
+  if (!stack.scopeRefresher) return res.status(409).json({ error: 'Scope refresh needs a live SuperProcure session (real mode only).' });
+  const r = await stack.scopeRefresher.refresh({ trigger: 'manual' });
+  if (r.deferred) {
+    return res.status(409).json({
+      error: `${r.armedCount} auction(s) are armed on this account - the refresh is held so live bidding is never interrupted. It retries on its own once they finish.`,
+      deferred: true, armedCount: r.armedCount,
+    });
+  }
+  if (r.inFlight) return res.status(409).json({ error: 'A scope refresh is already running for this account.' });
+  if (!r.ok) return res.status(502).json({ error: `Refresh failed (${r.error}) - the existing session is untouched and keeps bidding.` });
+  // same audit stream the reconnect flow appends to, so Settings > Recent changes tells one story.
+  await store.appendEvent('accountReconnect', { accountId, actor: req.admin ? req.admin.user : 'unknown', ip: req.ip || null, mode: 'scope-refresh' }).catch(() => {});
+  res.json({ ok: true, branches: r.branches, changed: r.changed, prevCount: r.prevCount });
+});
+
+// The console's history views re-read every closed bid and re-serialised the response on each
+// refresh, about 0.5 s of the event loop per call on the box (latency map row 11). A response is kept
+// as its serialised body until a store collection it reads, or the customer model it tags rows with,
+// changes; each request gets its own copy of the string. A store with no signature is never cached.
+const viewBodies = new Map();
+async function cachedViewBody(key, collections, build) {
+  const sig = typeof store.signature === 'function'
+    ? `${collections.map((c) => store.signature(c)).join('|')}|m${modelVersion}` : null;
+  const hit = sig != null ? viewBodies.get(key) : null;
+  if (hit && hit.sig === sig) return hit.body;
+  const body = JSON.stringify(await build());
+  if (sig != null) {
+    if (viewBodies.size >= 16) viewBodies.clear();
+    viewBodies.set(key, { sig, body });
+  }
+  return body;
+}
+
+// closed-bids history (Phase-5 BASE log: our bids + win/lost outcome, no competitor ladder)
+app.get('/api/closed-bids', async (req, res) => {
+  const { from, to } = req.query;
+  const body = await cachedViewBody(`closed-bids|${from}|${to}`, ['closedBids'], () => closedBidsView(from, to));
+  res.type('application/json').send(body);
+});
+
+async function closedBidsView(from, to) {
+  const rows = await bidLogger.listClosed({ from, to });
+  // The closed-bid log stores the company under `shipper` (the platform's own field name).
+  // Deliberately CROSS-PLATFORM, like /api/state and /api/price-requests: one operator desk works
+  // both portals, and this is the JSON twin of the bid-history CSV, which is all-portal for the
+  // same reason. platformKey rides every row (normalized through platformOf so an untagged legacy
+  // record reads 'sp' rather than blank) - without it the console and scripts/report-participation.js
+  // would be joining two portals' outcomes with no way to tell which row came from where.
+  return {
+    closedBids: rows.map((r) => ({ ...r, platformKey: platformOf(r), customer: customerTagFor(r.shipper) })),
+    summary: summarizeClosed(rows),
+  };
+}
+
+// ---- Filtered funnel export (read-only; the director's "all sorts of filters" export) --------
+// The funnel-spined export the data-export scope doc specifies (docs/2026-07-24_data-export-
+// filters-scope.md), built ON TOP of the existing stores — priceRequests LEFT-JOIN closedBids —
+// so surfaced-but-unpriced loads are visible (the participation/warranty fix) and every row
+// carries the reconciliation columns (SP Load Id + auction date + branch) to join to SP's own
+// export. Three views (funnel / outcomes / bids) + a summary endpoint backing the live strip, all
+// honouring the same filter params, emitted as real .xlsx (in-repo writer, no new dep) or CSV.
+// Registered BEFORE the generic /api/export/:stream below so these view names resolve here.
+// PHASE 1: rolling ~7-day window on the funnel (priceRequests is pruned; stated in the UI + PR).
+// resolveCustomerTag lets the join label loads with the same live matcher the console uses.
+const resolveCustomerTag = (companyName) => customerTagFor(companyName);
+
+// The console's History page: the COMPLETE on-screen record - every load either store still knows
+// about, whether we ever bid on it or not. Deliberately NOT /api/closed-bids, which is outcomes-only
+// and is exactly why a discovered-but-never-priced load was invisible on that page: no bid, no
+// closedBids record, no row. Sharing the export module's join means the screen and the file its
+// export button downloads are derived from one spine and cannot drift apart.
+// Rows go out through historyWireRow so the source docs' full ladder/bid detail never ships.
+// Deliberately CROSS-PLATFORM, on the same reasoning as /api/state and /api/price-requests above:
+// this is a per-row list the desk navigates, not an aggregate, and the desk that priced a GoComet
+// enquiry has to be able to find it again. historyWireRow carries `platform` per row, so a
+// two-portal list is labelled rather than blended. The aggregate on this response
+// (summarizeHistory) reports COUNTS and one win rate over decided auctions - see the note on
+// /api/export/summary below for why the participation PERCENTAGE is the one number kept scoped.
+app.get('/api/history', async (req, res) => {
+  try {
+    const body = await cachedViewBody('history', ['closedBids', 'priceRequests'], historyView);
+    res.type('application/json').send(body);
+  } catch (e) {
+    log(`[history] failed: ${e && e.message}`);
+    res.status(500).json({ error: 'History failed.' });
+  }
+});
+
+async function historyView() {
+  const { history } = await exportModel.buildDatasets({ requests, bidLogger }, { attachCustomer: resolveCustomerTag });
+  return {
+    rows: history.map(exportModel.historyWireRow),
+    summary: exportModel.summarizeHistory(history),
+    // The union inherits the request store's prune on ONE side: complete for the retention
+    // window, outcomes-only before that. Served from here so the page renders the caveat off the
+    // server's own answer rather than hardcoding a retention number that could drift from
+    // pruneEnded() - and DERIVED from PRUNE_RETENTION_MS, which is the constant pruneEnded
+    // actually defaults to. The previous literal 7 sat directly under that anti-drift comment
+    // while being exactly the drift it warned about: change the prune and the page keeps
+    // claiming seven days.
+    window: {
+      rolling: true,
+      retentionDays: Math.round(PRUNE_RETENTION_MS / 86_400_000),
+      note: `Complete for the last ~${Math.round(PRUNE_RETENTION_MS / 86_400_000)} days. `
+        + 'Before that, only auctions we bid on are still retained.',
+    },
+  };
+}
+
+// The ONE endpoint in this family that stays platform-SCOPED, and the exception is the point:
+// `summary` is a participation percentage the director reads as a single number. A percentage has
+// no row to hang a `platform` label on, so mixing two portals into it corrupts it in a way nobody
+// can see - which is exactly the failure the row-level label rules out everywhere else. The rows
+// beside it are all-portal; a desk that wants the two to agree passes `platform=sp`, the filter
+// exportModel.parseFilters honours on every view.
+app.get('/api/export/summary', async (req, res) => {
+  try {
+    const datasets = await exportModel.buildDatasets({ requests, bidLogger }, { attachCustomer: resolveCustomerTag, platformKey: config.platformKey });
+    const { funnel, outcomes } = datasets;
+    const filters = exportModel.parseFilters(req.query);
+    // Same POPULATION rule the funnel download resolves under, so the tiles and the file cannot
+    // disagree about which loads they counted. They are still differently SCOPED by portal - this
+    // endpoint narrows to config.platformKey (see the note above), the downloads do not - and
+    // `scope` below is what lets the page say so instead of leaving the reader to assume parity.
+    const basis = exportModel.funnelBasis(datasets, filters);
+    const filteredFunnel = exportModel.applyFilters(exportModel.datasetFor(datasets, exportModel.VIEWS.funnel, filters), filters);
+    const covered = exportModel.coveredRange(filteredFunnel);
+    res.json({
+      summary: exportModel.summarize(filteredFunnel),
+      // Open-right-now count for the strip's own open tile - reuses summarizeHistory's
+      // awaiting_price/armed/stopped predicate (exportModel.js) rather than a second copy of it.
+      open: exportModel.summarizeHistory(filteredFunnel).open,
+      facets: exportModel.facets(funnel, outcomes),
+      // What the numbers above actually cover, said in the server's own words rather than a
+      // hardcoded retention figure on the page. DERIVED from PRUNE_RETENTION_MS (same source
+      // /api/history's window uses) - a literal 7 here is exactly the drift the comment on
+      // /api/history warns about, just on this endpoint instead.
+      window: {
+        // `rolling` is the rolling ~N-day worklist claim, and it is FALSE once the union answered:
+        // that population reaches back to first deploy on one side and is pruned on the other.
+        rolling: basis === 'live',
+        basis,
+        // The portal these counts were narrowed to, null when they were not. The page renders the
+        // asymmetry with the downloads from this rather than inferring it.
+        scope: config.platformKey || null,
+        retentionDays: Math.round(PRUNE_RETENTION_MS / 86_400_000),
+        from: covered.from,
+        to: covered.to,
+        note: exportModel.coverageNote(covered, Math.round(PRUNE_RETENTION_MS / 86_400_000), basis),
+      },
+    });
+  } catch (e) {
+    log(`[export] summary failed: ${e && e.message}`);
+    res.status(500).json({ error: 'Summary failed.' });
+  }
+});
+
+
+
+
+// Remarks for the History Today view, stored per load in <dataDir>/remarks.json.
+const REMARKS_FILE = path.join(config.dataDir, 'remarks.json');
+function readRemarks() {
+  try { return JSON.parse(require('fs').readFileSync(REMARKS_FILE, 'utf8')); } catch { return {}; }
+}
+function writeRemarks(obj) {
+  const fs = require('fs');
+  const tmp = REMARKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
+  fs.renameSync(tmp, REMARKS_FILE);
+}
+app.post('/api/remarks', (req, res) => {
+  const { platform, loadId, text } = req.body || {};
+  if (loadId == null || loadId === '') return res.status(400).json({ error: 'loadId is required' });
+  const key = `${platform || 'sp'}:${String(loadId)}`;
+  const all = readRemarks();
+  const t = String(text || '').slice(0, 2000);
+  if (t.trim()) all[key] = { text: t, updatedAt: Date.now() };
+  else delete all[key];
+  writeRemarks(all);
+  res.json({ ok: true, key, remark: all[key] ? all[key].text : '' });
+});
+app.get('/api/remarks', (req, res) => res.json(readRemarks()));
+
+
+
+
+// Today / date-range inquiries for the History tab. An inquiry is a price request, filtered by the
+// day it was created (IST). History only holds CLOSED auctions, so it can't be used here.
+// const isoDay = (re) => /^\d{4}-\d{2}-\d{2}$/.test(re || '');
+// function istDay(ms) { return new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 10); }
+// app.get('/api/history/range', async (req, res) => {
+//   try {
+//     const today = istDay(Date.now());
+//     const from = isoDay(req.query.from) ? req.query.from : today;
+//     const to = isoDay(req.query.to) ? req.query.to : from;
+//     if (from > to) return res.status(400).json({ error: 'from must be on or before to' });
+//     const lo = Date.parse(`${from}T00:00:00+05:30`);
+//     const hi = Date.parse(`${to}T23:59:59.999+05:30`);
+//     const all = await requests.listAll();
+//     const remarks = readRemarks();
+//     const rows = all
+//       .filter((r) => r.createdAt != null && r.createdAt >= lo && r.createdAt <= hi)
+//       .map((r) => {
+//         const load = loadFor(r) || {};
+//         const cust = customerTagFor(load.companyName);
+//         const platform = platformOf(r);
+//         return {
+//           loadId: r.loadId,
+//           platform,
+//           customer: (cust && cust.label) || load.companyName || '',
+//           lane: (() => {
+//             const ld = load.laneDisplay || {};
+//             const end = (e) => (typeof e === 'string' ? e : (e && (e.label || e.city || e.name || e.address)) || '');
+//             return [end(ld.origin), end(ld.destination)].filter(Boolean).join(' → ');
+//           })(),
+//           cost: r.price && r.price.cost != null ? r.price.cost : null,
+//           equipment: load.equipment || '',
+//           status: r.status,
+//           closesAt: effectiveCloseAt(r.load),
+//           createdAt: r.createdAt,
+//           remark: (remarks[`${platform || 'sp'}:${String(r.loadId)}`] || {}).text || '',
+//         };
+//       })
+//       .sort((a, b) => b.createdAt - a.createdAt);
+//     const byStatus = {};
+//     for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+//     res.json({ from, to, count: rows.length, byStatus, rows });
+//   } catch (e) {
+//     log(`[history/range] failed: ${e && e.message}`);
+//     res.status(500).json({ error: 'Inquiry range failed.' });
+//   }
+// });
+
+//2026-10-31
+// Today / date-range inquiries for the History tab. An inquiry is a price request, filtered by the
+// day it was created (IST). Closed loads get bids, last bid and final rank from the cached history.
+
+// Returns the date as YYYY-MM-DD if it's a real calendar day, otherwise null.
+function isoDay(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) return null;
+  return v;
+}
+function istDay(ms) { return new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 10); }
+
+app.get('/api/history/range', async (req, res) => {
+  try {
+    const today = istDay(Date.now());
+    const from = isoDay(req.query.from) || today;
+    const to = isoDay(req.query.to) || from;
+    if (from > to) return res.status(400).json({ error: 'from must be on or before to' });
+    const lo = Date.parse(`${from}T00:00:00+05:30`);
+    const hi = Date.parse(`${to}T23:59:59.999+05:30`);
+
+    const { history } = await exportModel.buildDatasets(
+      { requests, bidLogger },
+      { attachCustomer: (name) => customerTagFor(name) },
+    );
+    const remarks = readRemarks();
+
+    const rows = history
+      .filter((r) => r.createdAt != null && r.createdAt >= lo && r.createdAt <= hi)
+      .map((r) => {
+        const w = exportModel.historyWireRow(r);
+        const closed = !!r._closed;
+        return {
+          loadId: w.loadId,
+          platform: w.platform,
+          customer: (r.customer && r.customer.label) || r.companyName || '',
+          // account: w.account || '',
+                    account: (w.account && (w.account.label || w.account.accountId)) || (typeof w.account === 'string' ? w.account : ''),
+          lane: [w.lane.origin, w.lane.destination].filter(Boolean).join(' → '),
+          laneDisplay: w.laneDisplay,
+          equipment: w.equipment,
+          cost: w.cost,
+          status: w.status,
+          closesAt: w.auctionCloseAt,
+          numBids: closed ? w.numBids : null,
+          lastBid: w.lastBid,
+          finalRank: w.finalRank,
+          createdAt: r.createdAt,
+          remark: (remarks[`${w.platform || 'sp'}:${String(w.loadId)}`] || {}).text || '',
+        };
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+
+    const byStatus = {};
+    for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+    res.json({ from, to, count: rows.length, byStatus, rows });
+  } catch (e) {
+    log(`[history/range] failed: ${e && e.message}`);
+    res.status(500).json({ error: 'Inquiry range failed.' });
+  }
+});
+// // Today / date-range inquiries for the History tab. An inquiry is a price request, filtered by the
+// // day it was created (IST). History only holds CLOSED auctions, so it can't be used here.
+// const isoDay = (re) => /^\d{4}-\d{2}-\d{2}$/.test(re || '');
+// function istDay(ms) { return new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 10); }
+// app.get('/api/history/range', async (req, res) => {
+//   try {
+//     const today = istDay(Date.now());
+//     const from = isoDay(req.query.from) ? req.query.from : today;
+//     const to = isoDay(req.query.to) ? req.query.to : from;
+//     if (from > to) return res.status(400).json({ error: 'from must be on or before to' });
+//     const lo = Date.parse(`${from}T00:00:00+05:30`);
+//     const hi = Date.parse(`${to}T23:59:59.999+05:30`);
+//     const all = await requests.listAll();
+//     const rows = all
+//       .filter((r) => r.createdAt != null && r.createdAt >= lo && r.createdAt <= hi)
+//       .map((r) => {
+//         const load = loadFor(r) || {};
+//         const cust = customerTagFor(load.companyName);
+//         return {
+//           loadId: r.loadId,
+//           platform: platformOf(r),
+//           customer: (cust && cust.label) || load.companyName || '',
+//           // lane: load.laneDisplay || '',
+//                     lane: (() => {
+//             const ld = load.laneDisplay || {};
+//             const end = (e) => (typeof e === 'string' ? e : (e && (e.label || e.city || e.name || e.address)) || '');
+//             return [end(ld.origin), end(ld.destination)].filter(Boolean).join(' → ');
+//           })(),
+//           cost: r.price && r.price.cost != null ? r.price.cost : null,
+//           equipment: load.equipment || '',
+//           // status: r.status,
+          
+//           closesAt: effectiveCloseAt(r.load),
+//           createdAt: r.createdAt,
+//         };
+//       })
+//       .sort((a, b) => b.createdAt - a.createdAt);
+//     const byStatus = {};
+//     for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+//     res.json({ from, to, count: rows.length, byStatus, rows });
+//   } catch (e) {
+//     log(`[history/range] failed: ${e && e.message}`);
+//     res.status(500).json({ error: 'Inquiry range failed.' });
+//   }
+// });
+
+
+// BC-28/CW-241: freight value Bid Command has handled, month by month since launch, on the
+// ALL-LOADS basis (every discovered load counts, not only the ones we bid on or won - see
+// src/reports/monthlyFreightValue.js). Deliberately ALL-PORTAL, unlike /api/export/summary above:
+// this is a report on freight value across the whole desk, keyed on (portal, loadId) the same way
+// the EOD reports are (declared in test-shared-reader-platform-scope.js), not a percentage with no
+// row to hang a platform label on. Cached on the same two collections /api/history uses, since a
+// full closedBids + priceRequestArchive scan is heavier than the live-window summary above.
+app.get('/api/export/freight-value', async (req, res) => {
+  try {
+    const body = await cachedViewBody('freight-value', ['closedBids', 'priceRequests'], freightValueSinceLaunchView);
+    res.type('application/json').send(body);
+  } catch (e) {
+    log(`[export] freight-value failed: ${e && e.message}`);
+    res.status(500).json({ error: 'Freight value failed.' });
+  }
+});
+
+async function freightValueSinceLaunchView() {
+  const { rows, allLoadsFrom } = await monthlyFreightValue.collectSinceLaunch({ requests, bidLogger });
+  const months = monthlyFreightValue.buildMonthlyReport(rows, { allLoadsFrom }).map((m) => ({
+    month: m.month,
+    // Whether THIS month's enquiry count is every discovered load (complete) or only the ones we
+    // priced/bid, from closedBids alone (partial) - see monthlyFreightValue.js's module doc. A
+    // single top-level 'basis: all loads' label was a customer-visible falsehood for any month
+    // before the priceRequestArchive stream existed (2026-09-25); this is per-month instead.
+    complete: m.complete,
+    enquiries: m.enquiries,
+    freightValueRs: m.freightValueRs,
+    noValueLoads: m.noValueLoads.length,
+  }));
+  const totals = months.reduce((acc, m) => ({
+    enquiries: acc.enquiries + m.enquiries,
+    freightValueRs: acc.freightValueRs + m.freightValueRs,
+    noValueLoads: acc.noValueLoads + m.noValueLoads,
+  }), { enquiries: 0, freightValueRs: 0, noValueLoads: 0 });
+  return { allLoadsFrom, totals, months };
+}
+
+app.get(['/api/export/funnel', '/api/export/outcomes', '/api/export/bids', '/api/export/history'], async (req, res) => {
+  const view = String(req.path).split('/').pop().toLowerCase();
+  const spec = exportModel.VIEWS[view];
+  if (!spec) return res.status(404).json({ error: `Unknown export view "${view}".` });
+  const format = String(req.query.format || 'xlsx').toLowerCase() === 'csv' ? 'csv' : 'xlsx';
+  try {
+    // All-portal + labelled (every view carries a 'Platform' column): these are bulk downloads a
+    // human opens, so hiding the other portal's rows loses data the desk needs, while labelling
+    // them costs one column. `platform=` narrows to one portal when that is what is wanted.
+    const datasets = await exportModel.buildDatasets({ requests, bidLogger }, { attachCustomer: resolveCustomerTag });
+    const filters = exportModel.parseFilters(req.query);
+    const filtered = exportModel.applyFilters(exportModel.datasetFor(datasets, spec, filters), filters);
+    const { headers, rows, numericColumns } = spec.project(filtered);
+    // filename stamped in IST (not UTC) so a saved file self-documents to the SAME calendar day
+    // SuperProcure's export reports — the reconciliation the whole feature exists for. The range it
+    // states is the rows' own, not the request's; the file does not claim to be COMPLETE over that
+    // range, and the funnel view's 'Source' column is what says so per row. See exportFilename.
+    const base = exportModel.exportFilename(spec, filtered, filters);
+    if (format === 'csv') {
+      res.set('Content-Type', 'text/csv; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="${base}.csv"`);
+      return res.send(toCsv(headers, rows));
+    }
+    res.set('Content-Type', XLSX_CONTENT_TYPE);
+    res.set('Content-Disposition', `attachment; filename="${base}.xlsx"`);
+    return res.send(toXlsx({ sheetName: spec.sheet, headers, rows, numericColumns }));
+  } catch (e) {
+    log(`[export] view ${view} failed: ${e && e.message}`);
+    res.status(500).json({ error: 'Export failed.' });
+  }
+});
+
+// ---- CSV exports (read-only; pull data out to analyse elsewhere) -------------
+// GET /api/export/:stream[.csv]?from=&to= — session-gated by the global /api gate.
+// Pure read-out of what we already store/log; the CSV is built in memory (no fs —
+// that stays inside the store seam). Builders + column specs: src/web/exports.js
+// and docs/CSV_EXPORTS_SCOPE.md.
+const exporters = makeExporters({ store, bidLogger, requests });
+app.get('/api/export/:stream', async (req, res) => {
+  const key = String(req.params.stream).replace(/\.csv$/i, '');
+  if (!exporters.has(key)) {
+    return res.status(404).json({ error: `Unknown export "${key}". Known: ${exporters.keys().join(', ')}.` });
+  }
+  const range = exporters.parseRange(req.query);
+  try {
+    const { headers, rows } = await exporters.build(key, range);
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    // IST filename stamp (was UTC): a load closing after 18:30 IST filed under the next UTC day.
+    res.set('Content-Disposition', `attachment; filename="${key}_${istStamp(range.from)}_to_${istStamp(range.to)}.csv"`);
+    res.send(toCsv(headers, rows));
+  } catch (e) {
+    log(`[export] ${key} failed: ${e && e.message}`);
+    res.status(500).json({ error: 'Export failed.' });
+  }
+});
+
+// admin-editable runtime config (Targets & Recipients + Settings)
+app.get('/api/config', async (req, res) => {
+  res.json({ config: await configStore.get(), meta: { alertKinds: ALERT_KINDS, mode: config.mode,
+    antiDetectionLimits: AD_LIMITS, antiDetectionDefaults: configStore.defaults.antiDetection,
+    walkLimits: walkLimitsMeta(), walkDefaults: configStore.defaults.walk, walkTiming: walkTimingNow,
+    walkEffective: effectiveSummary(mergeWalk(DEFAULT_WALK, config.walk), walkTimingNow), walkTimingPending: walkTimingRefresher.pending(),
+    clericalFloorDefault: { absRs: Number(config.minCostAbs) > 0 ? Number(config.minCostAbs) : 0,
+      perKmRs: Number(config.minCostPerKm) > 0 ? Number(config.minCostPerKm) : 0 },
+    whatsapp: { configured: wa.enabled() } } });
+});
+app.post('/api/config', async (req, res) => {
+  try {
+    const prevInterval = config.discoveryIntervalMs;
+    const before = await configStore.get();
+    const next = await configStore.save(req.body || {});
+    applyConfigValues(next); // take effect live, without a redeploy
+    for (const s of stacks) {
+      // A poller that is not running stays not running. Without the timer test this loop would
+      // silently re-start a poller an operator had just switched OFF, on the very next save of any
+      // unrelated setting - the console toggle would look like it worked and then undo itself.
+      if (!s.discovery || !s.discovery.timer) continue;
+      // the poller's tick is a setInterval period — restart it only if it actually changed
+      if (next.discoveryIntervalMs !== prevInterval) {
+        s.discovery.stop();
+        s.discovery.start(next.discoveryIntervalMs);
+      }
+      // A targets (allowlist) change: reconcile NOW instead of waiting for the next poll — pick up
+      // newly in-scope loads AND drop the now-out-of-scope awaiting-price asks (armed loads stay).
+      if (JSON.stringify(before.allowlist) !== JSON.stringify(next.allowlist)) {
+        s.discovery.tick().catch((e) => log(`[discovery] post-save reconcile failed: ${e && e.message}`));
+      }
+    }
+    // audit the change; a failed log must never fail the operator's save (it already persisted)
+    recordConfigChange(store, { actor: req.admin ? req.admin.user : 'unknown', before, after: next, ip: req.ip })
+      .catch((e) => log(`[audit] config-change log failed: ${e && e.message}`));
+    await requests.resnapshotOpenBands();
+    res.json({ config: next, applied: true });
+  } catch (e) {
+    res.status(e.code === 'BAD_INPUT' ? 400 : 500).json({ error: e.message });
+  }
+});
+
+// config-change audit trail (newest first); defaults to the last 14 days
+app.get('/api/config/audit', async (req, res) => {
+  const from = req.query.from != null ? Number(req.query.from) : Date.now() - 14 * 86_400_000;
+  const to = req.query.to != null ? Number(req.query.to) : Date.now();
+  const changes = (await store.readEvents('configChanges', { from, to })).reverse();
+  res.json({ changes });
+});
+
+// ---- engine mode control (kill / resume) — the money switch, audited ---------
+// The engine always places real bids. Kill is one-tap: it hard-stops every monitor
+// and lowers the adapter write backstop; resume un-kills back to live bidding.
+// Every mode op applies to ALL account engines (safety: one kill stops everything),
+// so the engines move in lockstep - status flags read from the primary.
+function engineStatus() {
+  const engine = primaryEngine();
+  const armed = allEngines().reduce((n, e) => n + e.snapshot().filter((m) => !m.finalized).length, 0);
+  return {
+    mode: config.mode,          // 'real' | 'mock'
+    killed: engine.killed,
+    killReason: engine.killReason || null,
+    armed,                      // active (non-finalized) monitors currently bidding
+  };
+}
+async function auditEngine(req, action, extra) {
+  try {
+    await store.appendEvent('engineMode', {
+      action, actor: req.admin ? req.admin.user : 'unknown', ip: req.ip || null, ...(extra || {}),
+    });
+  } catch (e) { log(`[audit] engine ${action} log failed: ${e && e.message}`); }
+}
+
+app.get('/api/engine', (req, res) => res.json(engineStatus()));
+
+// KILL — one tap, no phrase. Halts every timer on EVERY account's engine and
+// lowers the adapter write backstop everywhere (one kill stops everything).
+app.post('/api/engine/kill', async (req, res) => {
+  const reason = (req.body && String(req.body.reason || '').trim()) || 'manual (console)';
+  for (const e of allEngines()) e.kill(reason);
+  await auditEngine(req, 'kill', { reason });
+  res.json({ ok: true, status: engineStatus() });
+});
+
+// RESUME a kill — un-kills back to live bidding on every account's engine.
+app.post('/api/engine/resume', async (req, res) => {
+  for (const e of allEngines()) e.resume();
+  await auditEngine(req, 'resume', { armed: engineStatus().armed });
+  res.json({ ok: true, status: engineStatus() });
+});
+
+// operator "Send test" - verify WhatsApp delivery to one number (independent of notifyMode).
+app.post('/api/whatsapp/test', async (req, res) => {
+  const phone = req.body && String(req.body.phone || '').trim();
+  if (!phone) return res.status(400).json({ error: 'A phone number is required.' });
+  if (!wa.enabled()) return res.status(400).json({ error: 'WhatsApp is not connected. Set the Maytapi token, product ID and phone ID on the server first.' });
+  const result = await notifier.sendTest(phone, { note: `Test from ${req.admin ? req.admin.user : 'console'}.` });
+  if (!result.ok) return res.status(502).json({ error: result.error || 'Send failed.' });
+  res.json({ ok: true, messageId: result.messageId || null });
+});
+
+// ---- sender re-link QR (on-demand, always fresh) ----------------------------
+// The PRIMARY recovery path when the Maytapi sender logs out. A pushed QR image is dead on arrival
+// (the code rotates in ~20s; the monitor's re-alert cooldown is tens of minutes), so the operator
+// gets a URL instead: this page fetches a fresh QR per request and re-pulls one on a bounded timer,
+// meaning whatever is on screen is always inside the rotation window.
+//
+// Registered here, BELOW the /api session gate above, so it inherits the same operator login as
+// every other /api route - a pairing credential must never be reachable without one. It ALSO does
+// its own currentAdmin() check inside the handler: this is the highest-value endpoint in the app,
+// and it must fail closed even if the gate is ever reordered, split, or mounted after a new route
+// block. Two independent checks, because #103 showed what one silent disagreement costs.
+//
+// Serves nothing at all unless the slot is provably logged out (fail-closed, same rule the monitor
+// uses). The expected handset number comes from the monitor's state file - the live board reports
+// number:null in exactly the state this page is used in. MONITOR_STATE_FILE is the single knob both
+// sides read, so pointing the monitor at a custom path moves the app's read with it.
+const monitorStateFile = process.env.MONITOR_STATE_FILE || path.join(config.dataDir, 'monitor-wa-state.json');
+app.get(RELINK_QR_PATH, createRelinkQrHandler({
+  creds: config.whatsapp,
+  senderNumberProvider: () => readLastKnownNumber(monitorStateFile, process.env),
+  // The second, independent auth check (see above). Injected rather than imported because
+  // scripts/lib/sender-qr.js is shared with the standalone monitor and imports nothing from src/.
+  currentAdmin,
+  // Serving the PNG hands out a live pairing credential - the one action in this app whose abuse
+  // is an identity takeover, and until now the only action of its class that wrote no audit record.
+  // Routed through the same append-only store stream the config and engine audits use, so a
+  // "re-bound to an unexpected number" incident can be reconstructed on-box: who, when, from where.
+  onQrServed: ({ actor, ip, bytes, phoneId, suppressed }) => {
+    log(`[relink-qr] served QR for slot ${phoneId} to ${actor} from ${ip} (${bytes} bytes)${suppressed ? `, +${suppressed} polls suppressed` : ''}`);
+    pushEvent('relinkQr', { kind: 'qr_served', phoneId, actor, suppressed: suppressed || 0 });
+    store.appendEvent('senderQr', { action: 'qr_served', actor, ip, phoneId, bytes, suppressed: suppressed || 0 })
+      .catch((e) => log(`[audit] relink-qr log failed: ${e && e.message}`));
+  },
+  log,
+}));
+
+// recent notification send attempts (delivery visibility); newest first, last 3 days
+app.get('/api/notifications/recent', async (req, res) => {
+  const events = (await store.readEvents('notifications', { from: Date.now() - 3 * 86_400_000, to: Date.now() }))
+    .reverse().slice(0, 30);
+  res.json({ notifications: events });
+});
+
+// History outcome for a request's load; null until the engine recorded a final result.
+async function outcomeFor(r) {
+  if (!r) return null;
+  const rec = await bidLogger.getRecord(r.loadId).catch(() => null);
+  return rec && rec.status === 'closed' ? rec : null;
+}
+
+// the capture page a pricing person opens from the link. A request that is no longer
+// open (armed/closed/expired/dismissed) gets a proper status page, never the form -
+// re-opening the link after someone else submitted must read as "handled", not broken.
+app.get('/price/:token', async (req, res) => {
+  // The path may carry a cosmetic slug prefix (/price/<slug>-<token>); only the token resolves.
+  const token = tokenFromPath(req.params.token);
+  const r = await requests.getByToken(token);
+    if (!r) {
+    const moved = await requests.resolveMovedToken(token).catch(() => null);
+    if (moved && moved.live) return res.redirect(302, `/price/${publicSeg(moved.live)}`);
+    if (moved) return res.status(404).type('html').send(priceShell('No longer open', `
+<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">Load cost entry</span></span></div>
+<h1>No longer open for pricing</h1>
+<p class="big">This enquiry is not open for pricing right now. Check the console worklist.</p>`));
+  }
+  if (!r) return res.status(404).type('html').send(priceShell('Link not found', `
+<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">Load cost entry</span></span></div>
+<h1>Unknown or expired link</h1>
+<p class="big">This link doesn't match a price request we know about.</p>`));
+  // D026: the first GET is the page-open signal the desk scorecard needs to tell "delivered" from
+  // "someone actually looked" - fire-and-forget, off the render path, never a bot/prefetch
+  // special case (a page fetched at all is the fact recorded).
+  requests.markOpened(token, r).catch((e) => log(`[price] could not record page-open time for ${redactToken(token)}: ${e && e.message}`));
+  // Armed: this SAME link now doubles as the re-price surface for as long as the bot is
+  // bidding this load - no separate admin-only route. renderRequestStatus() also delegates
+  // 'armed' here, so every other path that lands on it (a raced capture POST, /price/:token
+  // after someone else already captured) gets the editable form too, not a dead-end page.
+  // A display fact: a store read that fails here must not take the cost-entry page down with it.
+  const customerMinPct = await requests.customerMinimumFor(r).catch(() => null);
+  if (r.status === 'armed' || r.status === 'awaiting_price') {
+    let booked;
+    try { booked = await auctionIsFinal(r); }
+    catch (e) { return res.status(503).type('html').send(renderCaptureError(r, e.message, { head: 'Could not load this page', label: 'Try again' })); }
+    if (booked) return res.status(410).type('html').send(renderPricingClosed(r, { booked: true }));
+  }
+  if (r.status === 'armed') return res.type('html').send(renderPriceForm(req, r, { reprice: true, customerMinPct }));
+  if (r.status !== 'awaiting_price') {
+    return res.type('html').send(renderRequestStatus(req, r, await outcomeFor(r), { customerMinPct }));
+  }
+  // Serve the cost form right up to the real close: a late cost is accepted best-effort (the engine
+  // snipes the floor into whatever window is left), so there is no early "cutoff" to fail closed on
+  // any more. Only a genuinely-closed auction gets the terminal page below - pricingClosed() keys
+  // off closesAt. Server-rendered + JS-free, so it holds if the page's script dies.
+  if (pricingClosed(r)) {
+    return res.status(410).type('html').send(renderPricingClosed(r));
+  }
+  res.type('html').send(renderPriceForm(req, r, { customerMinPct }));
+});
+
+// Soft low-cost guard: a fat-fingered cost (a Rs 2 typed for a ~Rs 22,000 load - 23189088 on
+// 2026-07-16) would arm a near-zero floor and the bot would bid ~cost. The floor invariant only
+// stops bidding BELOW the entered number; it can't tell an absurd cost from a real one. So an
+// implausibly low cost needs an explicit confirmation. SOFT by design: the /price form's confirm
+// dialog sets low_cost_ack and the submit goes through - Rs 2 becomes a deliberate choice, not a
+// typo that sails past. Enforced here (not just in the page JS) so it still holds if the script
+// dies or a raw curl/fetch hits the token - the same belt-and-suspenders posture as the pricing-
+// cutoff guard above. A non-numeric cost is left to the normal BAD_INPUT path (capture()).
+function lowCostNeedsConfirm(cost, body) {
+  const c = Number(cost);
+  if (!Number.isFinite(c)) return false;
+  const b = body || {};
+  const acked = b.low_cost_ack === '1' || b.low_cost_ack === 1 || b.low_cost_ack === true || b.low_cost_ack === 'on';
+  return c < config.minPlausibleCost && !acked;
+}
+function lowCostError(cost) {
+  const e = new Error(`Rs ${cost} looks unusually low for a freight rate - open the link and confirm it is correct before submitting.`);
+  e.code = 'LOW_COST';
+  return e;
+}
+
+// A per-load band below the customer's minimum is allowed, but only as a deliberate act: the page
+// asks, and its answer is a real POST field the server re-checks, so a raw POST or a dead script
+// cannot slip one through. The guard still holds at the band's own minimum.
+// A form can carry the field twice (a no-script copy and the page's own stamp); every copy must agree.
+const belowMinAcked = (body) => {
+  const yes = (v) => v === '1' || v === 1 || v === true || v === 'on';
+  const v = body && body.below_min_ack;
+  return Array.isArray(v) ? v.length > 0 && v.every(yes) : yes(v);
+};
+const pctText = (n) => String(Number(Number(n).toFixed(2)));
+// Null for a band validateMargins refuses, so that band keeps its own BAD_INPUT answer.
+async function belowMinimumFor(reqDoc, band) {
+  if (!band || !Array.isArray(band.marginsPct)) return null;
+  let v;
+  try { v = validateMargins(band.marginsPct, band.minMarginPct); } catch (_) { return null; }
+  return requests.belowCustomerMinimum(reqDoc, v);
+}
+// True when the posted m_0..m_n are exactly the rows the request carries, i.e. the page was saved
+// with its margin rows untouched. A blank or unparseable row is never "unchanged".
+function rowsUnchanged(body, marginsPct) {
+  if (!Array.isArray(marginsPct)) return false;
+  const keys = Object.keys(body || {}).filter((k) => /^m_\d+$/.test(k));
+  if (keys.length !== marginsPct.length) return false;
+  return marginsPct.every((m, i) => {
+    const raw = body[`m_${i}`] == null ? '' : String(body[`m_${i}`]).trim();
+    return raw !== '' && Number(raw) === Number(m);
+  });
+}
+// A re-price that would write back the plan already saved is refused on the page (owner ruling
+// 26 Sep). Let through, it re-arms onto the same ladder, and on a load whose lowest price already
+// stands that is a hold nobody asked for (2609269ZYK). Never on resume: restarting at the held plan
+// is what resume is for.
+const typeRates = (byType) => (byType && Array.isArray(byType.types) ? byType.types.map((t) => Number(t.cost)) : null);
+const sameRates = (a, b) => !!a && !!b && a.length === b.length && a.every((c, i) => c === b[i]);
+function sameRateError(rates) {
+  const list = rates.map((c) => `₹${rsFmt(c)}`);
+  const e = new Error(list.length === 1
+    ? `${list[0]} is already the rate on this load. Nothing to change.`
+    : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]} are already the rates on this load. Nothing to change.`);
+  e.code = 'SAME_RATE';
+  return e;
+}
+// Only while a monitor is live and the load is not on hold: otherwise the same rate re-saved is what
+// re-arms the load, or re-states a hold the page then shows.
+function hasLiveMonitor(reqDoc) {
+  const stack = stackForRequest(reqDoc);
+  const m = stack && stack.engine && stack.engine.monitors ? stack.engine.monitors.get(String(reqDoc.loadId)) : null;
+  return !!(m && !m.finalized);
+}
+function sameRateReprice(reqDoc, body, repriceByType) {
+  const price = reqDoc.price || {};
+  if (!rowsUnchanged(body, rowsShown(body) || reqDoc.marginsPct)) return null;
+  const saved = typeRates(price.costByType);
+  const postedCost = (body && body.cost != null && String(body.cost).trim() !== '') ? Number(body.cost) : null;
+  let rates;
+  if (repriceByType) {
+    rates = typeRates(repriceByType);
+    if (!sameRates(rates, saved)) return null;
+  } else if (postedCost != null) {
+    if (saved || postedCost !== Number(price.cost)) return null;
+    rates = [postedCost];
+  } else {
+    rates = saved || [Number(price.cost)];
+  }
+  const count = body && (body.vehicle_count ?? body.vehicleCount);
+  if (count != null && String(count).trim() !== '') {
+    const savedCount = price.bidVehicleCount != null ? price.bidVehicleCount : Math.round(Number(reqDoc.load && reqDoc.load.units));
+    if (Number(count) !== Number(savedCount)) return null;
+  }
+  const days = body && (body.transit_days ?? body.transitDays);
+  const transitPending = !!(reqDoc.load && reqDoc.load.rules && reqDoc.load.rules.loadIsTransitTimeOn) && price.transitDays == null;
+  if (transitPending && days != null && String(days).trim() !== '') return null;
+  return sameRateError(rates);
+}
+// The rows a /price page rendered (its hidden rows_shown), or null for a page served before the field
+// existed or a value that does not parse. A console save re-snapshots a waiting request under an
+// open page, so the stored band is not what that page showed (B-1).
+function rowsShown(body) {
+  const raw = body && typeof body.rows_shown === 'string' ? body.rows_shown : '';
+  const parts = raw.split(',').map((s) => s.trim());
+  if (parts.some((s) => s === '' || !Number.isFinite(Number(s)))) return null;
+  return parts.map(Number);
+}
+function belowMinimumError(below) {
+  const m = pctText(below.marginPct), c = pctText(below.customerMinPct);
+  const e = new Error(`Not saved. ${m}% is below this customer's ${c}% minimum. Confirm it on the price page to bid at ${m}%, or raise it to ${c}% or more.`);
+  e.code = 'BELOW_MINIMUM';
+  e.belowMinimum = below;
+  return e;
+}
+
+// ---- SHIPPER CEILING at COST-ENTRY time (the 2026-07-27 commitment) -----------------------------
+//
+// SIKA 23534893. SuperProcure capped the load at Rs 26,000. The desk entered Rs 27,000, so the
+// operating floor was Rs 27,540 - above the cap - and NO legal bid existed. The cost was accepted,
+// the load armed, and 47 minutes later it closed with nothing bid. The refusal was correct; letting
+// the cost be entered at all was the miss, and every minute between the two was a minute the desk
+// could have re-priced and still competed.
+//
+// WHY THE EXISTING PREVIEW DID NOT SAVE THEM. The data was there - deriveLoadRules runs at DISCOVERY
+// (realAdapter._mapLoad) and createForLoad snapshots load.rules onto the request, which is the same
+// snapshot arm() later resolved the 26,000 ceiling from. So this was never a data-timing problem.
+// It was a CONTROL problem, four ways:
+//   1. the warning was advisory. Both submit handlers gated on hardFloorOk() and lowCostConfirm()
+//      only; nothing read willNotBid, so the cost could be submitted by simply not reading.
+//   2. it rendered inside <details class="band">, which is COLLAPSED by default - the operator had
+//      to expand "Adjust" to ever see it, while the always-visible summary kept showing the
+//      uncapped margin prices, contradicting the hidden warning.
+//   3. it was debounced 350ms behind an async fetch nothing awaited, with a silent .catch, so a
+//      fast submit or a network blip simply never produced the line.
+//   4. the ceiling was never a first-class fact anywhere on the page - there was no rendering for
+//      "known and not binding" and none for "unknown", and a PARTIALLY binding ceiling silently
+//      truncated the ladder (capLadderToCeiling) with nothing said about the prices that vanished.
+//
+// SOFT, not hard, and deliberately so. This is the same shape as lowCostNeedsConfirm: the desk is
+// stopped and made to acknowledge, and the acknowledgement is a real POST field the server checks -
+// so it holds against a raw curl, a dead page script, or a stale tab, exactly like the low-cost and
+// pricing-cutoff guards. A HARD block was considered and rejected: SuperProcure's numeric fields do
+// lie (the year-2100 placeholder close time is the standing example), and a wrong or stale ceiling
+// would then strand the desk with no way to record a cost at all. Fail closed on the money, keep a
+// human path open - and the path requires a deliberate act, never inattention.
+//
+// THIS DOES NOT REPLACE THE ENGINE GUARD. bidEngine's ceilingBelowFloor stand-down and the adapter's
+// assertBelowCeiling belt are untouched and must stay untouched. This is defence in depth: the UI
+// stops the operator early, the engine still refuses at the wire. An acknowledged cost still will
+// not be bid - the ack records the desk's intent, it does not authorise a losing bid.
+const CEILING_ACK_FIELD = 'ceiling_ack';
+
+/**
+ * What the shipper ceiling means for THIS load, resolved exactly as the engine resolves it.
+ *
+ * Three states, all of which the page must show DIFFERENTLY - collapsing any two is what produced
+ * the incident:
+ *   'unknown'      - SuperProcure published no usable ceiling. Common and completely normal. It is
+ *                    NOT the same as "no ceiling exists"; it is "we cannot see one", and blocking on
+ *                    it would strand ordinary loads while treating it as absent is what let a load
+ *                    with a late-arriving cap through.
+ *   'pmt_unproven' - a per-tonne load carrying a ceiling. The ceiling's UNIT is unproven (per MT or
+ *                    whole load), so no comparison against it is trustworthy in either direction.
+ *                    assertRulesSupported already refuses this load outright; the page must say so
+ *                    rather than show a per-MT comparison this codebase declares unproven.
+ *   'known'        - a real, bound-checked ceiling.
+ * `ceiling` is FLOORED, matching arm(): every bid goes on the wire as Math.round(amount), so
+ * floor(ceiling) is the largest integer that can never exceed it.
+ */
+function ceilingFactsFor(load) {
+  const rules = (load && load.rules) || null;
+  const raw = plausibleCeiling(rules && rules.ceilingPrice);
+  if (raw == null) return { state: 'unknown', ceiling: null };
+  if (rules && rules.pricingMode === 'per_tonne') return { state: 'pmt_unproven', ceiling: Math.floor(raw) };
+  return { state: 'known', ceiling: Math.floor(raw) };
+}
+
+/**
+ * Would this cost + band produce a load we cannot bid at all? Read through engine.planPreview, which
+ * runs the SAME gates arm() runs, so the page can never disagree with what an actual arm would do.
+ * Returns null when there is nothing to warn about (no ceiling, ceiling not binding, or the plan
+ * could not be built - a preview failure must never become a submit refusal).
+ *
+ * A dead plan carries the corrective the refusal offers (costTarget), and on a per-truck-type load
+ * the rates that reach it (costTargetByType). Both are null when no cost fits.
+ */
+function ceilingDeadPlan(engine, load, cost, band, byType) {
+  const plan = ceilingVerdict(engine, load, cost, band);
+  if (plan && plan.reason !== 'pmt') Object.assign(plan, ceilingFix(engine, load, band, plan, byType));
+  return plan;
+}
+
+// Offered only once the same gate passes it, and only above the load's hard cost floor, which would
+// otherwise refuse the offered cost outright.
+function ceilingFix(engine, load, band, plan, byType) {
+  const none = { costTarget: null, costTargetByType: null };
+  const t = ceilingCostTarget(plan.ceiling, plan.marginsPct, plan.minMarginPct);
+  const hardFloor = isPmtBasis(load) ? 0 : hardCostFloorFor(load).floor;
+  if (t == null || !(t < plan.cost) || t < hardFloor) return none;
+  let rates = null;
+  let blend = t;
+  if (byType && Array.isArray(byType.types) && byType.types.length > 1 && byType.cost > 0) {
+    const counts = byType.types.map((x) => x.count);
+    rates = fitRatesToTarget(byType.types.map((x) => x.cost), counts, t, hardFloor);
+    if (!rates) return none;
+    blend = Math.round(rates.reduce((sum, c, i) => sum + c * counts[i], 0) / counts.reduce((a, b) => a + b, 0));
+  }
+  if (ceilingVerdict(engine, load, blend, band)) return none;
+  return { costTarget: t, costTargetByType: rates };
+}
+
+// One rule for the server and the page script, which embeds this function's source: scale every rate
+// by the same factor down to the target, but hold any rate that would fall under the hard floor at the
+// floor and take the difference off the others. A typed rate already under the floor starts at the
+// floor, so the fit is found on rates the floor accepts. Null when no such vector exists.
+function fitRatesToTarget(typed, counts, target, floor) {
+  var rates = typed.map(function (c) { return Math.max(c, floor, 1); });
+  var n = 0, i;
+  for (i = 0; i < rates.length; i++) n += counts[i];
+  var budget = target * n, out = rates.slice(), held = [];
+  for (var pass = 0; pass <= rates.length; pass++) {
+    var heldSum = 0, freeSum = 0, clamped = false;
+    for (i = 0; i < rates.length; i++) { if (held[i]) heldSum += out[i] * counts[i]; else freeSum += rates[i] * counts[i]; }
+    if (!(freeSum > 0)) break;
+    var k = Math.min(1, (budget - heldSum) / freeSum);
+    for (i = 0; i < rates.length; i++) {
+      if (held[i]) continue;
+      var v = Math.floor(rates[i] * k);
+      if (v < floor || v < 1) {
+        out[i] = Math.max(floor, 1); held[i] = true; clamped = true;
+      } else out[i] = v;
+    }
+    if (!clamped) break;
+  }
+  var total = 0;
+  for (i = 0; i < rates.length; i++) total += out[i] * counts[i];
+  return total <= budget ? out : null;
+}
+
+const CEILING_NO_FIX = 'No cost can bid under the max bid. Quote it by hand.';
+
+function ceilingVerdict(engine, load, cost, band) {
+  if (!engine || typeof engine.planPreview !== 'function') return null;
+  const c = Number(cost);
+  if (!Number.isFinite(c) || !(c > 0)) return null;             // a bad cost is capture()'s BAD_INPUT to report
+  try {
+    const preview = engine.planPreview(
+      { id: (load && load.id) || null, rules: (load && load.rules) || null, companyName: (load && load.companyName) || null },
+      { cost: c, marginsPct: band && band.marginsPct, minMarginPct: band && band.minMarginPct },
+    );
+    // A load the engine refuses outright is not a ceiling verdict, and must not borrow its refusal.
+    if (!preview || !preview.willNotBid || preview.willNotBid === 'unsupported_rule') return null;
+    // WHY it is dead, as a first-class field. The page, the server refusal and the WhatsApp
+    // receipt must never disagree about which of the two it is, so it is decided ONCE, here.
+    //
+    //   'cost'   ceiling < the true cost. Any bid at all loses money. This is the ONLY case where
+    //            "every bid would be below your own cost" is a true sentence.
+    //   'margin' ceiling >= cost but below the operating floor (cost x (1 + minMarginPct/100)).
+    //            The cost fits; the MARGIN is what makes it unbiddable, and lowering the lowest
+    //            margin fixes it. Saying "below your own cost" here is false and sends the desk to
+    //            the wrong control - the defect this field exists to kill.
+    //   'pmt'    per-tonne load carrying a ceiling of unknown basis. Neither, and unfixable here.
+    const ceilNum = preview.ceiling != null ? Number(preview.ceiling) : null;
+    const reason = preview.willNotBid === 'per_tonne_ceiling' ? 'pmt'
+      : (ceilNum != null && ceilNum < Math.round(c)) ? 'cost'
+        : 'margin';
+    return {
+      willNotBid: preview.willNotBid, ceiling: ceilNum, floor: preview.floor,
+      cost: Math.round(c), reason,
+      // The band being judged, carried so ceilingCostTarget can key on the TOP margin - the rung
+      // that actually binds. Without it the copy could only talk about the floor.
+      marginsPct: (band && Array.isArray(band.marginsPct)) ? band.marginsPct : null,
+      minMarginPct: band ? band.minMarginPct : null,
+    };
+  } catch (_) {
+    return null;  // preview is advisory here; a throw must not block a cost the desk is trying to save
+  }
+}
+
+/**
+ * The floor-step refusal as the server can know it at RENDER time, through the same planPreview the
+ * live preview calls. Pre-rendering it is the point: on a re-price the cost and the band are already
+ * on the request, so a desk with no JavaScript sees the blocked submit on load rather than after it.
+ *
+ * The stored per-type vector rides along where the portal can act on it, because the portal measures
+ * its minimum on each line's own amount - judging a per-type load on the blend alone would render a
+ * verdict the live preview then contradicts on the first keystroke.
+ */
+function floorStepPreflight(engine, load, cost, band, costByType) {
+  if (!engine || typeof engine.planPreview !== 'function') return null;
+  const c = Number(cost);
+  if (!Number.isFinite(c) || !(c > 0)) return null;
+  let rules = (load && load.rules) || null;
+  if (costByType && Array.isArray(costByType.types) && costByType.types.length > 1) {
+    rules = Object.assign({}, rules, { costByType });
+  }
+  try {
+    const preview = engine.planPreview(
+      { id: (load && load.id) || null, rules, companyName: (load && load.companyName) || null },
+      { cost: c, marginsPct: band && band.marginsPct, minMarginPct: band && band.minMarginPct },
+    );
+    // Unresolved here means unresolved: the render has no budget to spend a detail read, and the
+    // live preview does that a moment later. Blocking off the adapter's fallback is the one thing
+    // this must not do.
+    return floorStepRefusal(Object.assign({}, preview,
+      { minDecrementUnknown: !(rules && rules.minDecrement != null) }));
+  } catch (_) {
+    return null;  // advisory at render; a preview throw must not become a submit refusal
+  }
+}
+
+const ceilingAcked = (body) => {
+  const v = body && body[CEILING_ACK_FIELD];
+  return v === '1' || v === 1 || v === true || v === 'on';
+};
+
+/** True when the submitted cost cannot produce a single legal bid and the desk has not acknowledged it. */
+function ceilingNeedsConfirm(plan, body) {
+  if (!plan || !plan.willNotBid) return false;
+  return !ceilingAcked(body);
+}
+
+const rsFmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-IN') : '?');
+
+/**
+ * The margin that lands the lowest price exactly ON the ceiling, to one decimal (matching the
+ * band inputs' own step="0.1"). FLOOR, never round: rounding up produces a lowest price ABOVE the
+ * cap, which is the one arithmetic mistake this helper exists to prevent. Null when the cost
+ * itself is over the ceiling, because then no margin makes it biddable.
+ */
+/**
+ * The highest cost at which the WHOLE band still fits under the ceiling - i.e. the buying price
+ * this load is worth if the desk wants every rung to go out.
+ *
+ * Why this replaced the lower-the-margin suggestion (product owner, 2026-07-31). Dropping the
+ * lowest margin does technically produce one legal bid, but the top rungs are still over the cap
+ * and capLadderToCeiling collapses them ONTO it, so the ladder degenerates. On the evidence load
+ * (cap 15,500, cost 15,000, band 12.6/7.2/6):
+ *
+ *   lower the margin to 3.3%  ->  15,500 -> 15,495     2 rungs, Rs 5 of walk-down
+ *   lower the cost to 13,765  ->  15,499 -> 14,756 -> 14,591   3 rungs, Rs 908 of walk-down
+ *
+ * The walk-down IS the mechanic, so the margin suggestion was quietly advising the desk to throw it
+ * away. This number keeps the band intact and turns the problem into the purchasing question the
+ * desk can actually act on: can this truck be sourced at X.
+ *
+ * Keyed on the TOP margin, because that rung is the binding one - if the opening price fits, every
+ * rung below it does. FLOOR, never round: rounding up puts the opening bid over the cap.
+ *
+ * It is DISPLAYED, never written into the cost box. The cost field is what recordMarginAudit and the
+ * WhatsApp receipt store as what the truck cost BRL, so a machine-written figure there is a
+ * permanently wrong fact - the same failure hardCostFloorViolation refuses outright rather than
+ * offering to confirm. Showing the number costs nothing and keeps the claim human.
+ */
+function ceilingCostTarget(ceiling, marginsPct, minMarginPct) {
+  const cap = Number(ceiling);
+  const band = Array.isArray(marginsPct) ? marginsPct.map(Number).filter((n) => Number.isFinite(n)) : [];
+  if (!Number.isFinite(cap) || !(cap > 0) || !band.length) return null;
+  // Every price is raised to the minimum-margin price, so on a band whose minimum sits above its top
+  // margin it is the minimum that binds, and keying on the top margin repeats the same refusal.
+  const min = Number(minMarginPct);
+  const top = Math.max(...band, ...(minMarginPct != null && Number.isFinite(min) ? [min] : []));
+  if (!(top > -100)) return null;
+  const t = Math.floor(cap / (1 + top / 100));
+  return t > 0 ? t : null;
+}
+
+/**
+ * The desk-facing copy for a dead plan, as three lines plus an optional fix. Kept next to
+ * ceilingDeadError so the page the desk reads and the refusal the server throws are written in one
+ * place and cannot drift into stating different reasons for the same load. The inline script mirrors
+ * this shape (ceilReason / ceilFixPct) against the same two conditions.
+ */
+function ceilingCopy(plan) {
+  const rs = rsFmt;
+  if (plan.reason === 'pmt') {
+    return {
+      head: `Priced per tonne, and the customer set a ceiling (Rs ${rs(plan.ceiling)})`,
+      body: 'We cannot tell if that ceiling is per tonne or for the whole load. No bid will go out.',
+      why: 'Quote this load by hand on SuperProcure.',
+      fixPct: null,
+    };
+  }
+  const target = plan.costTarget != null ? plan.costTarget : null;
+  const why = target != null ? `Use Rs ${rs(target)} or less.` : CEILING_NO_FIX;
+  if (plan.reason === 'cost') {
+    return {
+      head: 'Cost too high',
+      body: `Max bid is Rs ${rs(plan.ceiling)}; your cost is Rs ${rs(Math.round(plan.cost - plan.ceiling))} over.`,
+      why,
+      costTarget: target,
+      fixPct: null,
+    };
+  }
+  return {
+    head: 'Price too high',
+    // The cap only: the lowest price is already on screen in the band below (product owner, 2026-07-31).
+    body: `Max bid is Rs ${rs(plan.ceiling)}.`,
+    why,
+    costTarget: target,
+    fixPct: null,
+  };
+}
+
+/**
+ * The refusal the desk reads when JavaScript is not running - the real gate's own voice.
+ * Two cases, never one. The old single string asserted "every bid would be below your own cost"
+ * for BOTH, which is false whenever the ceiling sits between the cost and the operating floor
+ * (ceiling 15,500 against cost 15,000 is Rs 500 ABOVE cost) and points the desk at the wrong
+ * control. The review fixtures were 14,000 and 20,000; both hide it.
+ *
+ * No "open the link and confirm" promise here: a desk with no JavaScript has no way to do that,
+ * so the honest instruction is to quote by hand.
+ */
+function ceilingDeadError(plan) {
+  const rs = rsFmt;
+  let msg;
+  if (plan.reason === 'pmt') {
+    msg = `Not saved. This load is priced per tonne and the customer set a ceiling (Rs ${rs(plan.ceiling)}). `
+      + 'We cannot tell if that ceiling is per tonne or for the whole load, so no bid will go out. '
+      + 'Quote this load by hand on SuperProcure.';
+  } else {
+    const target = plan.costTarget != null ? plan.costTarget : null;
+    msg = `Not saved. Max bid is Rs ${rs(plan.ceiling)}; `
+      + (plan.reason === 'cost'
+        ? `your cost is Rs ${rs(Math.round(plan.cost - plan.ceiling))} over.`
+        : `your lowest price is Rs ${rs(Math.round(plan.floor - plan.ceiling))} over.`)
+      + (target != null ? ` Use Rs ${rs(target)} or less.` : ` ${CEILING_NO_FIX}`);
+  }
+  const e = new Error(msg);
+  e.code = 'CEILING_DEAD';
+  e.costTarget = plan.costTarget != null ? plan.costTarget : null;
+  e.costTargetByType = plan.costTargetByType || null;
+  return e;
+}
+
+// ---- ZERO-MARGIN FLOOR at COST-ENTRY time (T6, 2026-09-09) --------------------------------------
+//
+// buildBandLadder derives the operating floor as max(cost, cost x (1 + minMarginPct/100)), so a
+// floor margin of 0 makes the floor EXACTLY the cost the desk typed and the ladder walks down to a
+// bid at cost. On the box: 133 loads carried a 0, 77 bid at exactly cost, 13 won - Rs 5,59,500 of
+// freight moved at no margin, all of it from a stored value nobody remembered setting.
+//
+// HARD, with no acknowledgement field, and that is the difference from the ceiling guard beside it.
+// A ceiling is SuperProcure's number and their numeric fields do lie, so stranding the desk with no
+// way to record a cost would be the worse failure. This number is OURS and it is simply wrong;
+// there is no load on which bidding at cost is the answer, so there is nothing for the desk to
+// acknowledge - only a margin for someone to correct.
+//
+// Judged on the RESOLVED band (a per-load override if the desk set one, else the inherited
+// customer/global band), because that is what buildBandLadder will be handed at arm.
+
+/**
+ * The effective never-go-below margin for a band, resolved exactly as buildBandLadder resolves it:
+ * the explicit minMarginPct when it is a finite number, else the band's own lowest margin. Null when
+ * the band carries neither - a shapeless band is capture()'s BAD_INPUT to report, not this gate's.
+ */
+function effectiveFloorMarginPct(band) {
+  const explicit = band && band.minMarginPct;
+  if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
+  const rungs = (band && Array.isArray(band.marginsPct) ? band.marginsPct : []).map(Number).filter(Number.isFinite);
+  return rungs.length ? Math.min(...rungs) : null;
+}
+
+/**
+ * Would this cost + band put the lowest bid at exactly the entered cost? Read off the margin rather
+ * than through engine.planPreview (which the ceiling gate uses) on purpose: planPreview returns null
+ * when no engine is in hand, and a money gate that silently passes when its dependency is missing is
+ * the shape of the defect this exists to close.
+ *
+ * NEGATIVES ARE NOT JUDGED HERE. A negative margin clamps to cost too, but it is already rejected by
+ * validateMargins on every write path, and intercepting it here would replace that rejection's own
+ * reason with copy that says "0%" about a -5% band - a false statement, and it breaks the preview/
+ * save parity pin (test-preview-endpoint.js) that keeps the two paths refusing for one reason. All
+ * 133 zero-floor loads measured on the box were exactly 0; a legacy stored negative is caught one
+ * layer down, at armFromRequest, which substitutes rather than arms.
+ */
+function bidsAtCost(cost, band) {
+  const c = Number(cost);
+  if (!Number.isFinite(c) || !(c > 0)) return false;  // a bad cost is capture()'s BAD_INPUT to report
+  const m = effectiveFloorMarginPct(band);
+  if (m == null || m < 0) return false;
+  // Not only exactly 0: a floor margin under 50/cost % rounds the floor rung onto the cost too.
+  return Math.round(c * (1 + m / 100)) <= Math.round(c);
+}
+
+/**
+ * The refusal the desk reads. Written to the client's own vocabulary, established on the 2026-09-08
+ * call: "band", "floor" and "your lowest price" do not survive translation on that desk, so the
+ * never-go-below wording is used instead. Names the rupee figure they just typed, the setting that
+ * is wrong, and who has to change it - a refusal with no fix in it is a refusal they will retry.
+ */
+function bidsAtCostError(cost, band) {
+  const m = effectiveFloorMarginPct(band);
+  const e = new Error(m > 0
+    ? `Not saved. The lowest margin here, ${m}%, adds less than Rs 1 on your cost of Rs ${fmtRs(cost)}, so the `
+      + 'never-go-below price would be the same as your cost. The margin has to be raised before this load can be priced.'
+    : `Not saved. This customer's margin setting is 0%, so the never-go-below price on this load is `
+    + `Rs ${fmtRs(cost)} - the same as your cost. The margin setting has to be corrected before this load can be priced.`);
+  e.code = 'ZERO_MARGIN';
+  return e;
+}
+
+/**
+ * The same refusal for a REVERT, which is a different sentence and not a wording preference. The
+ * desk entered no cost on this submit, so "the cost you entered" is false; and the load is already
+ * armed and bidding, so the reader's first question is whether refusing just broke it. Both the
+ * /price revert button and the console's margin/clear route land here, so the two say one thing.
+ */
+function revertAtCostError(cost, band) {
+  const m = effectiveFloorMarginPct(band);
+  const e = new Error(m > 0
+    ? `Not reverted. The standard lowest margin for this customer, ${m}%, adds less than Rs 1 on a cost of `
+      + `Rs ${fmtRs(cost)}, so the never-go-below price would be the same as your cost. This load is still bidding on `
+      + 'its current margins - correct the setting before reverting.'
+    : `Not reverted. The standard margin for this customer is 0%, so the never-go-below price on this load `
+    + `would be Rs ${fmtRs(cost)} - the same as your cost. This load is still bidding on its current margins - `
+    + 'correct the setting before reverting.');
+  e.code = 'ZERO_MARGIN';
+  return e;
+}
+
+// ---- HARD clerical-error floor (the 2026-07-25 commitment) --------------------------------------
+// The soft guard above catches an absurd number (Rs 2) and lets the desk confirm through it. It does
+// NOT catch the failure Suyashh actually named on the training call: a missing digit - 1,500 typed
+// for a load meant to be 15,000. That value is not absurd on its face, so a confirm dialog is exactly
+// the wrong instrument (it gets clicked). This band REFUSES: no ack bypasses it, the desk must re-enter.
+//
+// TRUCK basis only. A PMT load's cost is a per-METRIC-TONNE rate (a legitimate Rs 800), so an absolute
+// rupee floor would reject honest work; PMT keeps the soft confirm alone. The basis is READ through
+// discovery.isPmtBasis - the SAME predicate the price page's per-MT label and isMultiVehicle use, so
+// there is one definition of PMT and no reclassification here (loadRules.js is deliberately
+// untouched). An UNKNOWN basis is treated as truck: for a too-low cost that is the conservative
+// direction (guard on, not off).
+
+// The per-km term rides SuperProcure's OWN route distance (load.distanceKm <- loadDistance), never an
+// estimate: a floor computed from a guessed lane length would reject real rates. Absent/junk/<=0
+// distance -> no per-km term at all, and the absolute floor stands alone.
+//
+// The floor is a WHOLE RUPEE by construction, and that is load-bearing rather than cosmetic. SP's
+// loadDistance is fractional in real data (1,894.24 km on Alwar->Kamrup), so an unrounded floor of
+// 18,942.4 would be quoted to the desk as "Rs 18,942" (fmtRs is 0 dp), refused again when they typed
+// exactly that, printed beside arithmetic that does not multiply out, and inlined into the page as a
+// value the step="1" cost input rejects outright. Round the LANE LENGTH up to a whole km once, here,
+// then the product: every downstream surface then reads the same integer. Ceil in both places, never
+// floor or round - rounding must never LOWER a money guard.
+//
+// The console's clericalFloor setting, when set, replaces the env knobs and ADDS its two terms
+// (Rs abs + Rs perKm x km) instead of taking the higher. Read here on every call, so a save moves
+// the next request with no restart.
+function hardCostFloorFor(load) {
+  const set = clericalFloorSetting();
+  const pos = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
+  const abs = pos(set ? set.absRs : config.minCostAbs);
+  const perKm = pos(set ? set.perKmRs : config.minCostPerKm);
+  const rawKm = Number(load && load.distanceKm);
+  const km = Number.isFinite(rawKm) && rawKm > 0 ? Math.ceil(rawKm) : 0;
+  const byKm = perKm > 0 && km > 0 ? Math.ceil(perKm * km) : 0;
+  const floor = set ? abs + byKm : Math.max(abs, byKm);
+  return { floor, abs, perKm, km: km > 0 ? km : null, byKm, fromSetting: !!set };
+}
+
+function clericalFloorSetting() {
+  const cf = config.clericalFloor;
+  if (!cf || (cf.absRs == null && cf.perKmRs == null)) return null;
+  return { absRs: cf.absRs == null ? 0 : Number(cf.absRs), perKmRs: cf.perKmRs == null ? 0 : Number(cf.perKmRs) };
+}
+
+// Rs with Indian digit grouping, so the desk reads the same shape it types (4,500 not 4500).
+const fmtRs = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+// The per-km RATE is quoted as the operator set it (Rs 10, or Rs 10.5) rather than rounded to a whole
+// rupee: the message shows this number multiplied by the km, so rounding it here would print
+// arithmetic that does not hold.
+const fmtRate = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+// Returns an Error to throw, or null when the cost clears the hard floor. Named numbers in the
+// message (entered AND required, plus the per-km arithmetic when that is what binds) so the desk can
+// see WHY without asking anyone - "check for a missing digit" is the actual instruction.
+function hardCostFloorViolation(cost, load, typeLabel) {
+  const c = Number(cost);
+  if (!Number.isFinite(c)) return null;          // non-numeric stays capture()'s BAD_INPUT path
+  if (isPmtBasis(load)) return null;             // per-tonne rate: an absolute rupee floor cannot judge it
+  const f = hardCostFloorFor(load);
+  if (!(f.floor > 0) || c >= f.floor) return null;
+  const perKmPart = `Rs ${fmtRate(f.perKm)}/km x ${fmtRs(f.km)} km`;
+  const showKm = f.byKm > 0 && (f.fromSetting || f.byKm > f.abs);
+  const how = !showKm ? '' : (f.fromSetting && f.abs > 0 ? ` (Rs ${fmtRs(f.abs)} + ${perKmPart})` : ` (${perKmPart})`);
+  const basis = `the minimum for this load is Rs ${fmtRs(f.floor)}${how}`;
+  const what = typeLabel ? `The rate for ${typeLabel}` : 'This rate';
+  const e = new Error(`${what} looks too low for this load (Rs ${fmtRs(c)} entered; ${basis}). Check for a missing digit and re-enter.`);
+  e.code = 'LOW_COST';                           // same code/400 mapping as the soft band - one path
+  return e;
+}
+
+// A hard-floor refusal is the one money-path decision on this seam that produces NO artifact
+// otherwise: the desk is blocked, the request stays awaiting, and nothing anywhere records that it
+// happened. That is the failure mode the boot line below also guards - a mistyped SP_MIN_COST_ABS
+// refuses every truck-basis cost the desk enters, discovery keeps creating requests, WhatsApp keeps
+// sending links, every submit bounces, and the first signal is the next morning's cause-blind
+// "Missed the pricing cutoff" heartbeat, a full trading day late.
+//
+// So each refusal leaves the SAME two records the audited actions in this handler already leave: a
+// warn line (pm2-out.log + the console's live feed, via log.warn's pushEvent) and one append through
+// the store seam, so the count is queryable after the fact and can feed a heartbeat. Deliberately NOT
+// a WhatsApp alert - the desk is being told in the page, in real time; an alert per typo is noise.
+//
+// `opts` carries the two identity fields that make a refusal spike diagnosable rather than just
+// countable - WHICH seam refused and WHO drove it. Three situations produce the same count and need
+// completely different responses: a mistyped SP_MIN_COST_ABS refusing every truck-basis submit, the
+// desk fat-fingering the public link, and one operator repeatedly pushing a low cost through the
+// console. Without `source` they are indistinguishable. Set by every caller of enforceHardCostFloor.
+function recordCostFloorRefusal(reqDoc, cost, err, opts) {
+  const { source = null, req = null } = opts || {};
+  const loadId = (reqDoc && reqDoc.loadId) || null;
+  // The margin route runs behind the /api session gate, so req.admin.user is a real operator there -
+  // and the SUCCESSFUL action on that same handler already records it (recordMarginAudit). The public
+  // /price submit has no session by design; 'pricing' is the seam label this codebase already uses for
+  // it in its own audit trail (setBidOverride's setBy on that route), not an invented person. `source`
+  // is what actually distinguishes the two, and it is always caller-supplied.
+  const actor = req && req.admin ? req.admin.user : 'pricing';
+  const f = hardCostFloorFor(reqDoc && reqDoc.load);
+  const boundBy = f.fromSetting ? 'setting' : f.byKm > f.abs ? 'perKm' : 'abs';
+  log.warn(`[price] cost floor REFUSED load ${loadId} (${source || 'unknown'} / ${actor}): entered Rs ${Number(cost)}, floor Rs ${f.floor} (bound by ${boundBy}; abs ${f.abs}, perKm ${f.perKm} x ${f.km == null ? 'no km' : `${f.km} km`})`);
+  store.appendEvent('costFloorRefused', {
+    loadId, source, actor,
+    // reqDoc.id IS the price-request capability token - the entire auth for the public
+    // POST /price/<token> page, which arms a live-money bid. Anything holding it whole can re-price an
+    // open auction with no session, so it goes through redactToken like every other sink that prints
+    // one (redactCapturePath above; priceRequests.js's own log lines), leaving a short prefix that
+    // correlates two records and reconstructs nothing. This stream is APPENDED TO DISK under data/logs
+    // and rides into backups, so "only a log line" is not a reason to keep it whole. loadId, right
+    // beside it, is the correlation key anyone actually reads these records by.
+    requestId: reqDoc && reqDoc.id ? redactToken(reqDoc.id) : null,
+    status: (reqDoc && reqDoc.status) || null,
+    entered: Number(cost), floor: f.floor, boundBy, abs: f.abs, perKm: f.perKm, km: f.km,
+    message: err && err.message,
+  }).catch((e) => log(`[audit] costFloorRefused log failed: ${e && e.message}`));
+}
+
+// The knobs are read from env at require time and have no console surface, so the floor actually in
+// force on a box is otherwise unrecoverable from its logs. This line goes out in the real-mode boot
+// block, which makes a typo'd SP_MIN_COST_ABS (50000 for 5000 - refusing every truck-basis cost the
+// desk enters) visible on the restart that caused it, instead of a trading day later through a
+// cause-blind missed-cutoff heartbeat. A function, not an inline template, so it can be pinned by a
+// test without standing up a real-mode boot.
+function costFloorBootLine() {
+  const set = clericalFloorSetting();
+  if (set) return `[bid-command] desk cost floor: console setting Rs ${set.absRs} + Rs ${set.perKmRs}/km x km (TRUCK basis only, PMT exempt; env knobs not in use)`;
+  const abs = Number(config.minCostAbs) > 0 ? Number(config.minCostAbs) : 0;
+  const perKm = Number(config.minCostPerKm) > 0 ? Number(config.minCostPerKm) : 0;
+  if (!abs && !perKm) return '[bid-command] desk cost floor: DISABLED (both knobs 0) - soft confirm only';
+  return `[bid-command] desk cost floor: abs Rs ${abs}, per-km Rs ${perKm}/km (whichever is higher; TRUCK basis only, PMT exempt)`;
+}
+
+// The enforcement point every cost-entry seam calls: check, record, throw. One place, so a refusal can
+// never be enforced without also being recorded. `opts` ({ source, req }) is forwarded straight to the
+// recorder - pass a source tag naming the entry point at EVERY call site, and the express req wherever
+// one is in hand, so the record says which seam refused and who was behind it.
+function enforceHardCostFloor(cost, reqDoc, opts) {
+  const err = hardCostFloorViolation(cost, reqDoc && reqDoc.load, opts && opts.typeLabel);
+  if (!err) return;
+  recordCostFloorRefusal(reqDoc, cost, err, opts);
+  throw err;
+}
+
+// On a per-type entry the floor binds EACH type's rate (owner ruling 2026-09-19): ten trucks at
+// Rs 45,000 and one at Rs 4,999 blend to Rs 41,364, and judging only the blend let the missing
+// digit through onto that one freight line.
+function enforceHardCostFloorOnEntry(cost, byType, reqDoc, opts) {
+  if (!byType) return enforceHardCostFloor(cost, reqDoc, opts);
+  for (const t of byType.types) enforceHardCostFloor(t.cost, reqDoc, { ...opts, typeLabel: t.label });
+}
+
+// the capture submit: validate the cost -> arm the engine for this load
+app.post('/price/:token', priceForm, async (req, res) => {
+  const wantsJson = (req.headers['content-type'] || '').includes('application/json');
+  const token = tokenFromPath(req.params.token); // strip any cosmetic slug prefix -> the real token
+  try {
+    const reqDoc = await requests.getByToken(token);
+    if (!reqDoc) { const e = new Error('unknown price-request token'); e.code = 'NOT_FOUND'; throw e; }
+    if ((reqDoc.status === 'armed' || reqDoc.status === 'awaiting_price') && await auctionIsFinal(reqDoc)) throw bookedError();
+
+    // Re-price / revert submit on an already-armed load - the same link as the original
+    // capture, now doubling as the re-price surface. Real money, hence the same
+    // reArmWithNewBand() the admin dashboard route uses (stop -> rebuild the ladder off the
+    // new band, fired rungs kept). No admin session exists on this public route, so the audit
+    // trail attributes it to 'pricing' - the same convention already used for a bid-level
+    // override entered at capture time.
+    //
+    // Only intercept when the body actually signals that intent (band rungs m_0.. from the
+    // re-price form, or revert_override) - a stray POST to an armed load that ISN'T a re-price
+    // submit (e.g. a browser back+resubmit of the original one-field capture form after someone
+    // else already armed it) falls through to the generic "not open" handling further down,
+    // same as any other non-open status: an HTML caller gets the (now-editable) re-price page
+    // via renderRequestStatus()'s delegation below, unchanged; a JSON caller keeps the exact
+    // same machine-readable 409 it always got, since its body doesn't match a re-price shape.
+    const isRevert = req.body && req.body.revert_override === '1';
+    const hasBandFields = Object.keys(req.body || {}).some((k) => /^m_\d+$/.test(k));
+    // Snapshotted here, before any write on either branch: this is the last point at which the
+    // standing cost and band still exist to be recorded.
+    const beforeState = pricedState(reqDoc);
+    const beforeVehicleCount = (reqDoc.price && reqDoc.price.bidVehicleCount != null) ? reqDoc.price.bidVehicleCount : null;
+    // capture() moves a target ask to 'armed' while its single bid is on the wire, and the re-price
+    // path below would write its cost and band and then fail to arm it.
+    if (reqDoc.status === 'armed' && isTargetPriceReq(reqDoc)) {
+      const msg = `The answer to the customer's Rs ${rsFmt(reqDoc.targetPricePerUnit)} on load ${reqDoc.loadId} is already being sent, so nothing was changed. Reload this page to see the result.`;
+      if (wantsJson) return res.status(409).json({ error: msg });
+      return res.status(409).type('html').send(renderCaptureError(reqDoc, msg));
+    }
+    if (reqDoc.status === 'armed' && (isRevert || hasBandFields)) {
+      // Same low-cost guards as the first capture below: a re-price to Rs 2 (or a missing digit) is
+      // just as much a fat-finger. Skipped on a revert (margin-only, carries no cost in the body).
+      // HARD band first - it must not be reachable via low_cost_ack, which the soft check honours.
+      // Both guards judge the cost the server derives from the per-type rates, never the posted
+      // `cost` beside them: that field is the page's own copy, and a stale or crafted one walked a
+      // sub-floor vector straight through (H3).
+      const repriceTyped = isRevert ? null : readCostByType(req.body);
+      const repriceByType = repriceTyped ? normalizeCostByType(repriceTyped, reqDoc.load && reqDoc.load.cargoTypes) : null;
+      if (repriceTyped && !repriceByType) throw blankTypedCostError(reqDoc);
+      const repriceCost = repriceTyped ? repriceByType.cost : (req.body && req.body.cost);
+      if (!isRevert && !reqDoc.hold && hasLiveMonitor(reqDoc)) { const same = sameRateReprice(reqDoc, req.body, repriceByType); if (same) throw same; }
+      if (!isRevert) enforceHardCostFloorOnEntry(repriceCost, repriceByType, reqDoc, { source: 'price-submit', req });
+      if (!isRevert && lowCostNeedsConfirm(repriceCost, req.body)) throw lowCostError(repriceCost);
+      // SHIPPER CEILING on the RE-PRICE path. This is the higher-stakes half of the gate, not the
+      // lower: an armed load is already bidding, and reArmWithNewBand() below STOPS the monitor and
+      // rebuilds the ladder off the new band. If that band's operating floor lands above the
+      // ceiling, arm() sets ceilingBelowFloor and _decide never bids again - so a dead re-price does
+      // not merely fail to start, it can destroy a working bidding position that was live a second
+      // earlier, and then report "Saved - bidding off the new cost and margins now."
+      //
+      // The first version of this feature gated the capture path and POST /api/price-requests/:id/margin
+      // (the admin console route). The desk's own re-price form posts to location.pathname - i.e.
+      // right here - so the guard sat on the internal route and missed the public one entirely.
+      //
+      // The REVERT case is checked too, and it is not symmetric hand-waving: revert_override carries
+      // no cost in the body, but clearBidOverride RESTORES the inherited band, which RAISES the
+      // floor. A desk that lowered its margin to make a load biddable and then tapped "Revert to
+      // standard margins" would otherwise silently re-create the dead state on a live armed load,
+      // with a green confirmation. So the revert is judged against the stored cost and the band it
+      // is about to restore, not the body.
+      // The cost and band this re-price resolves to. Declared out here because the standing-bid gate
+      // below judges the same two values the ceiling gate does - one resolution, two invariants.
+      let bandForCheck = null;
+      let costForCheck = null;
+      {
+        const ownerStack = stackForRequest(reqDoc);
+        // On a revert the band being restored is the INHERITED one, resolved the same way
+        // clearBidOverride resolves it - NOT reqDoc.marginsPct, which is the override about to be
+        // discarded. Judging the outgoing band would pass the very case this is here to catch.
+        // Rows posted exactly as rendered keep the stored band and minimum: the page carries no
+        // minimum field, so re-deriving one here rewrote it on a Save that changed nothing (T1 D13).
+        bandForCheck = isRevert
+          ? await requests.resolveInherited(reqDoc.load || {}, reqDoc.platformKey)
+          : rowsUnchanged(req.body, rowsShown(req.body) || reqDoc.marginsPct)
+            ? { marginsPct: reqDoc.marginsPct, minMarginPct: reqDoc.minMarginPct }
+            : await requests.withCustomerMinimum(reqDoc, parseBandForm(req.body));
+        // A body with no cost keeps the cost on record, so that is the cost the new band is judged on.
+        costForCheck = (isRevert || repriceCost == null) ? (reqDoc.price && reqDoc.price.cost) : repriceCost;
+        // Zero margin BEFORE the ceiling, for the same reason the hard cost floor is checked before
+        // the soft low-cost band: this one takes no acknowledgement, so it must not be reachable by
+        // a submit that carries ceiling_ack.
+        if (bidsAtCost(costForCheck, bandForCheck)) throw isRevert ? revertAtCostError(costForCheck, bandForCheck) : bidsAtCostError(costForCheck, bandForCheck);
+        const deadPlan = ceilingDeadPlan(ownerStack && ownerStack.engine, reqDoc.load, costForCheck, bandForCheck, repriceByType);
+        if (ceilingNeedsConfirm(deadPlan, req.body)) throw ceilingDeadError(deadPlan);
+        if (!isRevert) {
+          const below = await belowMinimumFor(reqDoc, bandForCheck);
+          if (below && !belowMinAcked(req.body)) throw belowMinimumError(below);
+        }
+      }
+      // What this load has standing on the portal, captured BEFORE the write because the re-arm
+      // below replaces the monitor it is read off. It decides whether the saved plan is HELD; it no
+      // longer decides whether the save happens.
+      // Again after the gate reads above: the engine can book the load while they await.
+      if (await auctionIsFinal(reqDoc)) throw bookedError();
+      assertRepriceCanArm(reqDoc);
+      const standingBefore = standingBidFor(reqDoc);
+      const priorCost = (reqDoc.price && reqDoc.price.cost != null) ? Number(reqDoc.price.cost) : null;
+      const repriceOpts = { standingBid: NO_REACHABILITY_REFUSAL,
+        planFloor: requireArmedFloor(reqDoc, costForCheck, bandForCheck) };
+      const updated = isRevert
+        ? await requests.clearBidOverride(token, repriceOpts)
+        // transit_days rides along for the SET-ONCE recovery case only (an armed transit-required
+        // load captured before the transit build had days at all); once a load has days,
+        // setBidOverride ignores the field - transit time is sticky per load on SuperProcure.
+        : await requests.setBidOverride(token, { ...bandForCheck, cost: req.body && req.body.cost,
+            costByType: readCostByType(req.body),
+            transitDays: req.body && (req.body.transit_days ?? req.body.transitDays),
+            bidVehicleCount: req.body && (req.body.vehicle_count ?? req.body.vehicleCount) },
+          Object.assign({ setBy: 'pricing' }, repriceOpts));
+      let ladder = null, rearmRefusal = null;
+      try { const armedRes = await reArmWithNewBand(updated); ladder = armedRes && armedRes.ladder; }
+      catch (e) {
+        if (e.code === 'NOT_OPEN' || e.code === 'PLATFORM_STACK_UNAVAILABLE') rearmRefusal = e;
+        else throw await undoFailedReprice(token, reqDoc, e);
+      }
+      recordMarginAudit(req, isRevert ? 'margin_override_clear' : 'margin_override_set',
+        `bid margin: load ${updated.loadId}`,
+        { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct, cost: updated.price && updated.price.cost },
+        { before: beforeState, origin: 'pricing' });
+      // Audit the desk's re-priced truck count (the load's full count = bid-max; a lower one = a partial).
+      if (!isRevert && updated.price && updated.price.bidVehicleCount != null) {
+        recordMarginAudit(req, 'vehicle_count_set',
+          `vehicle count on re-price: load ${updated.loadId} -> bid for ${updated.price.bidVehicleCount} of ${updated.load && updated.load.units} trucks`,
+          { bidVehicleCount: updated.price.bidVehicleCount, loadUnits: updated.load && updated.load.units },
+          { before: { bidVehicleCount: beforeVehicleCount }, origin: 'pricing' });
+      }
+      pushEvent('price', { marginOverride: updated.loadId, source: updated.marginSource });
+      if (rearmRefusal) {
+        const message = rearmRefusal.code === 'NOT_OPEN' ? rearmRefusal.message
+          : `Your new price was saved, but ${rearmRefusal.message}`;
+        if (wantsJson) return res.status(409).json({ error: message });
+        return res.status(409).type('html').send(renderCaptureError(updated, message, { saved: true }));
+      }
+      // A save the desk pushed through with ceiling_ack is a save that will NOT bid, so it must not
+      // be confirmed with "bidding off the new cost and margins now" - that sentence is the whole
+      // product defect this change exists to remove, and it would simply reappear one screen later.
+      //
+      // Resolved HERE, above the receipt, rather than beside the message it selects: it also decides
+      // whether the "New Market Rate Submitted" WhatsApp goes out at all. It used to sit below, so
+      // the page said "Nothing will be bid" while the same save sent the desk's group a receipt
+      // whose bidding-contract line promised bids from the opening rung down to the floor - the
+      // screen and the message contradicting each other about one save.
+      const deadAfterSave = ceilingDeadPlan(stackForRequest(updated) && stackForRequest(updated).engine,
+        updated.load, updated.price && updated.price.cost,
+        { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct });
+      // Acknowledge the corrected rate the same way the first capture is acknowledged: the "New
+      // Market Rate Submitted" receipt (now carrying a change-link footer) also fires on a re-price,
+      // so the desk sees a confirmation for the corrected number instead of silence (BRL's ask,
+      // 2026-07-16). A revert is a margin-only change with the cost unchanged - not a new market
+      // rate - so it does not re-confirm. Best-effort: a send failure never fails the re-price.
+      // ...unless the corrected ladder cannot be bid at all. That receipt names an opening bid the
+      // engine will never send, so it would read as confirmation that bidding resumed while
+      // _holdAboveStandingBid stands the load down.
+      const held = await recordAndHold(token, updated, standingBefore, priorCost, reqDoc);
+      const savedDoc = held ? held.request : updated;
+      // A DEAD plan drops the LADDER, not the receipt: biddingContract renders nothing without the
+      // ladder numbers, so passing null removes exactly the untrue sentence and keeps the
+      // acknowledgement. deadAfterSave is declared ABOVE by the earlier hoist - re-declaring it
+      // here is a SyntaxError.
+      if (!isRevert && !held) notifier.confirmSubmitted(updated, deadAfterSave ? null : ladder, { reprice: true }).catch((e) => log(`[price] reprice-confirm failed for ${updated.loadId}: ${e && e.message}`));
+      const dangerZone = !!(updated.deadlineAt && Date.now() >= updated.deadlineAt
+        && (!(updated.load && updated.load.closesAt) || Date.now() < updated.load.closesAt));
+      // A HELD save gets the panel and no flash at all. Success styling on a load that will not bid
+      // is the product defect this change exists to remove, and a green tick beside a hold is that
+      // same defect in a different colour.
+      const savedMsg = held ? null
+        : deadAfterSave
+        ? `Saved. Nothing will be bid - max bid here is Rs ${rsFmt(deadAfterSave.ceiling)}, `
+          + `your lowest price is Rs ${rsFmt(deadAfterSave.floor)}.`
+        : isRevert
+          ? 'Reverted to standard margins.'
+          : (dangerZone
+              ? 'Saved and armed - but very close to close, so the new price may not land in time. Watch the live bid.'
+              : 'Saved - bidding off the new cost and margins now.');
+      if (wantsJson) {
+        return res.json({ ok: true, request: savedDoc, ladder, savedMsg,
+          savedIsError: !!(deadAfterSave || held), savedSticky: !!held,
+          held: held ? heldResponse(held.state) : null });
+      }
+      return res.type('html').send(renderPriceForm(req, savedDoc, { reprice: true, savedMsg,
+        customerMinPct: await requests.customerMinimumFor(savedDoc).catch(() => null) }));
+    }
+
+    // Scope backstop (defense in depth): discovery's allowlist is the primary gate, but a
+    // tokenized link can outlive a targets change (a soft-close ask created while hard-close-
+    // only was off, or a dismissed one later restored). Re-check the LIVE setting at the actual
+    // arm moment so an OUT-OF-SCOPE soft/unverified load can never be armed while the box is
+    // checked. With per-account allowlists, the OWNING account's effective allowlist governs.
+    //
+    // The carve-out below MUST mirror discovery's matchesAllowlist exactly: this same gate,
+    // without the soft-close exception, is what blocked the entire soft-close rollout - discovery
+    // admitted an enrolled, verified soft load onto the worklist and sent the price link, but this
+    // backstop then refused the desk's cost with OUT_OF_SCOPE, so zero soft bids ever landed.
+    // Reading the LIVE config here (not the token's frozen snapshot) is deliberate and unchanged:
+    // it is the same source discovery resolves softClose from, so intake and capture stay in lockstep.
+    const liveCfg = await configStore.get();
+    // A stopped load takes no rate (setBidOverride refuses it), so the number the desk typed is
+    // refused in words rather than dropped behind the paused page.
+    if (reqDoc.status === 'stopped') {
+      const typed = Number(req.body && (req.body.cost ?? req.body.amount));
+      const what = (Number.isFinite(typed) && typed > 0) ? `Rs ${fmtRs(typed)} not saved.` : 'Not saved.';
+      const msg = reqDoc.heldReason
+        ? `${what} This load is not bidding right now, so a new rate cannot be taken. Your earlier cost is kept.`
+        : `${what} An operator stopped bidding on this load. Reopen it first, then send your rate again.`;
+      if (wantsJson) return res.status(409).json({ error: msg });
+      return res.status(409).type('html').send(renderCaptureError(reqDoc, msg));
+    }
+    // A POST that lost a race (someone else submitted / the request expired or closed while
+    // the form was open) gets the same friendly status page a GET does - this raw-error path
+    // fired in front of the client. JSON callers keep the machine-readable 409; only a
+    // genuinely unknown token still falls through to the raw NOT_FOUND error below.
+    if (reqDoc && reqDoc.status !== 'awaiting_price') {
+      if (wantsJson) return res.status(409).json({ error: `price-request not open (status=${reqDoc.status})` });
+      const customerMinPct = await requests.customerMinimumFor(reqDoc).catch(() => null);
+      const dropped = reqDoc.status === 'armed' ? droppedCostOnArmed(req.body, reqDoc) : null;
+      if (dropped) {
+        return res.status(409).type('html').send(renderPriceForm(req, reqDoc, { reprice: true, customerMinPct, errorMsg: dropped }));
+      }
+      return res.type('html').send(renderRequestStatus(req, reqDoc, await outcomeFor(reqDoc), { customerMinPct }));
+    }
+    const ownerStack = stackForRequest(reqDoc);
+    const effectiveAl = (ownerStack && ownerStack.account.allowlist) || liveCfg.allowlist;
+    if (effectiveAl && effectiveAl.hardCloseOnly) {
+      const load = (reqDoc && reqDoc.load) || {};
+      // Refuse ONLY loads discovery would also reject. An enrolled, VERIFIED soft load
+      // (softAdmitted) is in scope via the L3 soft-close opt-in and is NOT refused - this is the
+      // one predicate shared with discovery.matchesAllowlist, so admit/reject decisions cannot
+      // drift apart. Everything softAdmitted still rejects stays refused here: a soft load whose
+      // shipper is NOT on the soft allowlist, an unverified-close-model load (closeModelKnown !==
+      // true), and any soft load while the master soft-close flag is off. hardCloseOnly loads that
+      // are out of scope for the ordinary reason (a soft load, or an unverified one) still throw.
+     
+     //2026-11-06
+
+           if (
+        reqDoc &&
+        isOutOfHardCloseScope(load) &&
+        !softAdmitted(liveCfg.softClose, load) &&
+        !tokenMatch(String(load.companyName || ''), 'Shyam Steel')
+      ) {
+        const e = new Error('This load is a soft-close (anti-snipe) auction, or its close type is unverified, and only hard-close loads are in scope - it will not be bid. Ask the operator to allow soft-close loads if this is intended.');
+        e.code = 'OUT_OF_SCOPE';
+        throw e;
+      }
+
+      // if (reqDoc && isOutOfHardCloseScope(load) && !softAdmitted(liveCfg.softClose, load)) {
+      //   const e = new Error('This load is a soft-close (anti-snipe) auction, or its close type is unverified, and only hard-close loads are in scope - it will not be bid. Ask the operator to allow soft-close loads if this is intended.');
+      //   e.code = 'OUT_OF_SCOPE';
+      //   throw e;
+      // }
+    }
+    // A load whose rate can NEVER be used is refused before anything is stored, so the desk is never
+    // told a number was taken that nothing will act on. Enforced here as well as on the page - same
+    // belt-and-suspenders posture as the hard cost floor - so a raw POST, a stale tab or a dead page
+    // script all land on the same answer as the form does. The deferred case (keepsCost) is
+    // deliberately NOT refused: that cost is kept on purpose and the arm seam parks the row.
+    {
+      const wontBid = loadWillNotBid(reqDoc);
+      if (wontBid && !wontBid.keepsCost) {
+        const e = new Error(wontBid.body); e.code = 'CANNOT_BID'; throw e;
+      }
+    }
+    // PER-TRUCK-TYPE RATES, read off the untrusted body and BLENDED HERE. The page posts a hidden
+    // `cost` holding the same blend, and it is deliberately not used when per-type rates arrive:
+    // every gate below (clerical floor, low-cost band, shipper ceiling) must judge the number the
+    // load will actually be armed at, and that number is the one normalizeCostByType derives.
+    // capture() re-derives it a third time off the same input, so the page cannot move any of them.
+    const costByType = readCostByType(req.body);
+    const byType = costByType ? normalizeCostByType(costByType, reqDoc && reqDoc.load && reqDoc.load.cargoTypes) : null;
+    if (costByType && !byType) throw blankTypedCostError(reqDoc);
+    const cost = costByType ? byType.cost : (req.body && (req.body.cost ?? req.body.amount));
+    // HARD clerical-error floor (see hardCostFloorViolation): a missing digit is refused outright -
+    // no ack bypasses it. Checked BEFORE the soft band so low_cost_ack can never open this gate.
+    enforceHardCostFloorOnEntry(cost, byType, reqDoc, { source: 'price-submit', req });
+    // Soft low-cost guard (see lowCostNeedsConfirm): an implausibly low cost needs the form's
+    // explicit confirm (low_cost_ack). Checked before capture(), whose only floor is Rs >= 1.
+    if (lowCostNeedsConfirm(cost, req.body)) throw lowCostError(cost);
+    // Optional bid-level margin override from the capture page's inline band editor.
+    // Form path: m_0..m_n (one % per bid). There is no separate minimum field - minMarginPct is the
+    // smallest margin, or the customer's minimum where that is lower. Rows that differ from the ones
+    // the page rendered (else the request's own) are the desk's band whether or not the page script
+    // set use_override (T1 D6: a dead script used to drop them and arm the inherited band); untouched
+    // rows arm the band the request carries now.
+    // JSON path: a { marginsPct, minMarginPct } object under marginOverride. capture()
+    // validates the shape; a bad band throws BAD_INPUT and renders the error page.
+    let marginOverride;
+    const overrideFlagged = !!(req.body && (req.body.use_override === '1' || req.body.use_override === 'on'));
+    if (wantsJson && req.body && req.body.marginOverride) {
+      marginOverride = req.body.marginOverride;
+    } else if (overrideFlagged || (hasBandFields && !rowsUnchanged(req.body, rowsShown(req.body) || reqDoc.marginsPct))) {
+      // parseBandForm rejects a blank/non-numeric or non-contiguous rung instead of coercing it
+      // to 0 (which would silently zero the derived floor); capture() then range-checks the band.
+      marginOverride = { ...(await requests.withCustomerMinimum(reqDoc, parseBandForm(req.body))), setBy: 'pricing' };
+    }
+    // SHIPPER CEILING (see ceilingNeedsConfirm). Checked AFTER the band is resolved, because the
+    // verdict depends on the band actually being saved - an override that lowers the margins can be
+    // exactly what makes a load biddable again, and judging it against the inherited band would
+    // refuse a cost that is in fact fine. Enforced HERE, not just in the page script, so it holds
+    // against a raw POST, a dead script or a stale tab - the same belt-and-suspenders posture as the
+    // hard cost floor and the pricing-cutoff guard above.
+    {
+      const band = marginOverride && Array.isArray(marginOverride.marginsPct)
+        ? { marginsPct: marginOverride.marginsPct, minMarginPct: marginOverride.minMarginPct }
+        : { marginsPct: reqDoc && reqDoc.marginsPct, minMarginPct: reqDoc && reqDoc.minMarginPct };
+      // Zero margin first (see the re-price path above): a hard refusal must not sit behind a gate
+      // the desk can acknowledge past.
+      if (bidsAtCost(cost, band)) throw bidsAtCostError(cost, band);
+      const deadPlan = ceilingDeadPlan(ownerStack && ownerStack.engine, reqDoc && reqDoc.load, cost, band, byType);
+      if (ceilingNeedsConfirm(deadPlan, req.body)) throw ceilingDeadError(deadPlan);
+      // Judged on the band this capture arms: a stored per-load override counts as much as one in
+      // the body (M0-F5).
+      const armsBand = marginOverride || (reqDoc.marginSource === 'bid'
+        ? { marginsPct: reqDoc.marginsPct, minMarginPct: reqDoc.minMarginPct } : null);
+      const below = await belowMinimumFor(reqDoc, armsBand);
+      if (below && !belowMinAcked(req.body)) throw belowMinimumError(below);
+    }
+    // Conditional transit time: required by capture() when the load's rules demand it (the form
+    // marks the field required, but THIS untrusted POST body is the real gate - capture() throws
+    // BAD_INPUT with an actionable message when the days are absent/invalid on a transit load).
+    const transitDays = req.body && (req.body.transit_days ?? req.body.transitDays);
+    // Operator-chosen truck count (bid-max default; the desk may lower it to a partial). Untrusted
+    // POST body; capture() re-validates it (whole number, 1..total) and rejects an over-total one.
+    const bidVehicleCount = req.body && (req.body.vehicle_count ?? req.body.vehicleCount);
+    if (await auctionIsFinal(reqDoc)) throw bookedError();
+    const updated = await requests.capture(token, { cost, costByType, marginOverride, transitDays, bidVehicleCount });
+    // EVERY captured cost is audited, whatever band it lands on. This used to be gated on
+    // `marginSource === 'bid'`, i.e. only when a bid-level margin override rode along with the
+    // number - so the ordinary case, a cost typed onto an inherited customer band, built a live
+    // ladder and left no configChanges row at all. That is an unaudited money-write, and it is why
+    // the Rs 29,000 first entered on 260908LD2Z is absent from that day's trail while the Rs 38,000
+    // that replaced it is present: the correction carried an override and the original did not.
+    //
+    // The row carries the full picture - cost + the margins AND the resulting Rs prices - so the
+    // trail / CSV export is self-contained (no recomputing cost x (1+margin) to see what was set),
+    // plus `marginSource`, which is what tells an inherited band apart from an override after
+    // the fact now that both write a row.
+    //
+    // `prices` are the ones the engine ARMED, so the row is written once the arm has run: the floor
+    // clamp, dedupe, decrement spacing, grid snap and ceiling cap all move prices after the margin
+    // arithmetic. A cost kept on a portal that cannot bid yet is audited with no prices.
+    const auditCapture = (prices) => {
+      if (!(updated && updated.price && updated.price.cost > 0)) return;
+      recordMarginAudit(req, 'cost_captured', `cost set on capture: load ${updated.loadId}`,
+        { cost: updated.price.cost, marginsPct: updated.price.marginsPct, prices, minMarginPct: updated.price.minMarginPct,
+          marginSource: updated.marginSource || null, setBy: 'pricing' },
+        { before: beforeState, origin: 'pricing' });
+    };
+    // Audit the desk's chosen truck count (the load's full count = bid-max; a lower one = a partial the
+    // desk set because BRL can supply fewer trucks). Only present on a multi-vehicle FTL load.
+    if (updated && updated.price && updated.price.bidVehicleCount != null) {
+      recordMarginAudit(req, 'vehicle_count_set',
+        `vehicle count on capture: load ${updated.loadId} -> bid for ${updated.price.bidVehicleCount} of ${updated.load && updated.load.units} trucks`,
+        { bidVehicleCount: updated.price.bidVehicleCount, loadUnits: updated.load && updated.load.units, setBy: 'pricing' },
+        { before: { bidVehicleCount: beforeVehicleCount }, origin: 'pricing' });
+    }
+    // A shipper TARGET RATE is answered HERE and returns - it must never reach armFromRequest.
+    // Routing it through the engine is what the original wiring did, and it never reached the
+    // portal: arm() short-circuits on the load's existing (finalized) auction monitor, so the
+    // desk's cost was handed back the dead monitor and its stale ladder was rendered as the plan.
+    // See targetPriceSubmit for why a single bid, not a ladder, is also the right shape.
+    if (isTargetPriceReq(updated)) {
+      const c = updated.price && updated.price.cost;
+      auditCapture(Array.isArray(updated.price && updated.price.marginsPct)
+        ? updated.price.marginsPct.map((m) => Math.round(c * (1 + m / 100))) : null);
+      const outcome = await answerTargetRate(updated);
+      pushEvent('price', { targetRateAnswered: updated.loadId, submitted: outcome.submitted,
+        price: outcome.price, reason: outcome.reason });
+      if (!TARGET_REFUSED_ON_PAGE.has(outcome.reason)) {
+        notifier.confirmTargetRate(updated, outcome)
+          .catch((e) => log(`[price] target-rate confirm failed for ${updated.loadId}: ${e && e.message}`));
+      }
+      if (wantsJson) return res.json({ ok: true, request: updated, target: outcome });
+      return res.type('html').send(renderTargetAnswered(updated, outcome));
+    }
+
+    let armed = null;
+    // arm on the request's OWNING account AND portal's engine; a portal that is not running refuses
+    // rather than borrowing another one (requireStackForRequest)
+    try { armed = armFromRequest(requireStackForRequest(updated).engine, updated, { requests }); }
+    catch (e) {
+      // A portal that cannot bid - because its write gate is shut, or because its stack is not
+      // running at all - is NOT a failed arm to retry, and must not take the rollback below:
+      // reopen() nulls the price and drops the row to 'awaiting_price', where expireOverdue later
+      // files it as 'skipped_no_price' and discovery alerts "no number entered" - a desk-non-response
+      // record about a load the desk actually priced. Keep the cost, park the row, and say plainly
+      // that the number was saved and the load is not being bid.
+      if (e.code === 'PLATFORM_BIDDING_DISABLED' || e.code === 'PLATFORM_STACK_UNAVAILABLE') {
+        log(`[price] not arming load ${updated.loadId}: ${e.message}`);
+        auditCapture(null);
+        await requests.holdUnbiddable(updated.id, e.code === 'PLATFORM_STACK_UNAVAILABLE' ? 'platform_stack_unavailable' : 'platform_bidding_disabled')
+          .catch((he) => log(`[price] hold failed for ${updated.id}: ${he.message}`));
+        // The original code is carried through, not flattened onto the other one: a shut write gate
+        // and an absent stack are different operator situations, and the desk page, the JSON caller
+        // and the log line all have to be able to tell them apart.
+        const err = new Error(`Your cost was saved, but ${e.message}. Your price is kept and will be used when this account can bid again, if the enquiry is still open.`);
+        err.code = e.code;
+        err.saved = true;
+        throw err;
+      }
+      // Never tell the pricing team "armed" when the engine isn't. Roll the request back to
+      // open so they can retry, and surface the failure instead of a false success page.
+      log(`[price] arm failed for load ${updated.loadId}: ${e.message}`);
+      await requests.reopen(updated.id).catch((re) => log(`[price] rollback failed for ${updated.id}: ${re.message}`));
+      const err = new Error(`could not arm this load (${e.message}); the cost was NOT saved - please retry`);
+      err.code = 'ARM_FAILED';
+      throw err;
+    }
+    const ladder = armed && armed.ladder ? armed.ladder : null;
+    auditCapture(ladder);
+    pushEvent('price', { captured: updated.loadId, cost: updated.price.cost });
+    // confirm receipt to the pricing team ("rate received, bot armed"). Best-effort: a send
+    // failure must never fail the capture the operator just completed.
+    //
+    // Same ladder-drop as the re-price branch above, and it is here so the two branches of one route
+    // cannot tell the desk different stories about the same acknowledged-dead cost. A first capture
+    // pushed through with ceiling_ack arms a monitor that will refuse every rung, and promising
+    // "We'll bid from X, never below Y" on it is the same untrue sentence.
+    const deadOnCapture = ceilingDeadPlan(stackForRequest(updated) && stackForRequest(updated).engine,
+      updated.load, updated.price && updated.price.cost,
+      { marginsPct: updated.marginsPct, minMarginPct: updated.minMarginPct });
+    notifier.confirmSubmitted(updated, deadOnCapture ? null : ladder).catch((e) => log(`[price] submit-confirm failed for ${updated.loadId}: ${e && e.message}`));
+    if (wantsJson) {
+      return res.json({ ok: true, request: updated, ladder });
+    }
+    res.type('html').send(renderCaptured(updated, ladder));
+  } catch (e) {
+    // PLATFORM_BIDDING_DISABLED is 409, alongside OUT_OF_SCOPE: the request is well-formed and the
+    // cost was accepted - the portal is simply not in a state to bid it. A 500 would read as a bug
+    // and invite the desk to retry something that can only fail again until GC_BID goes on.
+    const code = e.code === 'BAD_INPUT' ? 400 : e.code === 'LOW_COST' ? 400 : e.code === 'CEILING_DEAD' ? 400 : e.code === 'ZERO_MARGIN' ? 400 : e.code === 'NOT_FOUND' ? 404 : e.code === 'NOT_OPEN' ? 409 : e.code === 'OUT_OF_SCOPE' ? 409 : e.code === 'PLATFORM_BIDDING_DISABLED' ? 409 : e.code === 'PLATFORM_STACK_UNAVAILABLE' ? 409 : e.code === 'CANNOT_BID' ? 409 : e.code === 'UNREACHABLE' ? 409 : e.code === 'SAME_RATE' ? 409 : e.code === 'BELOW_MINIMUM' ? 409 : e.code === 'NO_CLOSE' ? 409 : e.code === 'NOT_REPRICED' ? 409 : e.code === 'CAPTURE_LOST' ? 409 : e.code === 'GONE' ? 410 : e.code === 'BOOKED' ? 410 : e.code === 'CHECK_FAILED' ? 503 : e.code === 'NO_VALID_CLOSE' ? 410 : 500;
+    if (wantsJson) {
+      // The page answers this one with its confirmation prompt, so it needs the figures, not prose.
+      if (e.code === 'BELOW_MINIMUM') return res.status(code).json({ error: e.message, code: e.code, belowMinimum: e.belowMinimum });
+      if (e.code === 'CEILING_DEAD') return res.status(code).json({ error: e.message, code: e.code, costTarget: e.costTarget });
+      if (e.code === 'BOOKED') return res.status(code).json({ error: e.message, code: 'GONE' });
+      return res.status(code).json({ error: e.message });
+    }
+    const cur = e.code === 'NOT_FOUND' ? null : await requests.getByToken(token).catch(() => null);
+    // A cost that arrived after the pricing cutoff gets its OWN page, not the generic expired
+    // one. The operator did enter a number - telling them "expired before a cost was entered"
+    // is simply false, and it is what made a real miss (load 23128437, 2026-07-14) read as the
+    // system losing their work silently. Say what actually happened and show both times.
+    // A refused RE-PRICE (armed load, past the re-price cutoff) needs the mirror-image care: the
+    // load IS being bid on its existing ladder, so it must NOT say "this load was not bid" - only
+    // the change was refused. Discriminate on status: armed -> re-price copy, awaiting -> cost-late.
+    // A placeholder close is NOT a closed auction and must not borrow its page - see
+    // renderNoValidClose.
+    if (e.code === 'NO_VALID_CLOSE' && cur) {
+      return res.status(code).type('html').send(renderNoValidClose(cur));
+    }
+    if (e.code === 'GONE' && cur) {
+      const opts = cur.status === 'armed' ? { reprice: true } : { costArrivedLate: true };
+      return res.status(code).type('html').send(renderPricingClosed(cur, opts));
+    }
+    if (e.code === 'NOT_OPEN' && cur) {
+      // capture() lost a race after the pre-check above: render the state, not an error.
+      return res.type('html').send(renderRequestStatus(req, cur, await outcomeFor(cur),
+        { customerMinPct: await requests.customerMinimumFor(cur).catch(() => null) }));
+    }
+    // A known request that failed to save (bad cost, scope check, arm failure) gets the same
+    // branded shell every other page here uses; only a genuinely unknown token falls through
+    // to a plain string, matching the /track and /price GET routes' unknown-token convention.
+    if (cur) return res.status(code).type('html').send(renderCaptureError(cur, e.message, { saved: !!e.saved, fix: ceilingFixLink(cur, e, req.body) }));
+    res.status(code).type('html').send(priceShell('Could not save', `<p class="big">Could not save: ${esc(e.message)}</p><p class="note">Reload the page and try again.</p>`));
+  }
+});
+
+/**
+ * CW-225. The desk takes a held load off hold, by putting back the plan it was bidding before the
+ * correction. Same auth model as /price/:token - the unguessable link IS the access.
+ *
+ * THIS PLACES NO BID AND DECIDES NO PRICE. It restores a cost and a band that already priced a bid
+ * this portal accepted, re-arms through the same reArmWithNewBand every re-price uses, and hands the
+ * load back to the ladder under every gate that was already there: the floor, the attempt budget
+ * carried on the intent, and the strictly-below-our-own-standing-bid rule the engine enforces at
+ * _decide. What the desk gets back is the state before the correction, not a new bidding mode.
+ *
+ * The correction is NOT erased by it. The hold that ended is appended to holdHistory with its
+ * reason, and the corrected cost stays on the close-time record's append-only correction trail - the
+ * live `costCorrection` override is what is withdrawn, because after a resume the cost on the plan
+ * IS the cost that priced the bid again and leaving the override would misreport the close margin.
+ */
+app.post('/price/:token/resume', async (req, res) => {
+  const wantsJson = (req.headers['content-type'] || '').includes('application/json');
+  const token = tokenFromPath(req.params.token);
+  try {
+    const reqDoc = await requests.getByToken(token);
+    if (!reqDoc) { const e = new Error('unknown price-request token'); e.code = 'NOT_FOUND'; throw e; }
+    const hold = reqDoc.hold;
+    if (!hold || hold.kind !== 'standing') { const e = new Error('this load is not on hold'); e.code = 'NOT_OPEN'; throw e; }
+    if (await auctionIsFinal(reqDoc)) { const e = new Error(AUCTION_CLOSED_NOTHING_SAVED); e.code = 'BOOKED'; throw e; }
+    const plan = hold.resume || {};
+    // Read BEFORE the write, for the same reason every re-price route reads it there: reArmWithNewBand
+    // replaces the monitor this comes off, and the reachability gate needs the price that was standing
+    // when the desk pressed the button.
+    const standingBefore = standingBidFor(reqDoc);
+    // Asked before the portal is, and in the same order resumeBidding asks its own guards: past the
+    // close the auction is over whatever the portal's state is, and answering "that portal is not
+    // running" there would replace the load's held-closed page with a message about a box.
+    const closedAt = effectiveCloseAt(reqDoc.load);
+    if (closedAt && Date.now() >= closedAt) { const e = new Error('this auction has closed on the portal'); e.code = 'GONE'; throw e; }
+    // Resolved BEFORE the write, for the reason the rearm route resolves its own there: a portal
+    // that is not running on this box cannot be re-armed, and refusing after the write would have
+    // spent the hold on a resume that was never going to reach the ladder.
+    //
+    // The write gate is asked here too, not only at the arm. These two codes are one pair at every
+    // other seam that arms (:826, :1821, :3288), and hoisting only the first left the second landing
+    // after resumeBidding had already retired the hold and rolled the corrected cost back.
+    assertBiddingEnabled(requireStackForRequest(reqDoc).engine);
+    // The stored cost was judged against whatever floor was in force when the hold was written, so
+    // it is judged again here, before the write, by the same check every other cost writer calls.
+    const resumeByType = plan.costByType && Array.isArray(plan.costByType.types) ? plan.costByType : null;
+    try { enforceHardCostFloorOnEntry(plan.cost, resumeByType, reqDoc, { source: 'resume', req }); }
+    catch (floorErr) {
+      const low = resumeByType && resumeByType.types.find((t) => hardCostFloorViolation(t.cost, reqDoc.load));
+      const e = new Error(low
+        ? `Not resumed. The rate for ${low.label} before the correction, Rs ${fmtRs(low.cost)}, is below the minimum for this load. Enter the right cost instead.`
+        : `Not resumed. Rs ${fmtRs(plan.cost)}, your cost before the correction, is below the minimum for this load. Enter the right cost instead.`);
+      e.code = 'BAD_INPUT'; throw e;
+    }
+    const updated = await requests.resumeBidding(token, {
+      reason: 'resumed_by_desk',
+      standingBid: standingBefore,
+      planFloor: requireArmedFloor(reqDoc, plan.cost,
+        { marginsPct: plan.marginsPct, minMarginPct: plan.minMarginPct }),
+    });
+    // Unconditional. This was gated on reqDoc.status === 'armed' while resumeBidding had no opinion
+    // about status, so a held load the desk had stopped spent its hold, armed nothing, and was told
+    // "Bidding resumed." anyway. The gate now lives where the write is.
+    try { await reArmWithNewBand(updated); }
+    catch (e) {
+      if (e.code === 'NOT_OPEN') throw e;
+      // The resume is already written and the re-arm has already stopped the live monitor, so a
+      // throw here is undone rather than reported: the hold, the corrected plan and a monitor on it
+      // go back, and the desk keeps the Resume button instead of a load nothing is bidding.
+      const lostToStop = () => {
+        const s = new Error('Not resumed. This load was stopped at the same moment, so it is not bidding.');
+        s.code = 'NOT_OPEN';
+        return s;
+      };
+      let restoredDoc;
+      try { restoredDoc = await requests.undoResume(token, reqDoc); }
+      catch (ue) { throw (ue.code === 'NOT_OPEN' && ue.actual === 'stopped') ? lostToStop() : ue; }
+      const heldAt = `Rs ${fmtRs(hold.correctedCost)}`;
+      let w;
+      try {
+        await reArmWithNewBand(restoredDoc);
+        w = new Error(`Not resumed. Bidding could not restart on this load (${e.message}). Nothing changed: it is still on hold at ${heldAt}. Try Resume again.`);
+        w.code = 'NOT_RESUMED';
+      } catch (e2) {
+        if (e2.code === 'NOT_OPEN') throw lostToStop();
+        log.error(`[price] resume undone on load ${reqDoc.loadId} but its monitor could not be re-armed: ${e2 && e2.message}`);
+        w = new Error(`Not resumed. Bidding could not restart on this load (${e.message}), and it is not bidding now. It is still on hold at ${heldAt}. Try Resume again, or enter a new cost.`);
+      }
+      throw w;
+    }
+    await bidLogger.noteCostCorrection(updated.loadId, {
+      from: Number(hold.correctedCost), to: Number(updated.price && updated.price.cost),
+      standingBidPrice: Number(hold.standingBidPrice), resumed: true });
+    recordMarginAudit(req, 'hold_resumed', `hold resumed: load ${updated.loadId}`,
+      { cost: updated.price && updated.price.cost, correctedCost: hold.correctedCost,
+        standingBidPrice: hold.standingBidPrice, marginsPct: updated.marginsPct,
+        minMarginPct: updated.minMarginPct });
+    pushEvent('price', { holdResumed: updated.loadId, cost: updated.price && updated.price.cost });
+    // The desk's one line. Best-effort, exactly like the re-price receipt it mirrors: a send failure
+    // must never fail the resume the operator just performed.
+    notifier.holdResumed(updated, hold).catch((e) => log(`[price] resume-notice failed for ${updated.loadId}: ${e && e.message}`));
+    // A resume can still land held - the restored plan is re-judged from the SAVED doc, the same way
+    // every other re-price route re-judges its own. It should not, because this plan priced the bid
+    // that is standing; if it ever does, the panel comes back rather than a green confirmation.
+    const held = await recordAndHold(token, updated, standingBefore, null, reqDoc);
+    const savedDoc = held ? held.request : updated;
+    if (wantsJson) {
+      return res.json({ ok: true, request: savedDoc, held: held ? heldResponse(held.state) : null,
+        savedMsg: held ? null : 'Bidding resumed.', savedIsError: !!held, savedSticky: !!held });
+    }
+    return res.type('html').send(renderPriceForm(req, savedDoc,
+      { reprice: true, savedMsg: held ? null : 'Bidding resumed.',
+        customerMinPct: await requests.customerMinimumFor(savedDoc).catch(() => null) }));
+  } catch (e) {
+    const code = e.code === 'BAD_INPUT' ? 400 : e.code === 'NOT_FOUND' ? 404
+      : e.code === 'NOT_OPEN' ? 409 : e.code === 'UNREACHABLE' ? 409
+      : e.code === 'PLATFORM_STACK_UNAVAILABLE' ? 409 : e.code === 'PLATFORM_BIDDING_DISABLED' ? 409
+        : e.code === 'NOT_RESUMED' ? 409 : e.code === 'GONE' ? 410 : e.code === 'BOOKED' ? 410 : e.code === 'CHECK_FAILED' ? 503 : 500;
+    if (wantsJson) return res.status(code).json({ error: e.message });
+    // Past the close the desk gets the load's own held-closed page, not an error string: the hold is
+    // untouched, so the page it lands on is the one it was already showing, in the past tense.
+    const cur = e.code === 'NOT_FOUND' ? null : await requests.getByToken(token).catch(() => null);
+    if (e.code === 'BOOKED' && cur) return res.status(code).type('html').send(renderPricingClosed(cur, { booked: true }));
+    if (e.code === 'GONE' && cur) return res.status(code).type('html').send(renderPricingClosed(cur, { reprice: true }));
+    if (cur) return res.status(code).type('html').send(renderCaptureError(cur, e.message, { saved: !!e.saved }));
+    res.status(code).type('html').send(priceShell('Could not resume', `<p class="big">Could not resume: ${esc(e.message)}</p>`));
+  }
+});
+
+// the capture page's poller source: a minimal live projection of THIS request's state, so
+// an open cost form notices it was priced/closed/expired/dismissed by someone else and swaps
+// itself to the right page - instead of the operator discovering the race only on submit.
+// Deliberately tiny (no engine/outcome work per poll); serverTime lets the page correct the
+// phone's clock skew, same as /track. Leaks nothing: status + timing only, never the cost.
+app.get('/price/:token/state', async (req, res) => {
+  try {
+    const r = await requests.getByToken(tokenFromPath(req.params.token));
+    if (!r) return res.status(404).json({ error: 'unknown token' });
+    res.json({
+      status: r.status,
+      // A hold leaves status 'armed', so without this a second open form never learns of it.
+      onHold: !!(r.hold && r.hold.kind === 'standing'),
+      // WHY it stopped, not just that it did. 'stopped' is reached by an operator pausing an armed
+      // load AND by the system parking a cost it cannot bid yet, and the open form's poller announced
+      // both as "an operator paused bidding" - the same wrong attribution renderRequestStatus carried,
+      // on the one surface a full page render never reaches. Both sites read this field or neither is
+      // fixed. Carries no cost and no identity, same as every other key here.
+      heldReason: r.heldReason || null,
+      // The EFFECTIVE close (priceRequests.effectiveCloseAt), which is what every server-side gate
+      // reads. On a portal whose posted close is provisional the snapshot is a number the platform has
+      // already superseded, and this field is what the open form counts down to and LOCKS itself on -
+      // so serving the snapshot here disables the only surface a human can price the load from while
+      // the auction is still running, and no reload recovers it because the reload reads this too.
+      closesAt: effectiveCloseAt(r.load) || null,
+      startsAt: (r.load && r.load.startsAt) || null, // future => window announced, not open yet
+      deadlineAt: r.deadlineAt || null,
+      serverTime: Date.now(),
+      // THE RANK THE WHATSAPP LINK PROMISES. The bid bubble's call to action reads "Tap to see live
+      // rank and update your rate" and points here, and this page had no rank on it - the number was
+      // one further tap away on /track, which nothing in that sentence says. A link that promises a
+      // fact and lands on a page without it is worse than no link.
+      //
+      // This deliberately relaxes the "no engine work per poll" note above. It is one snapshot scan
+      // per open form per four seconds, the same read /track's own poller already does, and it is
+      // read off the SAME expression trackState uses so the two pages cannot report different ranks
+      // for one load. Null before the first rank arrives, and null is rendered as nothing rather
+      // than as a dash that looks like a position.
+      ...(await (async () => {
+        const ownerStack = stackForRequest(r);
+        const engine = ownerStack ? ownerStack.engine : null;
+        const m = engine ? engine.snapshot().find((x) => String(x.auctionId) === String(r.loadId)) : null;
+        return loadPosition(m, await bidLogger.getRecord(r.loadId).catch(() => null));
+      })()),
+    });
+  } catch (e) {
+    // Express 4 does not forward a rejected async handler; unanswered, the poll hangs.
+    log.error(`[price] state read failed: ${e && e.message}`);
+    res.status(500).json({ error: 'could not read this load right now' });
+  }
+});
+
+/**
+ * Where this load stands, for every page that states it: the live monitor's rank while it has one,
+ * else the last one stored. A SuperProcure bid response carries no rank, so the monitor holds null
+ * from each accepted bid until the next socket read, and has no monitor at all after a restart or
+ * close - while the notice for that same bid already told the desk its rank. The stored rank of a
+ * bid is the one the platform returned for it, falling back to the socket read it was decided on,
+ * which is the rank the notice states.
+ */
+function loadPosition(m, rec) {
+  let myRank = m && m.myRank != null ? m.myRank : null;
+  if (myRank == null && rec) {
+    if (rec.finalRank != null) myRank = rec.finalRank;
+    else {
+      const bids = Array.isArray(rec.ourBids) ? rec.ourBids.filter(Boolean) : [];
+      for (let i = bids.length - 1; i >= 0 && myRank == null; i--) {
+        myRank = bids[i].rank != null ? bids[i].rank : (bids[i].socketRank != null ? bids[i].socketRank : null);
+      }
+    }
+  }
+  let lastBidPrice = m && m.lastBidPrice != null ? m.lastBidPrice : null;
+  if (lastBidPrice == null && rec && rec.lastBidPrice != null) lastBidPrice = rec.lastBidPrice;
+  return { myRank, lastBidPrice };
+}
+
+// Read-only ladder preview for ?cost=N via engine.planPreview (same gates as arm(), never drifts).
+// Same auth model as /price/:token - the link IS the access. Arms nothing, persists nothing.
+app.get('/price/:token/preview', async (req, res) => {
+  const r = await requests.getByToken(tokenFromPath(req.params.token));
+  if (!r) return res.status(404).json({ error: 'unknown token' });
+  res.set('Cache-Control', 'no-store'); // tokenized, per-keystroke data - never cache
+  const cost = Number(req.query.cost);
+  if (!(cost > 0) || !Number.isFinite(cost)) return res.status(400).json({ error: 'cost must be a number > 0' });
+  const ownerStack = stackForRequest(r);
+  if (!ownerStack) return res.json({ ladder: [], floor: null, rungCount: 0,
+    willNotBid: 'platform_stack_unavailable',
+    notice: 'The account for this load is unavailable. You can save your cost; its bid prices can be planned when that account reconnects while the enquiry is open.' });
+  const engine = ownerStack.engine;
+  if (!engine) return res.status(503).json({ error: 'engine not ready' });
+  // Optional ?m= = unsaved on-form band percents, validated EXACTLY like a save (validateMargins;
+  // minimum = lowest margin, or the customer's where lower) so the preview can never accept a band
+  // the save would reject, nor plan a different guard.
+  let marginsPct = r.marginsPct, minMarginPct = r.minMarginPct;
+  if (req.query.m != null) {
+    const raw = String(req.query.m).split(',').map(Number);
+    if (!raw.length || raw.length > 12) return res.status(400).json({ error: 'bad margins' });
+    try {
+      const typed = await requests.withCustomerMinimum(r, { marginsPct: raw, minMarginPct: Math.min(...raw) });
+      const v = validateMargins(typed.marginsPct, typed.minMarginPct);
+      marginsPct = v.marginsPct;
+      minMarginPct = v.minMarginPct;
+    } catch (e) {
+      return res.status(400).json({ error: String((e && e.message) || 'bad margins') });
+    }
+  }
+  // A load nothing can be bid on gets no ladder, whatever the cost says. The page for that load
+  // draws no cost field, so this is reached only by a stale tab or a raw fetch - and answering one
+  // with "prices that will go out" is the same false promise in a JSON envelope. Same willNotBid
+  // vocabulary planPreview already speaks, so the one caller that reads this needs no new branch.
+  {
+    const wontBid = loadWillNotBid(r);
+    if (wontBid && !wontBid.keepsCost) {
+      return res.json({ ladder: [], floor: null, rungCount: 0, willNotBid: wontBid.willNotBid });
+    }
+  }
+  try {
+    const L = r.load || {};
+    let rules = L.rules || null;
+    let costForPlan = cost;
+    // Optional ?ct= = the on-form per-truck-type rates, validated through the SAME normalizer the
+    // submit uses, so the preview can never plan on a vector the save would refuse. The rung the
+    // engine picks is scaled onto each type's own cost before it goes on the wire and the portal
+    // measures its minimum on each of those amounts, so the ladder cannot be spaced honestly without
+    // them. The blended cost is taken from the normalizer too rather than from ?cost=, so the page
+    // and the arm can never disagree about which number the prices were built from.
+    // Falls back to the vector already CAPTURED on the request when the form sends none, so a
+    // re-price of an armed per-type load previews against the same spacing the arm will use rather
+    // than against the blend alone - the arm reads exactly this vector (armFromRequest), and a page
+    // that promised three attempts where the arm builds two is the drift this whole change exists to
+    // remove. The gate mirrors armFromRequest's: carried only where the portal can act on it.
+    if ((engine.caps || {}).multiCargoBidSupported !== false) {
+      let byType = null;
+      try {
+        byType = req.query.ct != null
+          ? normalizeCostByType(String(req.query.ct).split(','), L.cargoTypes)
+          : ((r.price && r.price.costByType) || null);
+      } catch (e) {
+        return res.status(400).json({ error: String((e && e.message) || 'bad per-type costs') });
+      }
+      if (byType && Array.isArray(byType.types) && byType.types.length > 1) {
+        rules = Object.assign({}, rules, { costByType: byType });
+        // Only a vector the desk is typing RIGHT NOW may move the cost the ladder is built from; a
+        // stored one already agrees with the saved cost and must not override what the page sent.
+        if (req.query.ct != null) costForPlan = byType.cost;
+      }
+    }
+    // THIS LOAD'S MINIMUM GAP, fetched once when the portal never published it at discovery. On
+    // SuperProcure it is a listing field and is already on the request snapshot, so this never
+    // fires. On GoComet it is detail-only behind a budgeted enrichment, and a load that missed its
+    // slot never recovers the value on its own - so spend one read here, where a human is waiting,
+    // rather than plan on a fallback and say nothing. Bounded by the adapter's own detail cache and
+    // failure backoff; a read that does not land in time leaves minDecrementUnknown set and the page
+    // says so instead of presenting the fallback as fact.
+    //
+    // Read as a CAPABILITY off the adapter, never as a platform test - no caller outside
+    // src/platform/ may need to know which portal it is talking to. An adapter that publishes the
+    // value at discovery never reaches the fetch, and one that has no such read simply reports the
+    // value as unknown, which is the true answer either way.
+    let minDecrementUnknown = !(rules && rules.minDecrement != null);
+    const adapter = ownerStack && ownerStack.adapter;
+    if (minDecrementUnknown && adapter && typeof adapter.refreshLoadRules === 'function') {
+      // THE CACHED READ IS FREE AND MUST NOT BE RATE-LIMITED. The adapter answers a warm enquiry
+      // detail from its own cache without touching the wire, so gating every call made the second
+      // keystroke onward re-plan on the platform fallback and show "we do not have this customer's
+      // minimum gap yet" for a load whose minimum we had just read - the false caveat being the last
+      // thing the desk sees before submitting. The gate belongs on the MISS, which is the only thing
+      // that spends a read slot, so ask the adapter first and only ration a fetch it has to make.
+      const cached = typeof adapter.cachedLoadRules === 'function' ? adapter.cachedLoadRules(r.loadId) : null;
+      let fetched = cached;
+      if (!fetched && previewRulesAttemptAllowed(r.loadId, Date.now())) {
+        let timer = null;
+        fetched = await Promise.race([
+          Promise.resolve(adapter.refreshLoadRules(r.loadId)).catch(() => null),
+          new Promise((resolve) => { timer = setTimeout(() => resolve(undefined), PREVIEW_RULES_TIMEOUT_MS); }),
+        ]);
+        clearTimeout(timer); // the loser of the race must not hold the loop open for the full timeout
+      }
+      if (fetched && fetched.minDecrement != null) {
+        rules = Object.assign({}, rules, { minDecrement: fetched.minDecrement });
+        minDecrementUnknown = false;
+      }
+    }
+    const preview = engine.planPreview(
+      { id: r.loadId, rules, companyName: L.companyName || null },
+      { cost: costForPlan, marginsPct, minMarginPct },
+    );
+    res.json({ ladder: preview.ladder, floor: preview.floor, rungCount: preview.rungCount,
+      willNotBid: preview.willNotBid, ceiling: preview.ceiling,
+      minDecrement: preview.minDecrement, rungsRequested: preview.rungsRequested,
+      rungsFitting: preview.rungsFitting,
+      // WHAT WILL ACTUALLY BE SENT, carried separately from `ladder`. The two differ whenever a
+      // later transform (the grid snap, the ceiling cap) re-opens a gap the derivation had closed,
+      // and the price line names the prices that reach the board, never the ones that merely
+      // survived the plan.
+      fittingPrices: preview.fittingPrices,
+      shortfall: ladderShortfall(preview),
+      // The step into the last price, which every count above deliberately reads as sent. Carried as
+      // finished copy for the same reason the three beside it are, and separately from `shortfall`
+      // because this one stops the submit and that one does not.
+      floorStep: floorStepRefusal(Object.assign({}, preview, { minDecrementUnknown })),
+      notice: ladderNotice(preview),
+      caveat: ladderCaveat(Object.assign({}, preview, { minDecrementUnknown })) });
+  } catch (e) {
+    res.status(400).json({ error: String((e && e.message) || 'preview failed') });
+  }
+});
+
+// ---- tokenized read-only live-bid view (reuses the price token) --------------
+// Same auth model as /price/:token: the unguessable link IS the access. Strictly
+// read-only - GET only, no controls, one load per token. The floor / ladder / cost
+// deliberately never appear here: the link can be forwarded, and while our placed
+// bid is visible to the shipper anyway, the floor is not public to anyone.
+app.get('/track/:token', async (req, res) => {
+  const r = await requests.getByToken(tokenFromPath(req.params.token));
+  if (!r) {
+    const moved = await requests.resolveMovedToken(tokenFromPath(req.params.token)).catch(() => null);
+    if (moved && moved.live) return res.redirect(302, `/track/${publicSeg(moved.live)}`);
+  }
+  if (!r) return res.status(404).type('html').send(priceShell('Link not found', `
+<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">Live bid status</span></span></div>
+<h1>Unknown or expired link</h1>
+<p class="big">This link doesn't match a price request we know about.</p>`));
+  res.type('html').send(renderTrackPage(r));
+});
+
+// the track page's polling source: one load's live state (read-only projection)
+app.get('/track/:token/state', async (req, res) => {
+  const r = await requests.getByToken(tokenFromPath(req.params.token));
+  if (!r) return res.status(404).json({ error: 'unknown token' });
+  res.json(await trackState(r));
+});
+
+// Read-only projection for /track/:token. Countdown is served as closesAt + serverTime
+// so the page can correct for the phone's clock skew (same close the cost page shows).
+async function trackState(r) {
+  const L = loadFor(r);
+  const ownerStack = stackForRequest(r);
+  const engine = ownerStack ? ownerStack.engine : null;
+  const m = engine ? engine.snapshot().find((x) => String(x.auctionId) === String(r.loadId)) : null;
+  const rec = await bidLogger.getRecord(r.loadId).catch(() => null);
+  const outcome = rec && rec.status === 'closed' ? rec : null;
+  const pos = m ? loadPosition(m, rec) : null;
+  return {
+    loadId: r.loadId,
+    lane: `${laneEnd(L, 'origin')} -> ${laneEnd(L, 'destination')}`,
+    // same label-over-raw preference as the price form / status card (see renderLoadCard)
+    shipper: (r.customer && r.customer.label) || L.companyName || null,
+    equipment: L.equipment || null,
+    units: L.units != null ? L.units : null,
+    // Effective, for the same reason the cost page's own projection is: this feeds a countdown, and
+    // a tracker announcing "closed" over a running auction is the same stale snapshot read.
+    closesAt: effectiveCloseAt(L) || null,
+    softClose: !!L.softClose,
+    serverTime: Date.now(),
+    requestStatus: r.status,
+    // WHY it stopped, not just that it did - same field, same reason as the /price poller
+    // above and renderRequestStatus's stopped branch (server.js:4957). Only holdUnbiddable
+    // writes this. stop() itself does not clear it, but it cannot run on a stale value either:
+    // stop() only fires on an armed load, and the sole stopped -> armed path is rearm(), which
+    // clears heldReason on the way through (priceRequests.js:780) - so by the time an operator
+    // stop() lands, any earlier hold has already been cleared.
+    heldReason: r.heldReason || null,
+    engine: m ? {
+      status: m.status,
+      myRank: pos.myRank,
+      lastBidPrice: pos.lastBidPrice,
+      finalized: m.finalized,
+      // CW-229: the wall-clock mark the /track pre-first-bid state renders "by". Null for
+      // every monitor outside the establish hold this fix introduced (bidEngine.js,
+      // _pendingFirstBidAtMs) - those loads render exactly as before.
+      firstBidByMs: m.firstBidByMs != null ? m.firstBidByMs : null,
+      lastSecondsCloseMs: m.lastSecondsCloseMs != null ? m.lastSecondsCloseMs : null,
+    } : null,
+    outcome: outcome ? {
+      // THE CANONICAL RULE, not a local re-derivation of part of it. deriveStatus asks "did we bid?"
+      // FIRST and answers no_bid, and only then reaches the unknown test - while this page decided on
+      // `won == null` alone, so a load armed and retired before its first rung took the unknown branch
+      // on the ONE link the desk forwards off the price request, and History, both exports, the EOD
+      // and the participation report all said No-bid. Two answers for one load is the disagreement the
+      // unknown class exists to remove, so the page now reads the same function they do.
+      resultStatus: exportModel.deriveStatus(r, outcome),
+      // TRI-STATE, never coerced. outcomeFor admits any record with status 'closed', and the sweep
+      // now closes a record with won null - so `!!outcome.won` turned "we never saw the end" into
+      // false, and the renderer's two-branch Result printed "Lost" on a link the desk shares off the
+      // price request, while History, both exports and the participation report all say Unknown.
+      // renderRequestStatus (the sibling status page) has always guarded this with `won != null`.
+      won: outcome.won == null ? null : !!outcome.won,
+      finalRank: outcome.finalRank != null ? outcome.finalRank : null,
+      lastBidPrice: outcome.lastBidPrice != null ? outcome.lastBidPrice : null,
+    } : null,
+  };
+}
+
+// ---- mock-only demo routes (guarded so they 404 cleanly in real mode) -------
+function mockOnly(res) { res.status(400).json({ error: 'mock-mode route; server is in real mode' }); return null; }
+
+app.post('/api/sim/spawn', (req, res) => {
+  if (!sim) return mockOnly(res);
+  const { count = 1, ...cfg } = req.body || {};
+  const out = [];
+  for (let i = 0; i < Math.min(count, 10); i++) out.push(sim.spawn(cfg).id);
+  res.json({ spawned: out });
+});
+
+app.post('/api/bot/arm', (req, res) => {
+  if (!sim) return mockOnly(res);
+  const { auctionId, marketRate, costFloor } = req.body || {};
+  const a = sim.get(auctionId);
+  if (!a) return res.status(404).json({ error: 'no such auction' });
+  if (!(marketRate > 0) || !(costFloor > 0)) return res.status(400).json({ error: 'marketRate and costFloor must be > 0' });
+  if (costFloor > marketRate) return res.status(400).json({ error: 'costFloor above marketRate - nothing to bid' });
+  const meta = { id: a.id, lane: a.lane, equipment: a.equipment, units: a.units, closesAt: a.closesAt };
+  const m = primaryEngine().arm(meta, { marketRate: Number(marketRate), costFloor: Number(costFloor) });
+  res.json({ armed: true, ladder: m.ladder, floor: m.floor });
+});
+
+app.post('/api/bot/stop', (req, res) => {
+  primaryEngine().stop((req.body || {}).auctionId);
+  res.json({ stopped: true });
+});
+
+app.post('/api/demo/seed', (req, res) => {
+  if (!sim) return mockOnly(res);
+  const slate = [
+    { competitors: 2, closeModel: 'hard', durationMs: 44_000 },
+    { competitors: 3, closeModel: 'soft', durationMs: 48_000 },
+    { competitors: 5, closeModel: 'hard', durationMs: 52_000 },
+  ];
+  const armed = [];
+  for (const cfg of slate) {
+    const a = sim.spawn(cfg);
+    const marketRate = Math.round(a.ceiling * 0.85);
+    const costFloor = Math.round(a.ceiling * 0.70);
+    const meta = { id: a.id, lane: a.lane, equipment: a.equipment, units: a.units, closesAt: a.closesAt };
+    primaryEngine().arm(meta, { marketRate, costFloor });
+    armed.push({ id: a.id, marketRate, costFloor, closeModel: cfg.closeModel, competitors: cfg.competitors });
+  }
+  res.json({ seeded: armed });
+});
+
+app.post('/api/sim/reset', (req, res) => {
+  if (!sim) return mockOnly(res);
+  for (const m of primaryEngine().snapshot()) primaryEngine().stop(m.auctionId);
+  sim.auctions.clear();
+  res.json({ reset: true });
+});
+
+// ---- LIVE read-only connect flow (paste a token; never bids) ----------------
+let liveAdapter = null;
+app.post('/api/connect', async (req, res) => {
+  const { token } = req.body || {};
+  if (!token || String(token).length < 20) return res.status(400).json({ error: 'Paste a valid SuperProcure token.' });
+  try {
+    // authProbeEnabled:false - this adapter is NOT a member of `stacks`, so teardownStack never sees
+    // it and nothing would ever stop a probe armed here. It is a read-only console session it does
+    // not own the lifecycle of, and it has no business re-authenticating a known-dead token every 90
+    // seconds for the life of the process on a live shared account.
+    const a = new RealSuperProcureAdapter({ token: String(token).replace(/^Bearer\s+/i, '').trim(),
+      headers: config.capturedHeaders, authProbeEnabled: false });
+    const acct = await a.login();
+    // ...and discard whatever the OUTGOING one was doing before dropping the only reference to it.
+    // Overwriting this variable is the only teardown this object ever gets, so it goes through the
+    // same single chokepoint every other discarded adapter does - a probe armed before the flag above
+    // existed, a pending settle timer, and any callback from work still in flight all go inert here.
+    try { if (liveAdapter && typeof liveAdapter.discard === 'function') liveAdapter.discard(); } catch (_) {}
+    liveAdapter = a;
+    res.json({ connected: true, account: {
+      company: acct.company, user: acct.user, carrierId: acct.carrierId,
+      branches: acct.branchIds.length, tokenExp: acct.tokenExp } });
+  } catch (e) {
+    res.status(401).json({ error: 'Connect failed: ' + (e.message || 'auth error') });
+  }
+});
+
+app.get('/api/live-state', async (req, res) => {
+  if (!liveAdapter) return res.json({ connected: false, loads: [] });
+  try {
+    const loads = await liveAdapter.listAuctions();
+    res.json({ connected: true, serverNow: liveAdapter.serverNow(), readOnly: true,
+      account: { company: liveAdapter.account.company, user: liveAdapter.account.user,
+        branches: liveAdapter.account.branchIds.length, tokenExp: liveAdapter.account.tokenExp },
+      loads });
+  } catch (e) {
+    res.json({ connected: true, error: e.message, loads: [] });
+  }
+});
+
+// ---- SPA fallback: serve the React console for its client-side routes ---------
+// Registered AFTER every API/page route so it never shadows them. Excludes the API,
+// the tokenized price pages, the worklist, and /legacy. A sendFile error (e.g. no
+// build present in dev) falls through to a 404 instead of crashing the request.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const p = req.path;
+  const lp = String(p || '').toLowerCase();
+  if (lp.startsWith('/api/') || lp.startsWith('/price/') || lp.startsWith('/track/') || lp === '/worklist' || lp === '/legacy') return next();
+  if (!req.accepts('html')) return next();
+  res.sendFile(path.join(consoleDistDir, 'index.html'), (err) => { if (err) next(); });
+});
+
+/**
+ * The record's load, with its display bundle derived on the fly.
+ *
+ * ONE accessor for every page renderer, because the alternative is deriving at each call site that
+ * reaches renderPriceForm/renderLoadCard/loadSummaryHtml and having the next one added miss it -
+ * which is exactly what happened to the previous version of this note: it said "four call sites"
+ * and three more had since grown that read `r.load` raw. The API worklist derives at its own
+ * serialisation point (/api/price-requests). Rule and mechanics: src/web/laneDisplay.js.
+ */
+function loadFor(r) {
+  const portal = platformOf(r);
+  const stack = stackForRequest(r);
+  const meta = stack && stack.adapter && stack.adapter.loadMeta;
+  const live = meta && typeof meta.get === 'function' && meta.get(String(r && r.loadId));
+  // A capped cold poll can learn size after the saved link exists. Project only a matching missing size.
+  const changes = live ? planDimensionRefresh([r], [{ ...live, platformKey: portal }]) : [];
+  return withLaneDisplay(changes.length ? changes[0].afterLoad : ((r && r.load) || {}), portal);
+}
+
+/**
+ * One end of a load's lane, as it is written on screen. The rule is not here - it is in
+ * laneDisplay.js, and the console reads the same composed string off the payload. Derives on the
+ * spot for a load that did not come through loadFor, so a new call site cannot render a raw
+ * address by forgetting a step.
+ */
+function laneEnd(L, end) {
+  const d = (L && L.laneDisplay) || withLaneDisplay(L || {}).laneDisplay;
+  return d[end];
+}
+
+// ---- capture page: standalone, mobile-first, zero-dep; mirrors the console's look but is NOT the SPA bundle ----
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// fmtWeight (declared weight, shipper's own unit) lives in src/notify/waTemplates.js and is
+// imported above - shared with the WhatsApp template's loadDetails() so the KG/MT fallback
+// rule has exactly one place to change, not a second hand-copied one here.
+
+// Route distance in km, straight from SuperProcure. '' when absent so callers omit it.
+const fmtDistance = (km) => {
+  if (km == null || km === '' || !Number.isFinite(Number(km))) return '';
+  const n = Number(km);
+  return `${Number.isInteger(n) ? n : n.toFixed(2).replace(/\.?0+$/, '')} km`;
+};
+
+// Console design tokens inlined (light only) so the phone page reads like Bid Command without loading Tailwind/webfonts.
+const PRICE_CSS = `:root{--bg:hsl(240 6% 96%);--fg:hsl(240 10% 8%);--card:#fff;--muted:hsl(240 5% 92%);--muted-fg:hsl(240 4% 44%);--border:hsl(240 6% 88%);--primary:hsl(162 84% 26%);--accent:hsl(162 52% 95%);--accent-fg:hsl(162 84% 18%);--warn:hsl(32 90% 34%);--danger:hsl(4 80% 40%);--r:0.6rem;
+/* CW-225 hold surface. Amber, not red: the save succeeded and the hold is protective, so the page's
+   error palette would read as a panic wall for an outcome where nothing is broken. Paler than
+   .snote's amber because this state is settled rather than owed a decision. One red thing survives
+   on the panel - the gap figure - because that is the only genuinely bad fact on it. */
+--hold-bg:hsl(45 55% 97%);--hold-bd:hsl(45 32% 86%);--rule:hsl(45 30% 82%)}
+*{box-sizing:border-box}
+/* Always reserve the vertical scrollbar so expanding the band never toggles it and shifts the
+   centered card (the jitter). Styled thin + teal-tinted to match the page, not the OS default. */
+html{overflow-y:scroll;scrollbar-width:thin;scrollbar-color:hsl(162 15% 78%) transparent}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:hsl(162 14% 82%);border-radius:99px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:hsl(162 22% 70%)}
+/* The grid track must shrink below the form's intrinsic input width on phones. */
+body{margin:0;min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:16px;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.card{width:100%;min-width:0;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:calc(var(--r) + 2px);padding:22px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06)}
+.brand{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:18px}
+.brand .chip{display:grid;place-items:center;height:36px;width:36px;flex:none;border-radius:var(--r);background:var(--accent);color:var(--primary)}
+.brand .chip svg{height:18px;width:18px}
+.brand .bt{display:flex;flex-direction:column;line-height:1.25}
+.brand .t{font-size:14px;font-weight:600}
+.brand .s{font-size:12px;color:var(--muted-fg)}
+/* Identifier pair + close-model badge + close date: a RIGHT-ALIGNED COLUMN pinned to the header's
+   top-right corner. loadmeta owns the margin-left:auto that used to sit on .loadno directly, so
+   the whole column pins to that edge.
+   #199 (2026-08-12) moved this block to a full-width row under the brand and pushed the badge and
+   date onto the card; product-owner instruction 2026-08-17 restores all three to the corner. Keep
+   them here - the corner is where the desk looks for the load's identity.
+   Caution for future edits to this comment block: the two-word grid-cell label this badge replaced
+   is a page-content string that must be entirely absent from the served page whenever the close
+   model is unverified (test-price-page-close-model.js asserts on the raw response, this <style>
+   block included) - do not spell that label out verbatim in this CSS. */
+.brand .loadmeta{margin-left:auto;flex:none;min-width:0;max-width:100%;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+/* No reference published (SuperProcure): the portal key IS the identifier and keeps its weight. */
+.brand .loadmeta .loadno{font-size:13px;font-weight:700;color:#2563eb;letter-spacing:.02em}
+/* The SHIPPER's own reference, when the portal publishes one. It takes the prominence .loadno used
+   to hold alone and .loadno demotes beneath it, because the desk works by this number and the
+   portal's key is the thing they asked us to stop calling "the ID". Bounded to the header's own
+   width and allowed to wrap to two lines - these run long ("3262511465-5601270693 (E.com)") and an
+   unbounded one would push the close badge off the right edge. */
+.brand .loadref{font-size:12px;font-weight:700;color:var(--fg);letter-spacing:.01em;text-align:right;max-width:170px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.brand .loadref .oal{font-weight:600;color:var(--muted-fg)}
+.brand .loadref .oal::after{content:" "}
+/* The product name holds one line. */
+.brand .t{white-space:nowrap}
+.brand .loadref + .loadno{font-size:11px;font-weight:600;color:var(--muted-fg)}
+/* The close-model badge sits under the subtitle, inside .bt. That block is a COLUMN flex, so
+   align-self is what stops the pill stretching the full width into a banner; the small top margin
+   separates it from the subtitle without pushing the header taller than the 36px chip beside it. */
+.brand .bt .badge{align-self:flex-start;margin-top:5px}
+/* The portal badge reads as orienting context, not a status - muted so it never competes with the
+   close-type badge next to it, which is the one that changes how the load is priced. */
+.brand .loadmeta .badge.portal{background:var(--muted);color:var(--muted-fg)}
+/* The close date, back beside the close-type badge and the identifier. Muted and small - it is
+   orienting context, not a number the desk acts on, and it must not compete with the load id
+   above it. */
+.brand .loadmeta .lddate{font-size:11px;font-weight:600;color:var(--muted-fg);letter-spacing:.02em}
+h1{font-size:18px;font-weight:700;margin:0 0 14px}
+.load{background:var(--muted);border-radius:var(--r);padding:12px 14px;margin-bottom:18px}
+.load .lane{font-size:16px;font-weight:600}
+.load .sub{font-size:13px;color:var(--muted-fg);margin-top:4px;line-height:1.5}
+/* --- load-details card: spec sheet (lane header + icon fact grid + addresses) --- */
+.lc-spec .slane{display:flex;align-items:center;gap:12px}
+.lc-spec .sep{min-width:0;flex:1}
+.lc-spec .sep.to{text-align:right}
+/* The lane names the route; it does not headline the page. At 17px/700 it outweighed both the h1
+   and the cost field, and on a portal whose lane fields are full postal addresses (GoComet) it ran
+   to eleven bold lines and pushed the cost input off a phone screen entirely. Sized to read as a
+   strong sub-heading under the h1, and capped at two lines so no address can dominate the card
+   however badly it defeats the parser - a parsed city never reaches the cap, so the clamp is inert
+   on the loads that parse. The clamp is safe ONLY because renderLoadCard guarantees the whole
+   address is on the page whenever the portal gave no points: do not remove one without the other. */
+.lc-spec .scity{font-size:15px;font-weight:600;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.lc-spec .spin{font-size:12px;font-weight:600;color:var(--muted-fg);font-variant-numeric:tabular-nums;margin-top:3px}
+.lc-spec .sarw{flex:none;color:var(--primary);display:flex;align-items:center}
+.lc-spec .sarw svg{width:22px;height:22px}
+/* Fact grid: flex-wrap, MAX TWO COLUMNS (product-owner feedback, 2026-07-30 - the earlier
+   3-across layout on the wide card "looked ass"). The cell count is variable (each fact renders
+   only if present, currently up to 6: Vehicle/Shipment/Weight/Material/Cost by+Closes/Distance -
+   the close-model word moved to a header badge and Posted by moved to its own full-width row,
+   both below), so this stays flex rather than a fixed grid - a fixed 1fr 1fr grid forced an odd
+   count into an 8-slot block whose empty trailing slot showed as a border-coloured hole and cost
+   a whole 4th row. A percentage flex-basis (just under half the row, net of the 1px gap)
+   guarantees at most 2 items per row on ANY card width, phone or desktop - unlike the old
+   fixed-px basis, which packed 3 across once the card reached its full 420px width - while
+   flex-grow still lets a lone trailing cell stretch to fill its row, so any count packs flush
+   with no phantom slot. */
+.lc-spec .sgrid{display:flex;flex-wrap:wrap;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:14px}
+.lc-spec .scell{flex:1 1 calc(50% - 1px);min-width:0;background:var(--card);padding:9px 11px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:9px}
+/* Posted by: a wide two-column taker at the bottom of the grid (product-owner feedback) - the
+   contact name + phone number need room to breathe, not a cramped half-width cell. Wrapping a
+   plain .scell in this outer flex-basis:100% box - rather than adding a modifier class onto
+   .scell itself - keeps the cell's own markup byte-identical to every other row: test-load-
+   poster-display.js pins the exact div.scell > span.si ... span.sl "Posted by" shape, and this
+   way that pin needs no change. */
+.lc-spec .sgrid .scell-wide{flex:1 1 100%}
+.lc-spec .scell .si{grid-row:1/3;align-self:center;color:var(--primary);display:flex}
+.lc-spec .scell .si svg{width:18px;height:18px}
+.lc-spec .scell .sl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg);align-self:end}
+.lc-spec .scell .sv{font-size:13px;font-weight:600;overflow-wrap:anywhere;align-self:start}
+.lc-spec .scell .sv .ptel{color:var(--primary);text-decoration:none;white-space:nowrap}
+.lc-spec .scell .sv .ptel:hover{text-decoration:underline}
+/* Cost by / Closes merged cell: two stacked lines sharing the one .sv value slot, each carrying
+   its own small inline mini-label (same weight/case/colour as .sl, just inline rather than above)
+   so the relationship - enter your cost by X, it closes at Y - reads as one fact, not two
+   separate grid cells (product-owner feedback, 2026-07-30: "cost by and close by should somehow
+   neatly fit into one cell"). Values/formatting are unchanged from the old two-cell layout. */
+/* The merged timing cell carries NO outer .sl - the two inline mini-labels already name both
+   values, and stacking a "Cost by / Closes" header above a "Cost by ..." row and a "Closes ..."
+   row printed the same two words twice over (and forced the neighbouring Material cell to
+   stretch to match the taller cell). The value slot therefore spans both grid rows where the
+   label would have sat, centred against the icon like any single-line cell. */
+.lc-spec .scell.timing .sv{grid-row:1/3;align-self:center}
+.lc-spec .scell .sv .trow{display:block}
+.lc-spec .scell .sv .trow + .trow{margin-top:2px}
+.lc-spec .scell .sv .tk{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-fg);margin-right:3px}
+.lc-spec .scell .sv .tv{white-space:nowrap}
+.lc-spec .saddrs{margin-top:12px;display:grid;gap:6px}
+.lc-spec .saddr{display:flex;gap:8px;font-size:12.5px;line-height:1.45}
+.lc-spec .saddr .sk{flex:none;width:46px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-fg);margin-top:2px}
+.lc-spec .saddr .sav{color:var(--muted-fg);overflow-wrap:anywhere}
+.lc-spec .lmeta{font-size:12px;color:var(--muted-fg);margin-top:11px}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--accent);color:var(--accent-fg);margin-top:8px}
+.snote{background:hsl(45 95% 96%);border:1px solid hsl(45 85% 82%);border-radius:var(--r);padding:11px 13px;margin:-6px 0 18px}
+.snote .st{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--warn);margin-bottom:4px}
+.snote .sb{font-size:13px;line-height:1.55;white-space:pre-line;overflow-wrap:anywhere}
+.enote{background:hsl(4 90% 97%);border:1px solid hsl(4 80% 87%);border-radius:var(--r);padding:11px 13px;margin:-6px 0 18px}
+.efix{display:block;margin-top:10px;padding:12px 10px;min-height:44px;border-radius:var(--r);background:var(--danger);color:#fff;font-size:14px;font-weight:700;text-align:center;text-decoration:none}
+/* Ceiling block, RED state. Same geometry as .snote - it swaps class with it rather than being a
+   second element, so the block changes colour in place instead of appearing from nothing and
+   shoving the Submit button under the user's thumb. Palette is .enote's, which is also
+   .closewarn.red's, so this page has exactly ONE red. */
+.snote.bad{background:hsl(4 90% 97%);border-color:hsl(4 80% 87%)}
+.snote.bad .st{color:var(--danger)}
+.snote.bad .sb{color:var(--fg)}
+/* #ceilAlert is an aria-live announcer, not a visible line - it restates the heading+body for a
+   screen reader the instant the block turns red, which is exactly why it must never be ON SCREEN
+   too: rendered visibly it is a byte-identical THIRD copy of the two lines already above it. The
+   standard visually-hidden clip pattern keeps the announcement live without a pixel on the page. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* Action row - two buttons splitting the width the page's single green button owns, same geometry
+   family (padding/border-radius) so both read as buttons rather than one button beside a link. flex
+   default align-items:stretch matches their heights even when one label wraps and the other does not.
+   min-width:0 lets a flex item shrink below its content width; overflow-wrap/word-break are the
+   backstop for a cost figure too wide to fit even after the natural "Use / Rs / N" wrap points. */
+.ceilacts{display:flex;gap:10px;margin-top:10px}
+.ceilacts button{flex:1 1 0;min-width:0;width:auto;margin-top:0;padding:12px 10px;min-height:44px;font-size:14px;line-height:1.25;font-weight:700;border-radius:var(--r);cursor:pointer;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-align:center}
+.ceilacts #ceilFix{background:var(--danger);color:#fff;border:none}
+.ceilacts .ceilalt{background:none;border:1px solid var(--border);color:var(--muted-fg);font-size:13px}
+.ceilacts[hidden]{display:none}
+/* CW-225 hold strip. At rest this is ONE 44px line - pill, the gap, a chevron - because a settled
+   state is a status and an explanation panel on one reads as though something went wrong. One tap
+   opens two figures, one sentence and the way out, in 181px: figures in a fixed left column,
+   tabular so the rupee amounts line up on their digits, labels to the right of them. The resume
+   confirm REPLACES that body rather than adding to it, so the second tap never grows the panel. */
+.hstrip{background:var(--hold-bg);border:1px solid var(--hold-bd);border-radius:var(--r);margin:0 0 18px}
+.hstrip>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;min-height:42px}
+.hstrip>summary::-webkit-details-marker{display:none}
+.hstrip>summary:focus-visible{outline:2px solid var(--warn);outline-offset:-2px;border-radius:var(--r)}
+.hstrip .hpill{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:2px 9px;border-radius:999px;background:hsl(45 80% 88%);color:hsl(32 80% 26%)}
+.hstrip .hpill svg{width:11px;height:11px;flex:none}
+.hstrip .sgap{flex:1;min-width:0;font-size:15px;font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums;letter-spacing:-.012em;line-height:1.25}
+.hstrip .sgap .u{font-size:13px;font-weight:600;color:var(--fg);letter-spacing:0}
+.hstrip .hchev{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);flex:none;margin-top:-3px;color:var(--warn);margin-right:3px}
+@media (prefers-reduced-motion:no-preference){.hstrip .hchev{transition:transform 150ms cubic-bezier(.2,0,.38,.9)}}
+.hstrip[open]>summary .hchev{transform:rotate(-135deg);margin-top:2px}
+.hstrip .hbody{padding:0 12px 12px}
+.hstrip .hbody[hidden]{display:none}
+.hstrip .led{padding-top:10px;border-top:1px solid var(--rule);font-variant-numeric:tabular-nums}
+.hstrip .lrow{display:flex;align-items:baseline;gap:10px;font-size:12.5px;line-height:1.6;color:var(--muted-fg)}
+.hstrip .lv{width:84px;flex:none;font-size:13.5px;font-weight:700;color:var(--fg)}
+.hstrip .hact{margin:8px 0 0;font-size:12.5px;line-height:1.45}
+/* width:auto beats the global button{width:100%} rule - the same trap .ceilacts works around. */
+.hstrip .acts{display:flex;align-items:center;gap:12px;margin-top:10px}
+.hstrip .acts[hidden]{display:none}
+.hstrip .rbtn{width:auto;margin-top:0;font-size:13px;font-weight:700;padding:8px 13px;border:1px solid var(--border);border-radius:var(--r);background:#fff;color:var(--fg);cursor:pointer;font-family:inherit}
+.hstrip .rlink{width:auto;margin-top:0;padding:0;background:none;border:0;color:var(--muted-fg);font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;font-family:inherit}
+.hstrip .rbtn:focus-visible,.hstrip .rlink:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+/* The portal warning, on the ladder box rather than in the panel. Same palette as the strip, so the
+   two read as one held state split across the two places the operator looks. */
+.dontb{display:flex;gap:8px;align-items:flex-start;margin-top:14px;padding:10px 12px;background:var(--hold-bg);border:1px solid var(--hold-bd);border-radius:var(--r)}
+.dico{flex:none;width:16px;height:16px;color:var(--danger);margin-top:2px}
+.dtx{margin:0;font-size:13px;line-height:1.45}
+.dtx b{font-weight:700}
+.dtx span{color:var(--muted-fg)}
+/* The ladder, struck through. The band still names prices under a panel saying they cannot be sent;
+   a line through them says it without a word. */
+.brange.dead{color:var(--muted-fg);text-decoration:line-through;text-decoration-thickness:1.5px}
+/* Green is reserved for a page that is bidding. Re-price must stay AVAILABLE on a held load - the
+   hold is off status 'stopped' precisely so a second correction is possible (CW-220) - it just
+   stops being the loudest thing on the screen. */
+.heldpage #mainForm>button{background:#fff;color:var(--fg);border:1px solid var(--border);box-shadow:none}
+.heldpage #mainForm>button:disabled{color:var(--muted-fg)}
+.heldpage .cd,.heldpage .cd.soon{color:var(--muted-fg);background:none;border:0;padding:0;display:block}
+.onrec{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-fg);background:var(--muted);border-radius:999px;padding:2px 8px}
+.heldpage label[for=cost]{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+/* Cost field, invalid. Mirrors the existing focus-ring shape in red. The :focus selector is listed
+   so this still wins when the blocked-submit path focuses the field. */
+.field.bad input[type=number],.field.bad input[type=number]:focus{border-color:var(--danger);box-shadow:0 0 0 3px hsl(4 90% 94%)}
+/* Shake: small amplitude on purpose - a nudge, not a jolt. .field is already position:relative so
+   the absolutely-positioned "Rs" chip travels with it. */
+@keyframes ceilShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(3px)}30%,50%,70%{transform:translateX(-5px)}40%,60%{transform:translateX(5px)}}
+.field.shake{animation:ceilShake .4s cubic-bezier(.36,.07,.19,.97) both}
+.enote .st{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:hsl(4 76% 44%);margin-bottom:4px}
+.enote .sb{font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.enote .back{display:inline-block;margin-top:10px;font-size:13px;font-weight:600;color:var(--primary)}
+/* LADDER SHORTFALL - the half-failure, amber, sitting between the prices and the Submit button.
+   Amber and not red because nothing is broken: bids still go out, just fewer of them. Amber and not
+   the neutral .bfacts grey because something IS lost. The hues are the page's existing warning pair,
+   byte-identical to .closewarn.amber, so the desk reads one warning colour on this page and not two. */
+.lwarn{margin:14px 0 0;background:hsl(45 95% 92%);border:1px solid hsl(45 85% 78%);border-radius:var(--r);padding:11px 13px}
+.lwarn[hidden]{display:none}
+.lwfact{margin:0;font-size:13.5px;font-weight:700;line-height:1.5;color:var(--warn);overflow-wrap:anywhere}
+.lwact{margin:5px 0 0;font-size:13px;line-height:1.55;color:var(--fg);overflow-wrap:anywhere}
+/* ONE button (width:auto beats the global button{width:100%}) plus a demoted text link, same
+   flex-wrap family as .ceilacts: the link sits after the button when the row has room and wraps onto
+   its own line otherwise - no separate "link-only" layout needed for the no-honest-figure case,
+   where the link is simply what is left in the row on its own. */
+.lwacts{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+.lwacts[hidden]{display:none}
+.lwacts button{flex:1 1 0;min-width:0;width:auto;margin-top:0;padding:12px 10px;min-height:44px;font-size:14px;line-height:1.25;font-weight:700;border-radius:var(--r);cursor:pointer;white-space:normal;overflow-wrap:anywhere;text-align:center}
+.lwacts button[hidden]{display:none}
+.lwacts #lwUse{background:var(--warn);color:#fff;border:none}
+.lwacts .lwalt{flex:0 0 auto;min-height:auto;padding:0;background:none;border:0;color:var(--muted-fg);font-size:12.5px;font-weight:600;text-decoration:underline}
+/* The floor-step block holds the submit shut, so it takes the same danger pairing .snote.bad uses
+   rather than the amber the shortfall wears - the two sit in the same slot and must not read as the
+   same severity when only one of them stops the button. */
+.lwarn.bad{background:hsl(4 90% 97%);border-color:hsl(4 80% 87%)}
+.lwarn.bad .lwfact{color:var(--danger)}
+.lwacts #fsUse{background:var(--danger);color:#fff;border:none}
+.snote .pm{margin-top:6px;font-size:12px;color:var(--muted-fg)}
+.snote .track{display:inline-block;margin-top:8px;font-size:13px;font-weight:600;color:var(--primary)}
+label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.field{position:relative}
+.field .rs{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted-fg);font-size:18px;pointer-events:none}
+input[type=number]{width:100%;font-size:22px;font-weight:600;padding:12px 12px 12px 42px;border:1px solid var(--border);border-radius:var(--r);background:#fff;color:var(--fg);-moz-appearance:textfield}
+/* transit-days field: same chip-prefix shape as the cost field, wider gutter for the "Days" chip */
+.tfield .rs{font-size:15px}
+.tfield input[type=number]{padding-left:66px}
+.tfield input[type=number]:disabled{background:var(--muted);color:var(--muted-fg)}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
+button{width:100%;margin-top:16px;font-size:16px;font-weight:600;padding:13px 16px;border:none;border-radius:var(--r);background:var(--primary);color:#fff;cursor:pointer}
+button:active{opacity:.9}
+/* Server sets the disabled attribute for the zero-margin refusal (and any future hard-block) but
+   the base rule above never distinguished the look - the button rendered live-green regardless,
+   so a desk that never opens devtools cannot tell code-disabled from working. Same muted/disabled
+   pairing as .tfield input[type=number]:disabled above, so the two can't drift onto different
+   treatments. Pinned by test-zero-floor-guard.js Test 14. */
+button:disabled{background:var(--muted);color:var(--muted-fg);cursor:not-allowed}
+.ok{display:grid;place-items:center;height:40px;width:40px;border-radius:999px;background:var(--accent);color:var(--primary);margin-bottom:12px}
+.ok svg{height:22px;width:22px}
+.big{font-size:15px;margin:0 0 6px}.big b{font-weight:700}
+.note{font-size:12px;color:var(--muted-fg);margin:14px 0 0;line-height:1.5}
+/* The entered rates on the submit confirmation, one line per type - same shape they were typed in.
+   Wording here is deliberately generic: this sheet ships on EVERY price page, so a vehicle-basis
+   word in a comment reaches the PMT form too and asserts the wrong basis on it. */
+.rates{list-style:none;margin:10px 0 0;padding:0;font-size:14px}
+.rates li{padding:5px 0;border-top:1px solid var(--border)}
+/* The pricing cutoff, stated in server-rendered HTML. Deliberately NOT dependent on the
+   countdown script: when that script died (2026-07-10 -> 07-14) this line is what would have
+   told the operator the truth. Styled as a standing fact, not a transient warning. */
+.cutoff{font-size:12px;color:var(--muted-fg);margin-top:9px;padding-top:9px;border-top:1px solid var(--border);line-height:1.5}
+.cutoff b{color:var(--fg)}
+/* The shipper target-rate banner. Sits ABOVE the lane because on this card the two numbers are
+   the decision and the load spec is only context - the desk is answering "do we go to their
+   price", not "what is this load". Warn-toned rather than danger: it is a live opportunity with a
+   short fuse, not a failure. */
+.tgt{margin:-4px 0 14px;padding:12px 14px;border-radius:var(--r);background:hsl(32 92% 96%);border:1px solid hsl(32 80% 82%)}
+.tgt-h{font-size:13px;font-weight:700;color:var(--warn);margin-bottom:10px;line-height:1.35}
+.tgt-nums{display:flex;gap:18px;flex-wrap:wrap}
+.tgt-nums>span{display:flex;flex-direction:column;gap:1px}
+.tgt-k{font-size:11px;color:var(--muted-fg);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.tgt-v{font-size:17px;font-weight:700;color:var(--fg);white-space:nowrap}
+.tgt-want .tgt-v{color:var(--warn)}
+.tgt-had .tgt-v{font-weight:600;color:var(--muted-fg);text-decoration:line-through}
+.tgt-note{margin-top:9px;font-size:12px;color:var(--fg);line-height:1.45}
+.tgt-warn{margin-top:9px;font-size:12px;font-weight:600;color:var(--danger);line-height:1.45}
+.tgt-dl{margin-top:9px;font-size:12px;color:var(--muted-fg);line-height:1.45}
+.tgt-dl b{color:var(--fg)}
+.cd{font-size:13px;font-weight:600;color:var(--warn);margin-top:6px}
+/* The live position on a re-price page, filled by the poller. Neutral, not a warning colour -
+   it is a standing fact about the load, and it sits above the close warning so an amber or red
+   close banner still reads as the loudest thing on the page. Hidden until a rank arrives. */
+.livepos{display:none}
+.livepos.on{display:block;margin-top:9px;font-size:13px;font-weight:600;color:var(--fg);background:var(--muted);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px}
+.cd.soon{background:hsl(45 95% 92%);border:1px solid hsl(45 85% 78%);border-radius:8px;padding:5px 10px;display:inline-block}
+/* Live amber/red banner below the load card, tiered off the engine's OWN timing thresholds
+   (PRICE_ALERT_AMBER_MS/RED_MS, server-derived from bidEngine's real cfg - never invented
+   numbers) - so a human submitting close to the wire knows exactly when bid quality degrades. */
+.closewarn{display:none}
+.closewarn.amber{display:block;margin-top:9px;font-size:13px;font-weight:600;color:var(--warn);background:hsl(45 95% 92%);border:1px solid hsl(45 85% 78%);border-radius:var(--r);padding:9px 12px}
+.closewarn.red{display:block;margin-top:9px;font-size:13px;font-weight:700;color:var(--danger);background:hsl(4 90% 97%);border:1px solid hsl(4 80% 87%);border-radius:var(--r);padding:9px 12px}
+/* Multi-unit count control: ONE full-width joined field matching the cost input width directly below
+   it - an editable number on the left (the count to bid for, default = the load's full count) and a
+   "/ N trucks|metric tonnes" segment filling the rest. On a TRUCK load the number is editable and
+   flows to the bid's vehicle count (vcq); on a PMT load the tonnage is fixed by the load, so the
+   number is read-only (disabled) and never posts. No helper text - it is self-explanatory. Reuses the
+   page's number-input styling (same font/weight/spinner-strip as the cost field). */
+.mvfield{display:flex;align-items:stretch;width:100%;margin:0 0 18px;border:1px solid var(--border);border-radius:var(--r);background:#fff;overflow:hidden}
+.mvfield:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
+.mvfield input[type=number]{flex:none;width:96px;border:0;background:transparent;font-size:22px;font-weight:600;padding:12px 8px;color:var(--fg);text-align:center;-moz-appearance:textfield;outline:none;box-shadow:none}
+.mvfield input[type=number]:disabled{color:var(--muted-fg);background:var(--muted)}
+.mvfield input[type=number]::-webkit-outer-spin-button,.mvfield input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.mvtot{flex:1;display:flex;align-items:center;padding:0 14px;font-size:15px;font-weight:600;color:var(--muted-fg);border-left:1px solid var(--border);background:hsl(240 6% 98.5%)}
+/* Truck-type breakdown on a multi-type load. Same card-inside-a-card geometry, border colour and
+   radius as .mvfield directly under it, so the two read as one control rather than as a panel
+   someone bolted on: the types, then the count, then the rate. */
+.mvtypes{border:1px solid var(--border);border-radius:var(--r);background:var(--card);margin:0 0 14px;overflow:hidden}
+.mvtypes .mvth{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg);padding:9px 13px 7px}
+.mvtypes .mvtr{padding:0 13px 9px}
+.mvtypes .mvtk{display:flex;align-items:baseline;gap:10px}
+.mvtypes .mvtl{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.mvtypes .mvtc{flex:none;font-size:13.5px;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums}
+.mvtypes .mvtd{display:block;font-size:12px;font-weight:500;line-height:1.4;color:var(--muted-fg);overflow-wrap:anywhere;margin-top:2px}
+/* One rate field for each cargo type. Same joined-field geometry as .mvfield above it - chip,
+   number, muted segment - so the per-type rows read as the same control repeated, not as a second
+   design. The right-hand segment carries that type's own line total, and collapses while empty. */
+.mvtypes .mvtf{display:flex;align-items:stretch;margin-top:5px;border:1px solid var(--border);border-radius:var(--r);background:#fff;overflow:hidden}
+.mvtypes .mvtf:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
+.mvtypes .mvtf .rs{position:static;transform:none;flex:none;display:flex;align-items:center;padding-left:11px;font-size:15px;color:var(--muted-fg)}
+.mvtypes .mvtf input[type=number]{flex:1;min-width:0;width:auto;border:0;background:transparent;font-size:19px;font-weight:600;padding:9px 8px;color:var(--fg);-moz-appearance:textfield;outline:none;box-shadow:none}
+.mvtypes .mvtf .mvtt{flex:none;display:flex;align-items:center;padding:0 12px;font-size:13px;font-weight:700;color:var(--muted-fg);border-left:1px solid var(--border);background:hsl(240 6% 98.5%);font-variant-numeric:tabular-nums}
+.mvtypes .mvtf .mvtt:empty{display:none}
+/* The whole-load total: the block's own last row, so the arithmetic the desk is committing to sits
+   directly under the numbers it came from rather than in a sentence beside them. */
+.mvtypes .mvsumrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted-fg);padding:9px 13px;border-top:1px solid var(--border);background:hsl(240 6% 98.5%)}
+.mvtypes .mvsumrow b{font-size:14.5px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
+/* The running total under the cost field. Empty until a cost is typed, and :empty collapses it so
+   an un-filled form has no gap where a number is going to appear. */
+.mvsum{font-size:12.5px;line-height:1.5;color:var(--muted-fg);margin:8px 0 0}
+.mvsum:empty{display:none}
+.mvsum b{color:var(--fg);font-weight:700;font-variant-numeric:tabular-nums}
+@media (max-width:380px){
+  .card{padding:16px}
+  .brand{flex-wrap:wrap;gap:8px}
+  .brand .loadmeta{flex-basis:calc(100% - 44px);min-width:0;margin-left:44px;align-items:flex-start;overflow-wrap:anywhere}
+  .mvtypes .mvtf{flex-wrap:wrap}
+  .mvtypes .mvtf .mvtt{flex-basis:100%;justify-content:flex-end;border-left:0;border-top:1px solid var(--border);padding:7px 10px;overflow-wrap:anywhere}
+  .mvtypes .mvsumrow{flex-wrap:wrap}
+}
+.flash{background:var(--accent);border:1px solid hsl(162 40% 80%);color:var(--accent-fg);border-radius:var(--r);padding:11px 13px;margin-bottom:16px;font-size:13px;line-height:1.55}
+.flash b{font-weight:700}
+.flash.ok-flash{display:flex;align-items:center;gap:9px;padding:12px 14px;font-size:14px;font-weight:700;animation:flashPulse .5s ease-out}
+.flash.ok-flash svg{flex:none;height:20px;width:20px;color:var(--primary)}
+@keyframes flashPulse{0%{background:hsl(162 55% 88%);transform:scale(1.015)}100%{background:var(--accent);transform:scale(1)}}
+/* WCAG 2.3.3: motion triggered by interaction must be disableable unless it is essential. Neither
+   of these is - the red border, the red block, the heading and the role="alert" announcement each
+   carry the ceiling message on their own, and the save flash is pure celebration. So the honest
+   reduced-motion answer is no animation at all. flashPulse predates this and honoured nothing;
+   picked up here because this is the file's first prefers-reduced-motion block. */
+@media (prefers-reduced-motion: reduce){.field.shake{animation:none}.flash.ok-flash{animation:none}}
+/* Re-price save/revert confirmation: a timed-dismiss popup instead of reloading the page to
+   show a banner - the AJAX submit updates the form in place, so this is the only signal. */
+/* Appended directly to <body>, which is itself a grid container (display:grid;place-items:
+   center) for the centered card layout - a percentage width/max-width on a fixed-position
+   child can resolve against that grid formatting context instead of the viewport in some
+   engines, collapsing to a content-shrunk sliver (word-wrapped one-per-line). 100vw/100vh are
+   unambiguously viewport-relative regardless of the containing block chain; min-width is a
+   second safety net so the box can never shrink below a sane size either way. */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(10px);opacity:0;
+  max-width:calc(100vw - 32px);width:360px;min-width:260px;box-sizing:border-box;background:var(--card);border:1px solid var(--border);
+  border-left:4px solid var(--primary);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.16);
+  padding:12px 12px 12px 14px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;
+  color:var(--fg);z-index:50;transition:opacity .2s ease,transform .2s ease;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.toast.err{border-left-color:hsl(4 76% 52%)}
+.toast svg{flex:none;height:18px;width:18px;color:var(--primary)}
+.toast.err svg{color:hsl(4 76% 52%)}
+.toast .tx{flex:1;min-width:0;line-height:1.4}
+.toast .ta{flex:none;width:auto;margin-top:0;cursor:pointer;background:var(--danger);color:#fff;border:0;border-radius:var(--r);padding:8px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+/* width:auto overrides the global button{width:100%} rule (meant for the full-width form
+   submit buttons) - without it, the "x" dismiss button tries to fill the whole toast row as
+   its flex-basis, squeezing the message text down to 0 width (every word wraps its own line). */
+.toast .tc{flex:none;width:auto;margin-top:0;cursor:pointer;color:var(--muted-fg);background:none;border:0;padding:2px 4px;font-size:18px;line-height:1}
+/* In-app confirm dialog. Same card vocabulary as the page (--card / --border / --r) so it
+   reads as part of the form rather than a browser popup. The soft low-cost check used to be
+   a window.confirm, which blocks the tab and renders per-browser chrome around a bare line
+   of text - on a public capture link that looks like something to close, not to answer. */
+.mask{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.45);opacity:0;transition:opacity .15s ease}
+.mask.show{opacity:1}
+.mdl{width:100%;max-width:340px;background:var(--card);border:1px solid var(--border);border-radius:calc(var(--r) + 2px);padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);transform:translateY(6px);transition:transform .15s ease}
+.mask.show .mdl{transform:translateY(0)}
+.mdl h2{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin:0 0 8px}
+.mdl h2 svg{flex:none;height:18px;width:18px;color:var(--warn)}
+.mdl p{font-size:13px;line-height:1.5;color:var(--muted-fg);margin:0 0 16px}
+.mdl .acts{display:flex;justify-content:flex-end;gap:8px}
+/* width/margin reset for the same reason as .toast .tc - the global button rule is sized for
+   the full-width submit button. */
+.mdl .acts button{width:auto;margin-top:0;padding:9px 14px;font-size:13px;font-weight:600}
+.mdl .no{background:none;border:1px solid var(--border);color:var(--fg)}
+.mdl .yes{background:var(--warn);color:#fff}
+.lock{display:flex;gap:6px;align-items:flex-start;font-size:12px;color:var(--muted-fg);margin:16px 0 0;line-height:1.4}
+.lock svg{height:14px;width:14px;flex:none;margin-top:1px}
+a.btn{display:block;text-align:center;margin-top:16px;font-size:16px;font-weight:600;padding:13px 16px;border-radius:var(--r);background:var(--primary);color:#fff;text-decoration:none}
+a.btn:active{opacity:.9}
+.stat{background:var(--muted);border-radius:var(--r);padding:12px 14px;margin-top:14px}
+.stat .row{display:flex;justify-content:space-between;gap:10px;font-size:14px;line-height:1.7}
+.stat .row .k{color:var(--muted-fg)}
+.stat .row .v{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.src{font-size:12px;color:var(--muted-fg);margin:14px 0 0;line-height:1.5}
+.src b{color:var(--fg);font-weight:600}
+.band{margin-top:14px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+summary.bhd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:hsl(240 6% 98.5%);cursor:pointer;list-style:none;user-select:none}
+summary.bhd::-webkit-details-marker{display:none}
+.band[open]>summary.bhd{border-bottom:1px solid var(--border)}
+.bhd-main{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.band .bt2{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-fg)}
+.badj{flex:none;display:inline-flex;align-items:center;gap:5px;color:var(--primary);font-size:12px;font-weight:600}
+.band[open] .badj-lbl-open{display:inline}.badj-lbl-open{display:none}
+.band[open] .badj-lbl-shut{display:none}
+.bsum{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.band[open] .brange{display:none}
+.brange{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bchev{width:8px;height:8px;border-right:2px solid var(--primary);border-bottom:2px solid var(--primary);transform:rotate(45deg);transition:transform .15s;flex:none;margin-top:-2px}
+.band[open]>summary.bhd .bchev{transform:rotate(-135deg);margin-top:1px}
+.bsrc{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-fg)}
+.bsrc.custom{background:hsl(45 95% 92%);color:var(--warn)}
+.bsrc.hide{display:none}
+.mrs::placeholder{color:hsl(240 5% 66%);font-size:12px;font-weight:500;font-family:var(--sans, inherit)}
+.brows{max-height:40vh;overflow-y:auto}
+.bidrow{display:flex;align-items:center;gap:8px;padding:9px 13px}
+.bidrow+.bidrow{border-top:1px solid var(--border)}
+.bidrow.lands{background:hsl(162 40% 97.5%)}
+.bnm{flex:1;min-width:0;font-size:12.5px;font-weight:600}
+.bnm .bsub{display:block;font-size:10.5px;color:var(--muted-fg);font-weight:500}
+.mfield{display:inline-flex;align-items:center;gap:1px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px}
+.mfield:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--accent)}
+.mfield.pct{width:64px}
+.mfield.rs{width:94px}
+.mfield.await{border-style:dashed}
+.mfield .mu{color:var(--muted-fg);font-family:ui-monospace,Menlo,monospace;font-size:12px;flex:none}
+.mfield input{border:0;padding:0;margin:0;background:transparent;outline:none;box-shadow:none;width:100%;text-align:right;min-width:0;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--fg)}
+.mfield input:focus{box-shadow:none}
+.mfield input:disabled{color:hsl(240 5% 75%)}
+.meq{color:var(--muted-fg);font-size:13px}
+.bfoot{font-size:11.5px;color:var(--muted-fg);padding:9px 13px;background:hsl(240 6% 98.5%);border-top:1px solid var(--border);line-height:1.5}
+.bfoot b{color:var(--fg);font-weight:600}
+.bfoot.await{color:var(--primary);font-weight:600}
+.bfacts{font-size:11.5px;color:var(--muted-fg);margin:0;padding:9px 13px 9px 28px;border-top:1px solid var(--border);line-height:1.6;display:grid;gap:5px;list-style:disc}
+.bfacts li{padding-left:2px}
+/* A band row whose price sits ABOVE the customer's ceiling: it can never go out. Struck
+   through and dimmed rather than hidden - the desk set that margin and needs to see that
+   it is theirs and that it is dead, not wonder where a row went. */
+.bidrow.overceil .mfield.rs input{text-decoration:line-through;opacity:.55}
+.bidrow.overceil .bnm{opacity:.55}
+.bfacts li::marker{color:var(--muted-fg)}
+.bfacts b{color:var(--fg);font-weight:600}
+.abar{border:1px dashed var(--border);border-radius:var(--r);padding:12px 13px;margin-top:18px}
+.abar .al{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:8px}
+.abar button{margin-top:0}
+.abar .aerr{font-size:12px;color:var(--warn);margin-top:8px;line-height:1.4}
+.abar .alink{display:block;text-align:center;font-size:14px;font-weight:600;color:var(--primary);text-decoration:none;padding:2px 0}
+.cbackdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.cbackdrop.show{display:flex}
+.cbox{background:var(--card);border-radius:calc(var(--r) + 2px);padding:20px;max-width:340px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.cbox p{font-size:14px;line-height:1.5;margin:0 0 16px}
+.cbox .crow{display:flex;gap:8px}
+.cbox button{width:auto;flex:1;margin-top:0;font-size:14px;padding:10px 14px}
+.cbox .ccancel{background:var(--muted);color:var(--fg)}`;
+const ICON_TRUCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const ICON_ALERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+const ICON_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const ICON_SIGNIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+const ICON_BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>';
+const ICON_WEIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.46A2 2 0 0 0 17.48 8Z"/></svg>';
+const ICON_RULER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>';
+const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+const ICON_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>';
+const ICON_DISTANCE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 17.5 16 6.5" stroke-dasharray="2 2"/></svg>';
+const ICON_SHIPMENT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l10 10-8 8L3 11V3Z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>';
+const ICON_PHONE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>';
+const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
+function priceShell(title, body, cardClass = '') {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title><style>${PRICE_CSS}</style></head><body><div class="card${cardClass ? ` ${cardClass}` : ''}">${body}</div></body></html>`;
+}
+
+// Admin-only action block for a public price/track page. Reads the SAME sp_session cookie the
+// console uses (first-party, same-origin - currentAdmin(req) is a plain header read, no new
+// auth surface). Not signed in: a quiet link back into the console that round-trips through
+// login via ?admin_return=, since the console SPA has no router to hang a deep link on today.
+// Signed in: an inline button hitting the exact /api endpoint the console's own row actions use
+// (dismiss/restore/rearm) - same preconditions, same audit trail, just reachable from the link
+// an admin is already looking at instead of making them hunt the load down in the console.
+const ADMIN_ACTIONS = {
+  // muted: true on dismiss - the awaiting_price form's primary flow IS "Submit cost"; Decline
+  // is a rare admin escape hatch and must not read as a second, equally-weighted CTA sitting
+  // right under it. restore/reopen ARE the sole action on their page, so they keep the full
+  // primary button - same visual language as the rest of this flow (button, a.btn).
+  dismiss: { label: 'Decline this request', endpoint: (r) => `/api/price-requests/${encodeURIComponent(r.id)}/dismiss`,
+    confirm: 'Decline this price request? It will stop asking for a cost until restored.', muted: true,
+    pointer: 'Need to decline this?' },
+  restore: { label: 'Restore this request', endpoint: (r) => `/api/price-requests/${encodeURIComponent(r.id)}/restore`, confirm: null,
+    pointer: 'Need to resume or restore this?' },
+  reopen: { label: 'Reopen and resume bidding', endpoint: (r) => `/api/auctions/${encodeURIComponent(r.loadId)}/rearm`,
+    confirm: 'Resume bidding on this load from where it was stopped?', pointer: 'Need to resume or restore this?' },
+};
+function renderAdminBar(req, r, action) {
+  const cfg = ADMIN_ACTIONS[action];
+  const admin = currentAdmin(req);
+  if (!admin) {
+    const back = encodeURIComponent(req.originalUrl);
+    return `<p class="lock">${ICON_SIGNIN}<span>${esc(cfg.pointer)} <a href="/?admin_return=${back}" style="color:var(--muted-fg);font-weight:600;text-decoration:underline">Sign in here</a>.</span></p>`;
+  }
+  const btnStyle = cfg.muted ? ' style="background:transparent;color:var(--muted-fg);border:1px solid var(--border);box-shadow:none;font-size:13px;text-decoration:underline"' : '';
+  return `<div class="abar">
+<div class="al">Signed in as ${esc(admin.user)}</div>
+<button type="button" id="abtn"${btnStyle}>${esc(cfg.label)}</button>
+<div class="aerr" id="aerr" style="display:none"></div>
+${cfg.confirm ? `<div class="cbackdrop" id="cback" role="dialog" aria-modal="true"><div class="cbox"><p>${esc(cfg.confirm)}</p><div class="crow"><button type="button" class="ccancel" id="ccancel">Cancel</button><button type="button" id="cok">${esc(cfg.label)}</button></div></div></div>` : ''}
+<script>(function(){
+var b=document.getElementById('abtn'),e=document.getElementById('aerr'),orig=b.textContent;
+function run(){
+b.disabled=true;b.textContent='Working...';e.style.display='none';
+fetch(${jsonForScript(cfg.endpoint(r))},{method:'POST',headers:{'Content-Type':'application/json'}})
+.then(function(res){return res.json().catch(function(){return {};}).then(function(body){return {ok:res.ok,body:body};});})
+.then(function(result){
+if(!result.ok){b.disabled=false;b.textContent=orig;e.textContent=(result.body&&result.body.error)||'Failed - please try again.';e.style.display='';return;}
+location.reload();
+})
+.catch(function(){b.disabled=false;b.textContent=orig;e.textContent='Network error - please try again.';e.style.display='';});
+}
+${cfg.confirm ? `
+var back=document.getElementById('cback'),cancel=document.getElementById('ccancel'),ok=document.getElementById('cok');
+function closeConfirm(){back.classList.remove('show');}
+b.addEventListener('click',function(){back.classList.add('show');});
+cancel.addEventListener('click',closeConfirm);
+back.addEventListener('click',function(ev){if(ev.target===back)closeConfirm();});
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape')closeConfirm();});
+ok.addEventListener('click',function(){closeConfirm();run();});
+` : `
+b.addEventListener('click',run);
+`}
+})();</script>
+</div>`;
+}
+
+// ---- the pricing cutoff, shared by every surface that has to respect it ------------------
+//
+// A load closes at `closesAt`, but a cost has to land `priceDeadlineLeadMs` (the configured lead)
+// EARLIER, at `deadlineAt` - the engine needs that run-up to arm and walk its ladder down.
+// That distinction is the whole subject of this module's bug history: the cutoff was enforced
+// server-side but disclosed ONLY by client-side JS, so when that script died (a bad escape,
+// 2026-07-10 -> 2026-07-14) operators saw nothing but the CLOSE time, typed a cost inside a
+// window the UI implied was open, and had it thrown away.
+//
+// Rule of thumb for anything added here: the cutoff must be visible in server-rendered HTML.
+// If a guard only exists in JavaScript, it does not exist.
+
+/**
+ * Serialise a value for embedding inside an inline <script> block.
+ *
+ * JSON.stringify alone is NOT safe here, and this is the trap the rest of this file just fell
+ * into from the other direction. Two holes, both silent:
+ *
+ *   1. `</script>` inside any string value. The HTML parser tokenises <script> contents
+ *      independently of JavaScript syntax - it ends the element at the first `</script`,
+ *      whether or not that sits inside a JS string literal. The rest of the script then lands
+ *      in the document as markup and the script dies. WHATWG's own advice is to always write
+ *      `<\/script`. Escaping `<` to < kills this (and `<!--`, which flips the parser into
+ *      its legacy "script data escaped" state).
+ *   2. U+2028 / U+2029. Legal, unescaped, inside a JSON string; JavaScript line terminators
+ *      when the same bytes are parsed as JS source.
+ *
+ * Today every value we embed is a hardcoded constant or a server-derived time, so neither hole
+ * is reachable. That is luck, not design: the obvious next edit is putting a shipper name or
+ * the shipper's free-text note into a message, and BOTH come from SuperProcure. Route every
+ * script-embedded value through here so the pattern is safe by construction rather than safe
+ * by nobody-having-touched-it-yet.
+ *
+ * Refs: OWASP DOM-based XSS Prevention Cheat Sheet (JSON.stringify is not an output encoder);
+ * WHATWG HTML, the script data states.
+ *
+ * @param {*} value - The value to serialise for embedding inside an inline <script> block.
+ * @returns {string} - Script-safe JSON string, with `<`, U+2028, and U+2029 escaped.
+ */
+function jsonForScript(value) {
+  return JSON.stringify(value === undefined ? null : value)
+    .replace(/</g, '\\u003C')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/** The branded header every /price page carries (was duplicated verbatim in two renderers). */
+function brandBar(sub) {
+  return `<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">${sub}</span></span></div>`;
+}
+
+/** True once the AUCTION has closed on the portal - the only point a cost can genuinely no longer be
+ *  taken, whatever the stored status says. deadlineAt is no longer a wall: a cost is accepted right
+ *  up to the real close (best-effort), so the form serves until then and this gates only the truly
+ *  dead case. */
+function pricingClosed(r, nowMs = Date.now()) {
+  const closesAt = r && effectiveCloseAt(r.load);
+  return !!(closesAt && nowMs >= closesAt);
+}
+
+/** "2:43 PM" - the same clock format the close time already uses, so the two always agree. */
+function fmtClock(t) {
+  return t ? new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+}
+
+/** The cutoff-to-close gap, in words. Shows exact seconds for a sub-2-minute lead (the default is
+ *  well under that) rather than rounding up to "2 minutes" - the page exists to be precise here. */
+function fmtGap(ms) {
+  if (!(ms > 0)) return '';
+  const secs = Math.round(ms / 1000);
+  if (secs < 120) return `${secs} seconds`;
+  const mins = Math.round(secs / 60);
+  return `${mins} minute${mins === 1 ? '' : 's'}`;
+}
+
+// The engine's REAL timing thresholds (never re-invented as separate magic numbers on the
+// page) - merged the exact same way bidEngine.js's constructor does, so the /price page's
+// countdown tiers can never drift from what the engine actually does. hotThresholdMs (10s) is
+// the engine's own boundary into its final active-bidding/snipe cadence (bidEngine.js _phase);
+// floorWindowMs (2.5s) is the guaranteed-attempt "last chance" window (bidEngine.js
+// _isLastChance). Both come from DEFAULTS merged with config.engine, same as the live engine.
+const EFFECTIVE_ENGINE_CFG = Object.assign({}, ENGINE_DEFAULTS, config.engine);
+const PRICE_ALERT_AMBER_MS = EFFECTIVE_ENGINE_CFG.hotThresholdMs;
+const PRICE_ALERT_RED_MS = EFFECTIVE_ENGINE_CFG.floorWindowMs;
+
+/**
+ * The terminal page for a load whose AUCTION has closed on the portal - the later of the two points
+ * a cost or re-price can no longer be taken (a late one is accepted best-effort right up to then;
+ * see capture()/setBidOverride). Reached by a GET after close, or a POST that raced the close
+ * (GONE). The re-price variant notes the bot already placed its final bid; the first-cost variant
+ * notes the load was not bid. costArrivedLate/reprice only tune that wording - both mean "arrived
+ * after close". The OTHER refusal point, a load SuperProcure never gave a real close time, gets
+ * renderNoValidClose below; do not fold the two together.
+ */
+function renderPricingClosed(r, { costArrivedLate = false, reprice = false, booked = false } = {}) {
+  const headline = 'This auction has closed';
+  const lede = booked
+    ? "Auction closed. The price can't be changed now."
+    : reprice
+    ? 'The portal is no longer accepting bids, so the price can no longer be changed. The final bid was placed before it closed.'
+    : costArrivedLate
+      ? 'Your cost reached us after this auction closed on the portal, so it was not used and this load was not bid.'
+      : 'The portal is no longer accepting bids, so no cost can be entered - this load was not bid.';
+  return priceShell(headline, `
+${brandBar(reprice ? 'Re-price' : 'Load cost entry')}
+<h1>${esc(headline)}</h1>
+<p class="big">${lede}</p>
+${loadSummaryHtml(r)}`);
+}
+
+/**
+ * The refusal page for a load SuperProcure never gave a real close time (the shared year-2100
+ * placeholder it ships on biddingOn:0 loads). Separate from renderPricingClosed on purpose: the
+ * auction has NOT closed, so the closed-auction wording would be false, and the summary card
+ * directly below renders the placeholder date the operator would be reading it against. Says the
+ * cost was not saved, because capture() refuses before it writes anything.
+ */
+function renderNoValidClose(r) {
+  const headline = 'This load has no bidding deadline';
+  return priceShell(headline, `
+${brandBar('Load cost entry')}
+<h1>${esc(headline)}</h1>
+<p class="big">The portal has not given this load a real closing time, so bidding cannot be scheduled on it and your cost was not saved.</p>
+${loadSummaryHtml(r)}
+<p class="note">The closing time shown above is the portal's placeholder, not a real deadline. Nothing went wrong with what you entered. Check the load on SuperProcure, and send the cost again once it shows a proper closing time.</p>`);
+}
+
+// The load-details card the pricing person sees: a lane header (cities + single arrow, pincodes
+// as sub-labels) over a 2-col icon fact grid (vehicle / weight / material / closes), then the
+// full pickup+drop addresses. Pincode sub-labels + addresses only render when the load snapshot
+// carries points (real /sp/loads/v4 loads do; sim loads fall back to the lane header alone).
+/**
+ * THE close-model read for every operator-facing view: 'soft' | 'hard' | null (= not verified).
+ *
+ * Soft close is anti-snipe - a late bid pushes the end out - so the clock on screen is not the
+ * deadline it looks like, and a rate set to "just win at the wire" can be answered and
+ * re-answered. Hard close ends when it says it does. The desk prices those two differently, so
+ * the word has to be right or not said at all.
+ *
+ * READ PER LOAD, NEVER PER CUSTOMER. The authority is this load's OWN extend time
+ * (branchAuctionExtendTime), which realAdapter._mapLoad turns into softClose + closeModelKnown
+ * before priceRequests snapshots it. Close model is a per-BRANCH SuperProcure setting: Havells
+ * and KEI each run BOTH a soft (00:03:00) and a hard (00:00:00) branch at the same time, so the
+ * shipper name shown next to this label carries no information about the close model. Deriving
+ * it from the customer - or from the per-customer auction.closeModel config, which exists for
+ * rules validation and is NOT a per-load fact - would be wrong on loads bidding today.
+ *
+ * TRI-STATE, FAIL CLOSED TO null. closeModelKnown is true only when SuperProcure handed over a
+ * parseable HH:MM:SS extend time; false when it was absent or garbled; undefined on mock/sim
+ * loads and on snapshots persisted before the field existed. Only a verified read gets a word.
+ * The asymmetry is deliberate: a confident "hard close" on a load whose model was never verified
+ * tells the desk there is no extension war on a load that may well have one, which is the
+ * expensive direction to be wrong in. Silence keeps the desk's habit of checking the portal; a
+ * wrong word replaces that habit with false certainty.
+ *
+ * ONE function because this was wrong in TWO places at once - the price card and the compact
+ * card on the status/track/expired pages - and a second copy of the ternary is how the next one
+ * gets missed. Callers format the returned word; they do not re-derive the gate.
+ * Strict === true (not truthiness) so a stringified flag off an old snapshot cannot pass.
+ */
+function closeModelOf(load) {
+  if (!load || load.closeModelKnown !== true) return null;
+  return load.softClose === true ? 'soft' : 'hard';
+}
+
+/**
+ * The PORTAL facts this page states, read off the owning stack's `capabilities()`.
+ *
+ * Every field here is a capability, never a portal test - a page that needs to know which portal it
+ * is talking to in order to say something true is a page missing a capability
+ * (docs/MULTI_PLATFORM_ARCHITECTURE.md invariants 2 and 7). The stack is resolved through
+ * stackForRequest, the SAME lookup armFromRequest's caller uses, so what the page promises and what
+ * an arm actually does cannot drift apart - the rule ceilingDeadPlan already follows.
+ *
+ * `showLabel` keys on how many portals are RUNNING, not on which one this is. The orientation
+ * problem the label solves only exists on a box working two portals from one worklist; on a
+ * single-portal box the label is a word with no alternative, so it is not shown and the page is
+ * byte-identical to what the desk reads today. When it IS shown it is shown on every portal's page,
+ * because labelling only the newcomer is invariant 2 wearing a different hat.
+ *
+ * Presence-vs-value matters on `extensionCeiling` and is not pedantry: a declared null means the
+ * platform enforces NO cap, while an absent key means the cap is merely unknown - and a page that
+ * cannot tell those apart describes an unbounded auction and a three-round one with one sentence.
+ */
+function portalFactsFor(r) {
+  const stack = stackForRequest(r);
+  const caps = (stack && stack.engine && stack.engine.caps) || {};
+  return {
+    accountAvailable: !!stack,
+    label: typeof caps.platformLabel === 'string' ? caps.platformLabel : '',
+    showLabel: new Set(stacks.map((s) => platformOf(s))).size > 1,
+    // Exactly armFromRequest's predicate: only an explicit false refuses, so an adapter predating
+    // the field (or a hand-rolled test double) reads as biddable here and there alike. A record
+    // whose portal is not running resolves to no stack at all, and that arm refuses too
+    // (requireStackForRequest) - so it reads as not-biddable here rather than inheriting an empty
+    // capabilities object's permissive defaults and promising a bid the submit will not make.
+    biddingEnabled: !!stack && caps.biddingEnabled !== false,
+    uncappedExtension: Object.prototype.hasOwnProperty.call(caps, 'extensionCeiling') && caps.extensionCeiling === null,
+    multiCargoBidSupported: caps.multiCargoBidSupported !== false,
+    // Same only-an-explicit-false rule as biddingEnabled above, and for the same reason: an adapter
+    // predating the field keeps today's editable control rather than silently losing it.
+    partialVehicleCountSupported: caps.partialVehicleCountSupported !== false,
+    // Feature-detected exactly like the admin accounts API (line ~2393): mock/sim adapters carry no
+    // auth state machine, so an adapter predating isAuthDead (or one with none at all) reads as
+    // online, same as today. A stack's account can be LOGGED OUT (auth-dead) while the portal
+    // itself stays biddingEnabled - this is a warning about THIS load's account, not a refusal.
+    authDead: !!(stack && stack.adapter && typeof stack.adapter.isAuthDead === 'function' && stack.adapter.isAuthDead()),
+  };
+}
+
+/**
+ * Can this load be bid at all - answered BEFORE a cost is asked for, not after one is typed.
+ *
+ * Same shape and the same job as engine.planPreview's `willNotBid`, extended from "this cost cannot
+ * produce a legal bid" to "this LOAD cannot produce one whatever the cost is". The two refusals it
+ * carries were both discovered at bid time until now, which is the defect: a page that takes a
+ * number the system will never use is the exact shape a previous integration shipped, and it ended
+ * with the load reported as unpriced.
+ *
+ * `keepsCost` splits them, and it is the whole reason this returns a record rather than a boolean:
+ *   multi_cargo                 the rate can NEVER be used, so the form goes away with it.
+ *   platform_bidding_disabled   the rate IS used, later. The arm seam already keeps it (holdUnbiddable
+ *                               parks the row on 'stopped' with the cost intact), so taking the number
+ *                               is honest here and refusing to take it would throw away real work.
+ */
+function loadWillNotBid(r, facts) {
+  const f = facts || portalFactsFor(r);
+  const L = (r && r.load) || {};
+  const lines = Number(L.cargoLines);
+  const portal = f.label || 'the portal';
+  // One rate cannot be split across several charge lines: the portal SUMS them, so writing our
+  // number to each bids a multiple of what was meant, and nothing observed says how to split it.
+  if (!f.multiCargoBidSupported && Number.isFinite(lines) && lines > 1) {
+    return {
+      willNotBid: 'multi_cargo', keepsCost: false,
+      head: 'We will not bid this load',
+      body: `This load carries ${lines} separate cargo lines and one rate cannot be split across them. Quote this one by hand on ${portal}.`,
+    };
+  }
+  if (isTargetPriceReq(r) && f.biddingEnabled && !config.gocomet.targetPriceEnabled) {
+    const by = r.targetDeadlineMs ? ` before ${fmtClock(r.targetDeadlineMs)}` : '';
+    return {
+      willNotBid: 'target_price_off', keepsCost: true,
+      head: 'Sending target rates is switched off',
+      body: `To take this load at Rs ${rsFmt(r.targetPricePerUnit)}, accept their rate on ${portal} by hand${by}. A cost entered here is not sent.`,
+    };
+  }
+  if (!f.biddingEnabled && isTargetPriceReq(r)) {
+    // A target is one quote on the customer's clock, so nothing is kept for later: the auction copy
+    // below would promise a send that never happens.
+    const by = r.targetDeadlineMs ? ` before ${fmtClock(r.targetDeadlineMs)}` : '';
+    return {
+      willNotBid: 'platform_bidding_disabled', keepsCost: true,
+      head: 'Sending is switched off on this portal',
+      body: `To take this load at Rs ${rsFmt(r.targetPricePerUnit)}, accept their rate on ${portal} by hand${by}. A cost entered here is not sent.`,
+    };
+  }
+  // Anything the engine's own fail-closed check refuses under the live config (a pricing mode, a
+  // per-tonne load's unit or ceiling, an unbuilt mechanic), judged on the rules arm() heals the
+  // snapshot to: the same predicate _maybeBid applies, so the page and the engine cannot disagree.
+  try { assertRulesSupported(reconcilePricingMode(L.rules || null)); } catch (e) {
+    if (e.code !== 'UNSUPPORTED_RULE') throw e;
+    return {
+      willNotBid: 'unsupported_rule', keepsCost: false,
+      head: 'We will not bid this load',
+      body: "We don't bid loads priced this way yet. Quote it by hand on the portal.",
+    };
+  }
+  if (f.accountAvailable === false) {
+    return {
+      willNotBid: 'platform_stack_unavailable', keepsCost: true,
+      head: 'Bidding account unavailable',
+      body: 'The account for this enquiry is unavailable. You can save your cost; bidding will wait for that account to reconnect while the enquiry is still open.',
+    };
+  }
+  if (!f.biddingEnabled) {
+    // Wording tracks the arm seam's own sentence deliberately (priceRequests.armFromRequest, and the
+    // POST refusal that wraps it). One fact, one phrasing - a desk that reads it here and again on
+    // submit must not be left wondering whether the two are describing the same thing.
+    return {
+      willNotBid: 'platform_bidding_disabled', keepsCost: true,
+      head: 'Not bidding on this portal yet',
+      body: `This portal is not live for bidding yet, so we will not bid this load. Enter your cost anyway - your price is kept and will be used when this portal goes live.`,
+    };
+  }
+  return null;
+}
+
+/** The refusal card, in the same component the ceiling and shipper-note blocks already use. */
+function willNotBidBlock(plan) {
+  return plan ? `<div class="snote bad" id="wontBid"><div class="st">${esc(plan.head)}</div><div class="sb">${esc(plan.body)}</div></div>` : '';
+}
+
+/**
+ * A dead login is a WARNING, never a refusal - unlike willNotBidBlock above, the price is still
+ * taken and saved (armFromRequest arms it as usual; the write is only held at the adapter's own
+ * authWriteHeld() gate until the account reconnects). One line, deliberately no head/body split:
+ * docs/diagnoses/2026-09-28_rallis-never-priced.md found the desk got NO signal on this page that a
+ * captured price could not bid until someone re-logged in - this is that signal, kept as simple as
+ * the fix calls for. '' when the account is online, so the page stays byte-identical to today.
+ *
+ * The caller (renderPriceForm) skips this call entirely whenever loadWillNotBid returned a plan,
+ * whatever that plan's `keepsCost` - this function itself has no visibility into `wontBid` and must
+ * not be trusted to gate on it alone. Review r1
+ * (docs/reviews/bid-command/fix-pmt-copy-dead-login), Finding 2: the banner used to render on every
+ * page where the account was latched, INCLUDING refusal pages - "Your rate is saved" next to
+ * "We will not bid this load" on a noForm refusal, where nothing was or could be saved, and next to
+ * a keepsCost refusal (e.g. platform_bidding_disabled) whose real blocker is unrelated to the login.
+ */
+function authDeadBlock(portal) {
+  return portal && portal.authDead
+    ? '<div class="snote bad" id="authDeadNote">⚠️ This portal login is logged out. Your rate is saved, but no bid goes out until the login is reconnected.</div>'
+    : '';
+}
+
+// `held` drops the cutoff line ("Enter your cost by 2:23 pm to leave time to place it"), which on a
+// held load promises a placement that will not happen - the loudest remaining contradiction once the
+// panel above it says bidding has stopped.
+function renderLoadCard(r, { held = false } = {}) {
+  const L = loadFor(r);
+  const origin = esc(laneEnd(L, 'origin'));
+  const dest = esc(laneEnd(L, 'destination'));
+  // Portal points where the portal published them, the raw lane addresses where it did not - one
+  // list either way, composed by laneDisplay so this card and the console's follow-on rows cannot
+  // show different addresses for the same load.
+  const pts = L.laneDisplay.points;
+  // SECOND SOURCE for the pin: the shipper's note. SuperProcure's point payload is not reliable
+  // for this. On load 23674031 the pickup's pin arrived as "2209304" - SEVEN digits, so the
+  // \b\d{6}\b match above correctly refuses it rather than rendering a wrong six of them - and
+  // the drop carried no pin at all. The note, meanwhile, spelled the real origin pin out:
+  // "Origin Address - 770, JUGRAJPUR ROAD, SACHENDI, NATIONAL HIGHWAY -2, KANPUR - 209304".
+  // Deliberately NOT recovered by trimming a digit off the 7-digit value: 2209304 could be
+  // 220930 or 209304 and only the note disambiguates, so guessing would be a coin flip on which
+  // district a truck is sent to.
+  //
+  // Usable ONLY when the pin can be ATTRIBUTED to an end. The note is one string covering both,
+  // so lifting any six digits out of it would happily stamp the ORIGIN's pin onto the drop. It
+  // is therefore split on an explicit "Destination Address" marker - the shape SuperProcure's
+  // shippers actually use - and each half read separately. A note that does not carry that
+  // marker yields NOTHING, on purpose: a missing pin is a non-event the desk already lives with,
+  // a confidently wrong one is a truck in the wrong place.
+  // ONE reader, shared with the WhatsApp ask so the two surfaces cannot state different pins for
+  // the same load - laneDisplay.laneEndPins, which folds the note recovery above together with the
+  // pincode field a portal publishes for itself (GoComet's origin_zip_code / destination_zip_code,
+  // carried on laneParsed). Rules, evidence and the 7-digit case live in src/pricing/lanePins.js.
+  const { from: fromPin, to: toPin } = laneEndPins(L);
+  // Full route: EVERY point, in array order - a load can carry more than one pickup and/or
+  // drop (SuperProcure's schema allows it even though most loads have exactly one of each).
+  // Mirrors the dashboard's PriceRequests.tsx/LiveBids.tsx/History.tsx row-expansion
+  // convention: plain "Pickup"/"Drop" per entry, no numbering even when a kind repeats.
+  //
+  // THIS IS ALSO WHERE THE WHOLE ADDRESS LIVES WHEN THE HEADER ABOVE WAS SHORTENED, and the two
+  // are ONE decision: the header may be a city or a bounded prefix, so removing these rows would
+  // leave the desk pricing a place with no way to tell which facility. They can no longer be
+  // separated by accident - the short value and this list come out of the same function, which is
+  // what the previous arrangement (a CSS clamp here, a fallback list there, a comment asking the
+  // next reader not to split them) could only ask for.
+  const addrRows = pts.map((p) =>
+    `<div class="saddr"><span class="sk">${p.kind === 'pickup' ? 'Pickup' : 'Drop'}</span><span class="sav">${esc(p.address)}</span></div>`
+  ).join('');
+  // ONE TRUCK TYPE PER LINE. A joined string ("5 x 40 ft, 25 T + 1 x 20 ft ODC, 10 T") is a
+  // variable-length list dropped into a half-width tile: it wraps mid-phrase, so "10" and "T" land
+  // on different lines and the tile reads as a rendering fault rather than as two trucks. Stacked
+  // rows through the SAME .trow the timing cell already uses, in a full-width cell so each type
+  // gets a line to itself with its own size when supplied.
+  const typeLines = Array.isArray(L.cargoTypes) && L.cargoTypes.length > 1 ? L.cargoTypes : null;
+  const veh = typeLines
+    ? typeLines.map((t) => `<span class="trow">${esc(t.count)} &times; ${esc(t.label)}${t.dimensions ? ` &middot; Size ${esc(t.dimensions)}` : ''}</span>`).join('')
+    : esc(L.equipment || '');
+  // The load total is not repeated onto a multi-type tile - each row already carries its own count,
+  // and the total is the "/ N trucks" beside the count control on the form.
+  const units = (L.units != null && !typeLines) ? esc(L.units) : '';
+  const wt = fmtWeight(L.weight, L.weightUnit);
+  // Labelled "Size" below, not "Dimensions" - the client's own word for it (Suyashh: "the size
+  // is not coming"). GoComet's own punctuation, passed through verbatim by gocometCargo.
+  const dim = L.dimensions ? esc(L.dimensions) : '';
+  // BC-36/GC-2: same facts, same shared reader, as the WhatsApp ask's twoPointLine - see
+  // laneDisplay.twoPointFacts for the structured-vs-free-text precedence. Pickup and drop are
+  // separate tiles so an extra drop can never be mistaken for an extra pickup.
+  const twoPointFactsFor = twoPointFacts(L);
+  const alsoPickup = twoPointFactsFor.pickup ? esc(twoPointFactsFor.pickup) : '';
+  const alsoDrop = twoPointFactsFor.drop ? esc(twoPointFactsFor.drop) : '';
+  const alsoFreeText = twoPointFactsFor.freeText ? esc(twoPointFactsFor.freeText) : '';
+  const dist = fmtDistance(L.distanceKm);
+  const shipType = L.shipmentType ? esc(L.shipmentType) : '';
+  const mat = L.productName ? esc(L.productName) : '';
+  // display prefers the matched customer's clean label (r.customer, snapshotted at
+  // createForLoad) over the platform's raw companyName; older requests without the
+  // snapshot render the raw string exactly as before. For a multi-branch shipper the SP
+  // branch label is appended in parens ("Renewsys India (REN-K)") so the desk sees which
+  // branch it is priced against; blank/absent branchName leaves the header unchanged.
+  const shipperBase = (r.customer && r.customer.label) || L.companyName || '';
+  const shipper = esc(L.branchName ? `${shipperBase} (${L.branchName})` : shipperBase);
+  const loadId = esc(r.loadId || '');
+  // WHO POSTED THIS LOAD, so the desk can ring the shipper-side contact instead of hunting them
+  // down on the portal. The adapter has already fail-closed on SuperProcure's placeholders (the
+  // "System" poster, the 1000000000-class mobile, displayPartyDetails switched off) and
+  // priceRequests snapshotted only the survivor, so anything reaching here is a real person.
+  // Re-checked for a usable name anyway: this reads a STORED snapshot, and requests captured
+  // before this field existed carry no poster at all. Those render NO row - never a stranded
+  // "Posted by" label with nothing after it.
+  const pst = (L.poster && typeof L.poster.name === 'string' && L.poster.name.trim()) ? L.poster : null;
+  const pstDigits = (pst && pst.mobile != null) ? String(pst.mobile).replace(/\D/g, '') : '';
+  // 5+5 is how an Indian mobile is written on a docket and read back over a call. The href keeps
+  // the bare digits plus country code (a tel: URI cannot contain spaces), so it dials on a phone
+  // and hands off to a softphone on the desktop. A name with no usable number still renders -
+  // knowing who to ask for is most of the value.
+  const pstTel = pstDigits.length === 10
+    ? `<a class="ptel" href="tel:+91${esc(pstDigits)}">${esc(`${pstDigits.slice(0, 5)} ${pstDigits.slice(5)}`)}</a>`
+    : '';
+  const posterVal = pst ? `${esc(pst.name)}${pstTel ? ` &middot; ${pstTel}` : ''}` : '';
+  // NO date in this cell. It carries times only; the close DATE lives in the page header under
+  // the close-type badge (renderPriceForm), where there is room for it. Stamping "31 Jul, " onto
+  // both timing lines wrapped the times onto extra lines and made this the tallest cell in the
+  // grid, which stretched its neighbour to match - the whole reason the grid looked heavy.
+  // ONE close for this whole card, and it is the effective one (priceRequests.effectiveCloseAt) so
+  // the printed time, the countdown and the form's own lock cannot disagree. The stored snapshot
+  // still says what the desk was told at intake; the card says what the platform is running to.
+  const closeAt = effectiveCloseAt(L);
+  const closeShort = closeAt ? esc(fmtClock(closeAt)) : '';
+  // The cutoff, rendered as plain HTML on the server. This is the line whose absence caused
+  // the miss: the card used to show ONLY the close time, so an operator pricing at 2:44 for a
+  // 2:45 close had no way to know the cost had to land by 2:43:30. It must never again depend
+  // on JavaScript to be seen.
+  const cutoffShort = r.deadlineAt ? esc(fmtClock(r.deadlineAt)) : '';
+  // Window not open yet (SP UI: "Auction starts at ...") - say so, or the close countdown
+  // alone reads like a live auction and the pricing person mistakes the urgency. Same clock
+  // format as closeShort/cutoffShort so the three times on the card read consistently.
+  const startsNote = L.startsAt && L.startsAt > Date.now()
+    ? ` &middot; bidding opens ${esc(fmtClock(L.startsAt))}` : '';
+  // Close type used to live here as its own grid cell. Product-owner feedback (2026-07-30): the
+  // 3-column grid read cramped and Close type is a short status word, not a spec fact like
+  // weight/distance - it now renders as a badge in the page HEADER, next to the load-number
+  // (renderPriceForm builds it, since that's where the header markup lives; closeModelOf still
+  // owns the tri-state gate and unverified still renders nothing - see test-price-page-close-model.js).
+  // The meta line still carries no close-model word, same reasoning as before: it used to render
+  // `${L.softClose ? 'soft' : 'hard'} close`, which printed a confident "hard close" for every
+  // load whose extend time SuperProcure never sent - one of the two fail-open sites that fixed.
+  // The close DATE lives back in the header too (product-owner instruction, 2026-08-17): PR #199
+  // moved it here as "closes Wed, 12 Aug" appended to this line, but that put it under a
+  // three-line explanatory paragraph as the near-last fact on the card. It reads under the
+  // close-type badge in the header again - see renderPriceForm's closeDayLabel.
+  const metaLine = `Load #${loadId}${shipper ? ` &middot; ${shipper}` : ''}${startsNote}`;
+  const cdEl = `<div class="cd" id="cd" data-closes="${Number(closeAt) || 0}" data-deadline="${Number(r.deadlineAt) || 0}"></div>`;
+  const cell = (icon, label, val) => val ? `<div class="scell"><span class="si">${icon}</span><span class="sl">${label}</span><span class="sv">${val}</span></div>` : '';
+  // Cost-by and Closes are two timestamps a few minutes apart - reading them as separate cells
+  // was noise (product-owner feedback, 2026-07-30). Merged into ONE cell, each time on its own
+  // line with its own inline mini-label, so "enter your cost by X, it closes at Y" reads as one
+  // relationship rather than two disconnected facts. Same values, same formatting as before -
+  // only the container changed.
+  //
+  // This cell is built inline rather than through cell(), because it is the one cell that must
+  // NOT carry an outer .sl label: the mini-labels below already say "Cost by" and "Closes", and
+  // a header above them repeated both words a second time.
+  //
+  // The two rows COLLAPSE into one when they render to the same clock value. The cost-by lead is
+  // only 35s (config.priceDeadlineLeadMs), and both are formatted to the minute, so they print
+  // the same string whenever the close falls at second >= 35 - a clear majority of loads. Two
+  // stacked lines reading "Cost by 9:55 am" and "Closes 9:55 am" is noise that looks like a bug,
+  // and it is what makes the cell tall. Collapsed, the label names both facts against the one
+  // time. Nothing is lost: the exact cutoff is still spelled out in the .cutoff sentence below
+  // and the live countdown sits under it.
+  // The time sits in its own .tv rather than as bare text so it can be held on one line. In a
+  // half-width cell at phone width a two-digit hour broke as "10:27" / "am", which reads as a
+  // rendering fault. nowrap is on the TIME only, not the whole row - the label is still free to
+  // wrap ahead of it, so a narrow cell degrades by moving the label up rather than overflowing.
+  const trow = (k, v) => `<span class="trow"><span class="tk">${k}</span> <span class="tv">${v}</span></span>`;
+  const timingRows = (cutoffShort && closeShort && cutoffShort === closeShort)
+    ? trow('Cost by / Closes', closeShort)
+    : [
+      cutoffShort ? trow('Cost by', cutoffShort) : '',
+      closeShort ? trow('Closes', closeShort) : '',
+    ].filter(Boolean).join('');
+  // A shipper TARGET RATE leads the card, because it is the entire decision: the customer has
+  // reopened a load we already quoted and named their price, and the desk is being asked whether
+  // to go there. The two numbers sit together so the gap is readable without arithmetic.
+  //
+  // The multi-vehicle warning is not cosmetic. On a load with more than one truck type the target
+  // covers all of them at once and the submit path writes a single line, so there is no number the
+  // system could send - the desk has to do that one on the portal. Saying so here is what stops a
+  // cost being typed into a form that could never use it.
+  const atQuote = isTargetPriceReq(r) && targetNotBelowQuote(r.targetPricePerUnit, r.standingPricePerUnit);
+  const targetBanner = isTargetPriceReq(r) ? `<div class="tgt">
+<div class="tgt-h">${atQuote ? 'Customer sent a rate on this load' : 'Customer wants a lower rate on this load'}</div>
+<div class="tgt-nums">
+<span class="tgt-want"><span class="tgt-k">They want</span><span class="tgt-v">Rs ${rsFmt(r.targetPricePerUnit)}</span></span>
+<span class="tgt-had"><span class="tgt-k">We quoted</span><span class="tgt-v">Rs ${rsFmt(r.standingPricePerUnit)}</span></span>
+</div>
+${r.targetComment ? `<div class="tgt-note">Customer note: ${esc(r.targetComment)}</div>` : ''}
+${atQuote ? `<div class="tgt-warn">We already quoted Rs ${rsFmt(r.standingPricePerUnit)}, at or under their Rs ${rsFmt(r.targetPricePerUnit)}, so there is nothing to send. Our quote stands.</div>` : ''}
+${Number(r.chargeLineCount) > 1 ? `<div class="tgt-warn">This load has ${Number(r.chargeLineCount)} vehicle types and the customer's price covers all of them together. Enter this one on the portal by hand.</div>` : ''}
+<div class="tgt-dl">Their offer ends at <b>${esc(fmtClock(r.targetDeadlineMs))}</b>. After that the load is gone.</div>
+</div>` : '';
+  return `<div class="load lc-spec">
+${targetBanner}
+<div class="slane">
+<div class="sep from"><div class="scity">${origin}</div>${fromPin ? `<div class="spin">${esc(fromPin)}</div>` : ''}</div>
+<span class="sarw">${ICON_ARROW}</span>
+<div class="sep to"><div class="scity">${dest}</div>${toPin ? `<div class="spin">${esc(toPin)}</div>` : ''}</div>
+</div>
+<div class="sgrid">
+${veh && typeLines ? `<div class="scell-wide">${cell(ICON_TRUCK, 'Vehicle', veh)}</div>` : cell(ICON_TRUCK, 'Vehicle', veh ? `${veh}${units ? ` &times;${units}` : ''}` : '')}
+${cell(ICON_RULER, 'Size', dim)}
+${cell(ICON_PIN, 'Also pickup', alsoPickup)}
+${cell(ICON_PIN, 'Also drop', alsoDrop)}
+${cell(ICON_PIN, 'Also', alsoFreeText)}
+${cell(ICON_SHIPMENT, 'Shipment', shipType)}
+${cell(ICON_WEIGHT, 'Weight', wt)}
+${cell(ICON_BOX, 'Material', mat)}
+${timingRows ? `<div class="scell timing"><span class="si">${ICON_CLOCK}</span><span class="sv">${timingRows}</span></div>` : ''}
+${cell(ICON_DISTANCE, 'Distance', dist)}
+${posterVal ? `<div class="scell-wide">${cell(ICON_PHONE, 'Posted by', posterVal)}</div>` : ''}
+</div>
+${addrRows ? `<div class="saddrs">${addrRows}</div>` : ''}
+<div class="lmeta">${metaLine}</div>
+${(isTargetPriceReq(r) && !held)
+    ? `<div class="cutoff">Enter your cost by <b>${cutoffShort || 'the time above'}</b>. Unlike an auction close this one is a hard stop - the customer's offer lapses and the load is lost.</div>`
+    : ((cutoffShort && !held) ? `<div class="cutoff">Enter your cost by <b>${cutoffShort}</b> to leave time to place it${(closeShort && r.deadlineAt < closeAt) ? ` before the ${closeShort} close - a cost after that still counts but is best-effort and may not land` : ''}.</div>` : '')}
+${cdEl}
+</div>`;
+}
+
+// r.status 'awaiting_price' -> the first-time capture form; 'armed' (opts.reprice) -> the
+// SAME form re-opened on the same link, prefilled with the captured cost + current band, so
+// re-pricing an armed load - cost AND margin both - is exactly the form the pricing team
+// already knows, not a second bespoke UI. The only additions for reprice: an armed-bot
+// warning banner, "Re-price" copy instead of "Enter your cost", and a saved-confirmation
+// flash after a successful submit (the page re-renders itself rather than dead-ending).
+/**
+ * WHAT A PER-TONNE BID COMMITS TO, as one plain sentence for the desk.
+ *
+ * A pure function, and exported, because this is a money-commitment decision rather than markup:
+ * it used to be a nested ternary inside a template literal inside esc() inside renderPriceForm, so
+ * the only way to check any of its three states was a regex over rendered HTML. Now the states are
+ * pinned directly and the renderer only wraps the result.
+ *
+ * `unitWord` is the LOAD's own unit word (see pmtUnitWord at the call site) - never a hardcoded
+ * 'metric tonnes'. Passing it in is what keeps this function from re-acquiring a unit assumption.
+ *
+ * SAYS SOMETHING IN EVERY STATE, including the one where SuperProcure's own figures cannot settle
+ * the truck count (`trucks` null). "No line" would be indistinguishable from "one truck", and that
+ * ambiguity is the whole failure this text exists to prevent. It never claims a count it does not
+ * have, and it never names a quantity it was not given.
+ */
+function pmtCommitmentText(trucks, totalUnits, perTruck, unitWord) {
+  const total = totalUnits != null ? ` (${totalUnits} ${unitWord})` : '';
+  if (trucks == null) {
+    return `This bid is for the whole load${total}. SuperProcure works out how many trucks that is`
+      + ' - this load does not say - and you cannot bid for part of it.';
+  }
+  if (trucks === 1) {
+    return `This bid is for the whole load${total}, on 1 truck. You cannot bid for part of it.`;
+  }
+  const detail = totalUnits == null ? ''
+    : ` (${totalUnits} ${unitWord}${perTruck != null ? `, ${perTruck} ${unitWord} each` : ''})`;
+  return `This bid commits to all ${trucks} trucks on this load${detail}.`
+    + ' Your rate is charged on the quantity of every one of them, and you cannot bid for part of the load.';
+}
+
+function renderPriceForm(req, r, opts) {
+  const prefill = prefilledCosts(req);
+  const reprice = !!(opts && opts.reprice);
+  const L = loadFor(r);
+  const lane = `${esc(laneEnd(L, 'origin'))} -> ${esc(laneEnd(L, 'destination'))}`;
+  // Close type (soft/hard/unknown), rendered as a small badge next to the load number in the
+  // header rather than as a load-details grid cell (product-owner feedback, 2026-07-30: it's a
+  // short status word, not a spec fact, and it was crowding the grid). closeModelOf owns the
+  // tri-state gate - unverified returns null and the badge is omitted entirely, same fail-closed
+  // behaviour test-price-page-close-model.js pins, just at a new location.
+  const cm = closeModelOf(L);
+  // The portal's own facts (capabilities, never a portal name test) - see portalFactsFor.
+  const portal = portalFactsFor(r);
+  // A refusal decided BEFORE the cost field is drawn. `noForm` is the case where the rate could
+  // never be used, so the whole entry form comes off the page rather than collecting a number the
+  // system will discard; the deferred case keeps the form, because that rate genuinely is used.
+  const wontBid = loadWillNotBid(r, portal);
+  const noForm = !!(wontBid && !wontBid.keepsCost);
+  // "Soft" alone is a SuperProcure word, and on SuperProcure it means an anti-snipe window that can
+  // push the end out a bounded number of times. A portal that declares no ceiling at all is a
+  // different auction - two in three extend, one observed load ran 22 rounds - and reading the same
+  // three words for both is what would let a desk price an unbounded auction as a bounded one.
+  // Short enough to sit under the subtitle without wrapping, and the three-way distinction still
+  // has to survive: whether the clock can move at all, and if it can, whether it can move forever.
+  // That second half is a pricing decision, not a detail - against an unlimited extension there is
+  // no final window to snipe, so a bidder who reads "soft" and stops there plays the wrong game.
+  const closeModelLabel = cm === 'soft' ? (portal.uncappedExtension ? 'Soft - unlimited' : 'Soft - limited')
+    : cm === 'hard' ? 'Hard close' : '';
+  // The close DATE, in the header under the close-type badge (product-owner feedback,
+  // 2026-07-31; restored here 2026-08-17 after a spell on the card's meta line under PR #199 -
+  // see renderLoadCard's metaLine comment). It used to sit inside the timing cell, stamped onto
+  // both the Cost by and the Closes line, where it wrapped the times and made that cell the
+  // tallest in the grid. The header has room the grid does not, so it lives here rather than
+  // being dropped.
+  //
+  // Rendered ALWAYS, not only on an overnight load: this slot costs nothing, and a desk person
+  // glancing at a link someone forwarded them should never have to infer which day it is for.
+  // The weekday is included because "Fri" is read faster than a date is. Deliberately NOT tied
+  // to closeModelLabel - an unverified close model renders no badge, and the date must still
+  // show, so the two are independent siblings rather than one nested in the other.
+  const closeDay = effectiveCloseAt(L);
+  const closeDayLabel = closeDay
+    ? esc(new Date(closeDay).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }))
+    : '';
+  // WHICH NUMBER IS WHOSE. The desk's question was literally "that is the GID number, which you
+  // are saying is ID - where is the number my people work by", and both halves of that are a
+  // presentation fault rather than missing data.
+  //
+  // The portal's name now rides ON the identifier ("GoComet #2608115VVB") instead of beside it as
+  // a third pill. That is one fewer thing stacked in a corner that already held three, and it
+  // answers the question in the place the question is asked - a bare "#2608115VVB" is what made
+  // the number look like ours.
+  //
+  // The SHIPPER's own reference goes above it and takes the visual weight. GoComet publishes it
+  // per enquiry and we have always carried it; it simply never reached the page. BRL's own GoComet
+  // tool renders these two in exactly this order and relationship - the reference as the heading,
+  // the portal key subordinate beneath it - so this is the desk's existing habit, not a new one.
+  //
+  // LABELLED "OA", which it was not until the client settled it himself. He forwarded Best
+  // Roadways' own portal notification - it renders `Name:- <ref> (<key>)` - and said the one next
+  // to the name is the OA number and the one in brackets is the portal's ID. So the two lines here
+  // were already the right two values in the right order; only the name was missing. "OA" is his
+  // word, not a tidied-up synonym.
+  //
+  // RENDERED VERBATIM, and that is the load-bearing part. His example was a clean 3260108709, but
+  // the captured value on the enquiry this page was built against is a hyphenated compound with a
+  // trailing suffix, so the shape varies between loads. Nothing here splits it, strips it or
+  // extracts "just the number" - their own notification passes the whole value through untouched,
+  // and a wrong extraction puts a wrong OA number in front of a pricer, which is worse than the
+  // unlabelled state this replaces.
+  //
+  // The confirmation covers the portal that publishes this field today, which is the only adapter
+  // emitting shipperRef. An adapter emitting it for some other identifier would need this label
+  // revisited, not just the value.
+  //
+  // `showLabel` still gates the portal word on more than one portal RUNNING, unchanged: on a
+  // single-portal box the name is a word with no alternative, and this line stays what it is today.
+  //
+  // THE PAIR NOW OWNS A ROW instead of a right-aligned corner column. That corner had grown to four
+  // stacked things and the client called it too compact; a 170px column also wrapped a real OA
+  // ("3262511465-5601270693 (E.com)") onto two lines at the very moment it became the page's
+  // primary identifier. Given the card's full width the longest captured value sets on one line,
+  // and the OA can take a type step that says it is the number to read. See .loadmeta in PRICE_CSS.
+  const shipperRef = (typeof L.shipperRef === 'string' && L.shipperRef.trim()) ? L.shipperRef.trim() : '';
+  const idText = (portal.showLabel && portal.label) ? `${portal.label} #${r.loadId}` : `#${r.loadId}`;
+  const idLines = `${shipperRef ? `<span class="loadref"><span class="oal">OA</span>${esc(shipperRef)}</span>` : ''}<span class="loadno">${esc(idText)}</span>`;
+  // Shipper-attached context (only rendered when the load actually carries it): the
+  // note text (already plain text in the snapshot) + a hint when the portal holds
+  // comments/attachments this page can't show. The pricing person must not miss these.
+  const portalBits = [L.hasPortalComments ? 'comments' : null, L.hasPortalAttachments ? 'attachments' : null]
+    .filter(Boolean).join(' and ');
+  const noteBlock = (L.notes || portalBits) ? `<div class="snote">${
+    L.notes ? `<div class="st">Shipper note</div><div class="sb">${esc(L.notes)}</div>` : ''}${
+    portalBits ? `<div class="${L.notes ? 'sb pm' : 'sb'}">${L.notes ? 'This load also has' : 'This load has'} ${portalBits} on the SuperProcure portal - check there before pricing.</div>` : ''}</div>` : '';
+  // Reprice-only: a load reopened here from WhatsApp before it's priced has no bid yet, so
+  // /track would show an empty screen. Once armed, this is the only route to it on this page.
+  // Second flip on this page: 331fb77 (9-Jul-2026) removed this same link for duplicating Live
+  // Bids and looking like a second .btn. Neither applies here - the WhatsApp desk has no Live
+  // Bids access, and this is a plain text anchor (.snote .track), not a .btn.
+  // CW-225. The panel is rendered from the DURABLE hold record, not from the POST that produced it,
+  // so a reload, a forward or a second visit shows byte-identical page furniture. Nothing in it is
+  // time-dependent; only the page around it moves.
+  const isHeld = !!(reprice && r.hold && r.hold.kind === 'standing');
+  const holdBlock = isHeld ? renderHoldPanel(r.hold) : '';
+  // SUPPRESSED while held, and this is the point of the panel rather than a detail of it. The block
+  // says bidding is active and that saving updates the prices below right away; on a held load both
+  // halves are false, and on a phone it sits directly above the panel that just said the opposite.
+  const warnBlock = (reprice && !isHeld)
+    ? `<div class="snote"><div class="st">Already priced - bidding is active</div><div class="sb">Saving updates the prices below right away. Any bid already sent stays as it was; it will still never go below your lowest price.</div><a class="track" href="/track/${esc(publicSeg(r))}">See rank and last bid &rarr;</a></div>`
+    : '';
+  // The re-price success state re-renders this SAME form (so the pricing team can immediately
+  // adjust again) rather than a dead-end confirmation page - which means "it worked" has to be
+  // loud, since the page otherwise looks identical to before the submit. Checkmark + a pulse
+  // animation on load, not just a quiet text banner.
+  const savedFlash = (reprice && opts.errorMsg)
+    ? `<div class="enote" role="alert"><div class="st">Not saved</div><div class="sb">${esc(opts.errorMsg)}</div></div>`
+    : (reprice && opts.savedMsg && !isHeld) ? `<div class="flash ok-flash">${ICON_CHECK}<span>${esc(opts.savedMsg)}</span></div>` : '';
+  // Margin band + where it came from (default / this customer / a per-load override).
+  // The "Adjust margin" expander lets the pricing person set a bid-level override for THIS
+  // load only; its inputs are prefilled with the inherited band, so the common case is a
+  // quick one-number tweak. Left closed, the submit stays a one-tap cost-only entry.
+  const ms = r.marginSource || 'default';
+  // A014: resolve.js can emit an 'assignment:<id>' source (an assignment-level override) as well
+  // as 'bid' and 'customer:<id>' - it must not fall through to "default margins", which is a
+  // materially different (and wrong) provenance to show the desk on a live band.
+  const srcLabel = ms === 'bid' ? 'custom for this load'
+    : ms.indexOf('customer:') === 0 ? 'this customer’s margins'
+    : ms.indexOf('assignment:') === 0 ? 'this assignment’s margins'
+    : 'default margins';
+  // Always-visible band: one row per bid, each editable as a % OR a Rs price. The Rs prices
+  // fill in live from the cost as it is typed (client script below). No minimum field - the
+  // lowest bid, or the customer's minimum where lower, guards this load. Editing any number marks it a per-load override
+  // (a hidden use_override flips on); untouched, the submit stays a one-tap cost entry that
+  // keeps the inherited band. The rung inputs POST as m_0..m_n; the Rs mirrors are display-only.
+  // Hide the source pill on the plain default band (no signal there); keep it for a customer
+  // profile ("this customer's band") or once the operator customizes ("custom for this load").
+  const srcHidden = ms === 'default' ? ' hide' : '';
+  const bids = r.marginsPct || [];
+  const shownRows = prefill.rows && prefill.rows.length === bids.length ? prefill.rows : bids;
+  const bidRows = shownRows.map((m, i) => {
+    const last = i === bids.length - 1;
+    // Names describe the BAND, not a bid sequence - fine steps fill in between anchors and rungs
+    // are picked by rank, not in order, so "Bid 2" would be wrong.
+    const nm = i === 0 ? 'Opening' : (last ? 'Lowest' : (bids.length > 3 ? `Middle ${i}` : 'Middle'));
+    const sub = i === 0 ? 'top price' : (last ? 'lowest bid' : 'a price in between');
+    return `<div class="bidrow${last ? ' lands' : ''}" data-i="${i}">`
+      + `<span class="bnm">${nm}<span class="bsub">${sub}</span></span>`
+      + `<span class="mfield pct"><input type="number" step="any" min="0" name="m_${i}" value="${esc(m)}" inputmode="decimal" class="mpct" aria-label="${nm} margin percent"><span class="mu">%</span></span>`
+      + `<span class="meq">=</span>`
+      + `<span class="mfield rs await"><span class="mu">Rs</span><input class="mrs" inputmode="numeric" placeholder="add cost" aria-label="${nm} price" disabled></span>`
+      + `</div>`;
+  }).join('');
+  // PORTAL FACTS: per-load SuperProcure facts, absent on older/sim snapshots (line doesn't render).
+  // Allowed revisions shows only when fine-step eligible (mirrors the engine's arm-time gate);
+  // eligibility reads the BOOT config.
+  const allowedBids = Number.isFinite(Number(L.revisionLimit)) ? Number(L.revisionLimit)
+    : ((L.rules && Number.isFinite(Number(L.rules.revisionLimit))) ? Number(L.rules.revisionLimit) : null);
+  const scBoot = config.softClose || {};
+  const fineEligible = allowedBids != null && allowedBids > 3 && !!scBoot.enabled
+    && Array.isArray(scBoot.shippers) && scBoot.shippers.some((s) => tokenMatch(String(L.companyName || ''), s));
+  // Live armed ladder straight off the monitor (zero drift). Only present once armed; best-effort -
+  // any lookup hiccup just drops the line, never the form.
+  let liveLadder = null;
+  try {
+    for (const s of stacks) {
+      const snap = s.engine && s.engine.snapshot ? s.engine.snapshot().find((m) => String(m.auctionId) === String(r.loadId)) : null;
+      if (snap && Array.isArray(snap.ladder) && snap.ladder.length) { liveLadder = snap.ladder; break; }
+    }
+  } catch (_) { /* display-only */ }
+  const inr = (n) => 'Rs ' + Number(n).toLocaleString('en-IN');
+  // id=pvLadder is shared with the client-side previewLadder() script - the server-rendered armed
+  // ladder is just the initial state; live edits update the same element.
+  // "Prices that will go out" is a promise, and on a portal that cannot bid yet it is not true today.
+  // The prices are real and they are what will be sent - just not now - so the line is re-tensed
+  // rather than removed: a desk that priced a load and then sees nothing about its prices has been
+  // given less, not more. Shared with the client-side preview below so the two cannot disagree.
+  // On a held load "Prices that will go out" is a promise about prices that will not go out - the
+  // page's loudest element asserting the plan the panel above it has just refused. Re-tensed rather
+  // than removed, the same way the not-yet-live portal case is: a desk that priced a load and then
+  // sees nothing about its prices has been given less, not more.
+  const ladderLead = isHeld ? 'Prices we would have sent - this load is on hold, so none of these go out'
+    : isTargetPriceReq(r) ? 'Your prices, for reference only - not sent'
+    : wontBid && wontBid.keepsCost ? 'Prices we will send when this portal goes live' : 'Prices that will go out';
+  const bandFacts = [
+    fineEligible ? `This customer allows <b>${esc(allowedBids)} price revisions</b> - in-between steps are filled in automatically from your prices, so these ${bids.length} rows are all you set.` : '',
+    liveLadder ? `<li id="pvLadder">${esc(ladderLead)} (<b>${liveLadder.length}</b>): ${liveLadder.map((p) => esc(inr(p))).join(' &rarr; ')}.</li>` : '',
+  ].filter(Boolean);
+  const bandFactsBlock = bandFacts.length
+    ? `<ul class="bfacts">${bandFacts.map((t) => (t.startsWith('<li') ? t : `<li>${t}</li>`)).join('')}</ul>` : '';
+  const bandBlock = `<details class="band">`
+    + `<summary class="bhd">`
+    +   `<span class="bhd-main"><span class="bt2" id="bandHead">${isHeld ? 'On hold - not being sent' : 'Bids will go out'}</span>`
+    +     `<span class="bsum"><span class="bsrc${srcHidden}" id="bsrc">${srcLabel}</span><span class="brange${isHeld ? ' dead' : ''}" id="brange"></span></span></span>`
+    +   `<span class="badj"><span class="badj-lbl-shut">Adjust</span><span class="badj-lbl-open">Close</span><span class="bchev" aria-hidden="true"></span></span>`
+    +   `</summary>`
+    + `<div class="brows">${bidRows}</div>`
+    + `<div class="bfoot await" id="bfoot">Add your cost above and your prices fill in here.</div>`
+    + bandFactsBlock
+    + `<input type="hidden" name="use_override" id="useOverride" value="">`
+    + `<input type="hidden" name="rows_shown" value="${esc(bids.join(','))}">`
+    + (shownRows !== bids && prefill.ack ? '<input type="hidden" id="prefillAck" name="below_min_ack" value="1">' : '')
+    + `</details>`;
+  // THE SHORTFALL BLOCK. Empty and hidden at render; the preview fills it on every price edit, the
+  // same cycle that fills the price line. Its place in the document is the point of it: BELOW the
+  // price panel and directly ABOVE Submit, so a plan that cannot send everything the desk typed is on
+  // the path to the button rather than inside an expander the desk has no reason to open. The same
+  // words lived in that expander and went unread.
+  // aria-live on the fact only - the action and the button text change with it, and announcing all
+  // three would read the block out three times on one keystroke.
+  const ladderWarnBlock = `<div class="lwarn" id="ladderWarn" hidden>`
+    + `<p class="lwfact" id="lwFact" role="status" aria-live="polite"></p>`
+    + `<p class="lwact" id="lwAction"></p>`
+    + `<div class="lwacts" id="lwActs" hidden>`
+    // The corrective price as a BUTTON, mirroring the ceiling block: tapping types that price into
+    // the last row for the desk, a labelled act with the number on its face rather than a silent
+    // auto-fill. The other lever has no single number to offer, so its button opens the rows instead.
+    +   `<button type="button" id="lwUse" hidden></button>`
+    +   `<button type="button" class="lwalt" id="lwSpread">Adjust prices</button>`
+    + `</div></div>`;
+  // THE FLOOR-STEP BLOCK - the same slot and the same shape as the shortfall above it, in the red
+  // state and holding the submit shut. Pre-rendered from the request on a re-price so a desk with no
+  // JavaScript is stopped on load, exactly as the ceiling block is; on a capture there is no cost
+  // yet, so it opens hidden and the preview fills it on the first one typed.
+  const fsPre = reprice && r.price && r.price.cost > 0
+    ? floorStepPreflight((stackForRequest(r) || {}).engine, L, r.price.cost,
+      { marginsPct: r.marginsPct, minMarginPct: r.minMarginPct }, r.price.costByType || null)
+    : null;
+  const floorStepBlock = `<div class="lwarn bad" id="floorStep"${fsPre ? '' : ' hidden'}>`
+    + `<p class="lwfact" id="fsFact" role="status" aria-live="polite">${fsPre ? esc(fsPre.fact) : ''}</p>`
+    + `<p class="lwact" id="fsAction">${fsPre ? esc(fsPre.action) : ''}</p>`
+    + `<div class="lwacts" id="fsActs"${fsPre ? '' : ' hidden'}>`
+    +   `<button type="button" id="fsUse"${fsPre && fsPre.priceTarget != null ? '' : ' hidden'}>${
+      fsPre && fsPre.priceTarget != null ? esc(`Use Rs ${rsFmt(fsPre.priceTarget)}`) : ''}</button>`
+    +   `<button type="button" class="lwalt" id="fsSpread">Adjust prices</button>`
+    + `</div></div>`;
+  const cost = prefill.cost != null ? prefill.cost : reprice && r.price && r.price.cost > 0 ? r.price.cost : null;
+  // MULTI-UNIT COUNT CONTROL + PER-UNIT COST LABEL. The BACKEND reads the load's pricing BASIS off the
+  // SP data (quoteType) - the desk never picks it. Two bases:
+  //   TRUCK  (FTL "Quote Per Vehicle", or an unknown basis in REAL mode): `units` is a TRUCK COUNT.
+  //          SuperProcure charges the bid `amount` PER TRUCK and multiplies by the count it records
+  //          (vcq). The desk gets an EDITABLE count (default = the load's full count, bid-max-always;
+  //          it may LOWER it when BRL can supply fewer) that flows to the bid's vcq, and a per-TRUCK
+  //          cost label. The editable count IS the human read of the count - it replaces the old
+  //          confirm-checkbox; the tonnes-vs-trucks hazard is resolved by reading quoteType, not a tick.
+  //   PMT    ("Quote Per MT"): `units` is the MT/KG QUANTITY on one movement, NOT a truck count. The
+  //          desk enters a PER METRIC TONNE rate here and that rate goes on the wire UNCHANGED -
+  //          SuperProcure multiplies it by the load's own per-vehicle tonnage server-side and stores
+  //          the product as `amount`, echoing our rate back verbatim on amountPMT and bidRate.
+  //          SETTLED from a captured desk WRITE on 2026-08-05, load 23828313
+  //          (_research/2026-08-05_pmt-createv2-capture-SETTLED.md): sent amount 2240, stored
+  //          amount 33600 = 2240 x 15. NOTE: this comment has been wrong in BOTH directions. It once
+  //          said SP multiplies (right), was "corrected" on 2026-08-01 to say the adapter must send
+  //          the total and SP divides (wrong - that inference came from a READ-side census that
+  //          could not test it, and #88 shipped a tonnage multiplier to match, an overbid scaling
+  //          with tonnage), and is now back to the captured truth. Do not re-derive this from the
+  //          readback census; read the capture.
+  //          There is no adapter-side conversion at all any more, so this page, the engine ladder
+  //          and the operating floor are all in per-MT terms end to end. There is no per-tonne quantity
+  //          field on the bid wire, so a PARTIAL tonnage is not a bid shape the engine can place
+  //          today: the count is shown READ-ONLY (fixed by the load) and never flows to a bid; the
+  //          engine bids PMT single (unchanged). The real win here is the per-METRIC-TONNE cost
+  //          label, so the desk enters a per-tonne rate, not a total.
+  //          (Making the PMT count editable is scoped, unbuilt engine work - see the PR notes.)
+  //          DISPLAY UNITS ARE A KNOWN GAP, deliberately not changed here: this page, the bid_placed
+  //          event and the WhatsApp templates all render the per-MT rung as a bare rupee figure with
+  //          no "/MT" qualifier and no total, so the desk sees "Rs 4,000" and SuperProcure shows
+  //          Rs 100,000. Fixing that is a product decision about what the desk and the director
+  //          should see, not a money-path change, and it is tracked as its own follow-up.
+  // TRUCK basis uses the SAME predicate + per-mode scope the engine bids on (isMultiVehicle /
+  // strictUnknownBasis = REAL mode), so the control shown is exactly the set the engine bids vcq:N for.
+  // FAIL CLOSED / byte-identical otherwise: a single-truck / single-unit / countless load renders no
+  // control and the plain "Your cost (Rs)" label, exactly as before.
+  const totalUnits = pmtTotalUnitsFor(L);
+  const isTruckMulti = isMultiVehicle(L, { strictUnknownBasis: config.mode === 'real' });
+  const isPmtMulti = isPmtBasis(L) && totalUnits != null && totalUnits > 1;
+  // The desk's chosen truck count survives a re-price render (stored on price.bidVehicleCount by
+  // capture/setBidOverride); a fresh capture defaults to the full count (bid-max). PMT shows the
+  // load's own fixed tonnage.
+  const chosenCount = (r.price && Number.isInteger(r.price.bidVehicleCount)) ? r.price.bidVehicleCount : null;
+  const countDefault = chosenCount != null ? chosenCount : totalUnits;
+  // THE QUANTITY UNIT WORD IS READ OFF THE LOAD, never hardcoded. `weightUnit` is normalizeUnit's
+  // canonical KG/MT (null -> MT, this display layer's long-standing default) and is the SAME value
+  // the load card above renders through fmtWeight - so this page can no longer name two different
+  // units for one load. Hardcoding 'metric tonnes' here is verbatim the ~1000x mislabel fmtWeight
+  // was written to kill (see its comment in src/notify/waTemplates.js): Ashirvad Pipes and Tata
+  // Consumer really are KG-quoted branches, and this page renders for them whether or not the bot
+  // will bid - PMT_UNIT gates the WIRE, not the pricing form, and the desk enters a cost here.
+  const pmtUnitWord = L.weightUnit === 'KG' ? 'kilograms' : 'metric tonnes';
+  const unitWord = isTruckMulti ? 'trucks' : pmtUnitWord;
+  const costLabel = isTruckMulti ? 'Your cost PER TRUCK (Rs)'
+    : isPmtMulti ? `Your cost PER ${L.weightUnit === 'KG' ? 'KILOGRAM' : 'METRIC TONNE'} (Rs)`
+    : 'Your cost (Rs)';
+  // WHAT A PMT BID COMMITS TO, stated on the form. The count control above is read-only on PMT and
+  // reads in TONNES, so on its own it never told the desk the one thing a per-tonne bid silently
+  // decides: how many TRUCKS BRL is on the hook for. `vcq:-1` is not "one vehicle" - SuperProcure
+  // derives the count from the load and records it (2026-08-05 capture, load 23828313: sent vcq:-1,
+  // SP recorded bidVehicleCount 2). So a 30 MT load bid at Rs 2,240/MT is a commitment to TWO trucks
+  // and Rs 67,200, and none of that was on screen.
+  //
+  // This is the whole reason the vehicleCount/weight comparison was kept as a fact (LoadRules
+  // pmtVehicleCount) rather than deleted with the multiplier it was written for. The alternative
+  // considered was restoring a blanket refusal on split loads - rejected because the desk bids these
+  // by hand and wins (23828313 took rank 1), and 3 of the 5 live Vishal Pipes PMT loads on
+  // 2026-08-05 are splits, so refusing them discards most of that customer for a commitment shape
+  // the FTL path already takes by default (its count control defaults to bid-max).
+  //
+  // Says something in EVERY state, including the one where SuperProcure's own figures cannot settle
+  // the truck count (pmtVehicleCount null) - "no line" would be indistinguishable from "one truck",
+  // and that ambiguity is the failure this block exists to prevent. Never claims a count it does
+  // not have.
+  // THE SNAPSHOT IS PREFERRED, THE LOAD IS THE FALLBACK - and the fallback is the point.
+  // `rules.pmtVehicleCount` is absent on any LoadRules captured before that field existed, and
+  // reconcilePricingMode structurally cannot backfill it (a persisted snapshot carries neither
+  // `vehicleCount` nor `weight` - see its docstring). This page is not so limited: it holds the
+  // mapped load itself, which carries both. So re-derive through the SAME derivePmtVehicleCount the
+  // fact layer uses rather than declaring the count unknown on a load whose own figures settle it.
+  // One derivation, one set of null rules, no chance of the page and the engine disagreeing.
+  const pmtTrucks = (L.rules && Number.isInteger(L.rules.pmtVehicleCount) && L.rules.pmtVehicleCount > 0)
+    ? L.rules.pmtVehicleCount
+    : (isPmtBasis(L) ? derivePmtVehicleCount({ vehicleCount: totalUnits, weight: L.weight }, 'per_tonne') : null);
+  // The per-truck figure is SuperProcure's OWN `weight` ("Qty/Vehicle"), not totalUnits/pmtTrucks -
+  // it is the same field pmtVehicleCount was derived from, so quoting it directly means the two
+  // numbers on this line cannot disagree with each other or with the load card above.
+  const pmtPerTruck = (Number.isFinite(Number(L.weight)) && Number(L.weight) > 0) ? Number(L.weight) : null;
+  const pmtCommit = !isPmtBasis(L) ? ''
+    : `<p class="note mvcommit" id="pmtCommit" style="margin:6px 0 0">${esc(
+      pmtCommitmentText(pmtTrucks, totalUnits, pmtPerTruck, unitWord))}</p>`;
+  // A PARTIAL COUNT IS NOT OFFERED WHERE THE PORTAL CANNOT SEND ONE. Read as a capability, never a
+  // portal test (MULTI_PLATFORM_ARCHITECTURE.md invariants 2 and 7). GoComet has no per-bid count
+  // field at all - the count IS the quote's `units` and the server multiplies our per-truck price by
+  // it - so its write path refuses a partial outright (PARTIAL_VEHICLE_COUNT) rather than bidding
+  // for every truck while the desk believed it had asked for fewer. An editable control there takes
+  // a number the system will never use and the load closes with no bid at all, which is the same
+  // take-a-cost-then-discard-it shape loadWillNotBid exists to keep off this page. So the control
+  // degrades to the treatment PMT already gets: shown, read-only, with the commitment stated.
+  const countEditable = isTruckMulti && portal.partialVehicleCountSupported;
+  // The FULL count, not a persisted partial: a request captured before the portal declared itself
+  // may carry one, armFromRequest now drops it, and showing it here would state a commitment the
+  // engine will not make.
+  const countShown = countEditable ? countDefault : totalUnits;
+  // The count is fixed and the control beside it already says "N / N trucks", so the mechanism
+  // behind that (no per-bid count field on the wire, the server multiplies) changes nothing the
+  // desk can do and is not written here. The one clause that DOES change what they do - the way
+  // out when BRL can supply fewer - is what is left.
+  const truckAllNote = (isTruckMulti && !countEditable)
+    ? `<p class="note mvcommit" id="mvAllTrucks" style="margin:6px 0 0">${esc(
+      `To bid for fewer than ${totalUnits}, quote this load by hand.`)}</p>`
+    : '';
+  // ONE full-width joined control (editable number on the left + "/ N <unit>" filling the rest,
+  // matching the cost field's width directly below). No helper text on the editable TRUCK branch -
+  // it is self-explanatory. PMT, and TRUCK on a portal that cannot send a partial: read-only
+  // (disabled), never posts, and carries its commitment line above.
+  // EVERY TRUCK TYPE ON THE LOAD, EACH WITH ITS OWN COUNT, above the field the rate goes into.
+  //
+  // This is a correctness requirement of the multi-truck-type write, not decoration. GoComet models
+  // each truck type as its own freight line and the bot writes the ONE rate the desk types onto
+  // every one of them. Until 2026-08-19 such a load was refused, so the desk saw a refusal card and
+  // quoted by hand; now it is priced, and a page that named a single vehicle would take a rate
+  // reasoned for a 40 ft and put it on a 20 ft ODC as well. The types have to be on screen before
+  // the number is.
+  //
+  // Rendered only when the load carries MORE THAN ONE type and every descriptor parsed (the adapter
+  // publishes cargoTypes all-or-nothing for that reason), so a single-type load is byte-identical
+  // to what the desk reads today.
+  const cargoTypes = Array.isArray(L.cargoTypes) && L.cargoTypes.length > 1 ? L.cargoTypes : null;
+  // ONE COST PER TRUCK TYPE, when the load's own types can each be routed to a freight line.
+  //
+  // A 40 ft 25 T and a 20 ft ODC 10 T are not worth the same per truck, so a single blended rate
+  // sits below cost on the dearer type and hands the cheaper one away. That was the standing
+  // hazard of the uniform write, and no assertion could close it while only one cost existed.
+  //
+  // `match` is what makes it safe: it is the token the ADAPTER joins the desk's types to the
+  // quote's freight lines on, so a type carrying none cannot be priced separately whatever this
+  // page renders. A snapshot taken before that field existed therefore falls back to the single
+  // rate - visibly, with the types still listed - rather than offering inputs the bid path would
+  // refuse. Same all-or-nothing posture as the parser: every type or none.
+  const perTypeCost = !!(cargoTypes && cargoTypes.every((t) => t && t.match && Number.isInteger(t.count) && t.count > 0));
+  const storedByType = (r.price && r.price.costByType && Array.isArray(r.price.costByType.types))
+    ? r.price.costByType.types : null;
+  const typeCostOf = (i) => {
+    if (prefill.byType && prefill.byType.length === (cargoTypes || []).length) return esc(prefill.byType[i]);
+    if (!reprice || !storedByType || !storedByType[i] || !(storedByType[i].cost > 0)) return '';
+    return esc(storedByType[i].cost);
+  };
+  const typeRows = !cargoTypes ? ''
+    : perTypeCost
+      ? `<div class="mvtypes"><div class="mvth">Your cost per truck, by type</div>`
+        + cargoTypes.map((t, i) => `<div class="mvtr" data-count="${esc(t.count)}">`
+          + `<div class="mvtk"><span class="mvtl">${esc(t.label)}${t.dimensions ? `<span class="mvtd">Size (L &times; W &times; H): ${esc(t.dimensions)}</span>` : ''}</span><span class="mvtc">&times;${esc(t.count)}</span></div>`
+          + `<div class="mvtf"><span class="rs">Rs</span>`
+          +   `<input id="cost_type_${i}" name="cost_type_${i}" type="number" min="1" step="1" required inputmode="numeric"${i === 0 ? ' autofocus' : ''} value="${typeCostOf(i)}" aria-label="Your cost per truck for ${esc(t.label)}${t.dimensions ? `, size ${esc(t.dimensions)}` : ''}">`
+          +   `<span class="mvtt" aria-live="polite"></span>`
+          + `</div></div>`).join('')
+        + `<div class="mvsumrow"><span>Whole load, ${esc(totalUnits)} ${unitWord}</span><b id="mvTotal" aria-live="polite"></b></div>`
+        + `</div>`
+      : `<div class="mvtypes"><div class="mvth">${esc(cargoTypes.length)} truck types on this load</div>`
+        + cargoTypes.map((t) => `<div class="mvtr"><div class="mvtk"><span class="mvtl">${esc(t.label)}${t.dimensions ? `<span class="mvtd">Size (L &times; W &times; H): ${esc(t.dimensions)}</span>` : ''}</span><span class="mvtc">&times;${esc(t.count)}</span></div></div>`).join('')
+        + `</div>`;
+  const countBlock = (isTruckMulti || isPmtMulti)
+    ? `<label for="vehicle_count">How many ${unitWord} to bid for</label>`
+      + `<div class="mvfield">`
+      +   `<input id="vehicle_count"${countEditable ? ' name="vehicle_count"' : ' disabled'} type="number" min="1" max="${esc(totalUnits)}" step="1" inputmode="numeric" value="${esc(countShown)}" aria-label="How many ${unitWord} to bid for, out of ${esc(totalUnits)}">`
+      +   `<span class="mvtot">/ ${esc(totalUnits)} ${unitWord}</span>`
+      + `</div>`
+      + (isTruckMulti ? truckAllNote : pmtCommit)
+    : pmtCommit;
+  // On the per-type form the count comes FIRST: it is the load's fixed shape, and the cost block
+  // below it is the thing being filled in. Everywhere else the order is unchanged.
+  const mvControl = perTypeCost ? countBlock + typeRows : typeRows + countBlock;
+  // WHAT THE RATE ADDS UP TO, filled in by the page as the cost is typed - the half a pricer can
+  // check against their own number. On the per-type form it is the block's own last row (above);
+  // on a multi-type load still taking ONE rate it sits under the cost field. On a single-type load
+  // it is rate x the count already beside the field, and a line restating it would be noise.
+  const mvTotalBlock = (cargoTypes && !perTypeCost && totalUnits > 0)
+    ? `<div class="mvsum" id="mvTotal" data-units="${esc(totalUnits)}" data-unit="${esc(unitWord)}" data-per="per ${esc(unitWord.replace(/s$/, ''))}" aria-live="polite"></div>`
+    : '';
+  // Conditional transit time (rules-driven field): SuperProcure rejects a bid on a
+  // loadIsTransitTimeOn load unless it carries transit days (proven live on SIKA), so the pricing
+  // person must give the days WITH the cost. Three shapes:
+  //   first capture            -> required entry field (capture() re-validates server-side).
+  //   re-price, days on record -> read-only display. Transit time is sticky per load - SP reuses
+  //                               the first value on every revision - so it is deliberately not
+  //                               editable, and the disabled input is never POSTed.
+  //   re-price, days MISSING   -> required entry field again (recovery: a request captured before
+  //                               the transit build deployed; the engine refuses to bid it until
+  //                               days exist - this is where the operator supplies them, set-once
+  //                               via setBidOverride).
+  // SHIPPER CEILING - stated on the form itself, ALWAYS VISIBLE, in all three states.
+  //
+  // The old surface for this was a bullet inside <details class="band">, which is COLLAPSED by
+  // default, rendered only for the fully-dead case, and only after a 350ms debounced fetch that
+  // nothing awaited. Meanwhile the always-visible band summary kept showing the uncapped margin
+  // prices. So the one number that decided the load was hidden, late, conditional - and contradicted
+  // by what was on screen. This block is server-rendered, sits directly under the cost field, and
+  // says something in EVERY state, because "no ceiling line" is indistinguishable from "no ceiling"
+  // and that ambiguity is what the incident was made of.
+  //
+  // The verdict sentence (#ceilVerdict) is the only part the client rewrites, as the cost is typed.
+  // Its server-rendered default never claims a verdict it cannot have yet.
+  const ceilFacts = ceilingFactsFor(L);
+  // Resolved by the async callers; without it, a request still on its inherited band states it, and
+  // an override below it carries the figure it was confirmed against. Otherwise the server's refusal
+  // is what prompts.
+  const customerMinPct = (opts && opts.customerMinPct != null) ? opts.customerMinPct
+    : r.marginSource !== 'bid' ? effectiveFloorMarginPct({ marginsPct: r.marginsPct, minMarginPct: r.minMarginPct })
+      : (r.marginOverride && r.marginOverride.belowMinimum ? r.marginOverride.belowMinimum.customerMinPct : null);
+  const ceilRs = ceilFacts.ceiling != null ? Number(ceilFacts.ceiling).toLocaleString('en-IN') : '';
+  // The block is PRE-RENDERED in its final state wherever the server can know it. On a fresh
+  // capture it cannot - there is no cost yet - so it opens neutral and the script fills it in. On
+  // the RE-PRICE form it can: the cost and the band are both already on the request. Rendering the
+  // red state server-side there means a desk with no JavaScript sees the problem on load instead of
+  // having to submit for it, and it removes the whole "the page looked fine" class of report.
+  const ceilPre = (() => {
+    if (ceilFacts.state === 'pmt_unproven') {
+      const c = ceilingCopy({ reason: 'pmt', ceiling: ceilFacts.ceiling });
+      return Object.assign({ dead: true }, c);
+    }
+    if (ceilFacts.state !== 'known') {
+      return {
+        dead: false, head: 'No price ceiling on this load',
+        body: 'SuperProcure has not shown a maximum. That is normal. It is not a guarantee there is no cap.',
+        why: '', fixPct: null,
+      };
+    }
+    const head = `Customer will not pay above Rs ${ceilRs}`;
+    const savedCost = reprice && r.price ? r.price.cost : null;
+    if (savedCost != null) {
+      const stack = stackForRequest(r);
+      const plan = ceilingDeadPlan(stack && stack.engine, L, savedCost,
+        { marginsPct: r.marginsPct, minMarginPct: r.minMarginPct }, r.price.costByType || null);
+      if (plan) return Object.assign({ dead: true, costTargetByType: plan.costTargetByType }, ceilingCopy(plan));
+    }
+    return {
+      dead: false, head,
+      body: savedCost != null ? `All prices are under Rs ${ceilRs}.`
+        : 'Enter your cost to check your prices fit.',
+      why: '', fixPct: null,
+    };
+  })();
+  // NO BLOCK AT ALL when the load has no published ceiling (product owner, 2026-07-31: "no need to
+  // show this by default"). Most loads carry no ceiling, so "No price ceiling on this load /
+  // SuperProcure has not shown a maximum" was a paragraph of nothing on the majority of pages,
+  // sitting directly under the field the desk is trying to type into.
+  //
+  // This is NOT the fail-open pattern #112 fixed. That one was a wrong POSITIVE claim - the page
+  // asserted "hard close" for a close model nobody had verified. Saying nothing about an absent
+  // ceiling asserts nothing; the constraint only exists when SuperProcure publishes one, and that
+  // is exactly when the block appears. The script guards on CEILSTATE before touching any of these
+  // nodes, so their absence is already a supported state.
+  const ceilBlock = ceilFacts.state !== 'known' && ceilFacts.state !== 'pmt_unproven' ? ''
+    : `<div class="snote${ceilPre.dead ? ' bad' : ''}" id="ceilNote">`
+    // data-neutral carries the non-error heading so the SCRIPT never has to contain that sentence.
+    // It is the shipper-facing wording, and a copy of it inside the inline script would be served on
+    // every page including the no-ceiling one - which is both a duplicate definition and a false
+    // positive for any test asserting the unknown page does not borrow the known-ceiling wording.
+    + `<div class="st" id="ceilHead" data-neutral="${esc(ceilFacts.state === 'known' ? `Customer will not pay above Rs ${ceilRs}` : ceilPre.head)}">${esc(ceilPre.head)}</div>`
+    + `<div class="sb" id="ceilVerdict" role="status" aria-live="polite">${esc(ceilPre.body)}</div>`
+    + `<div class="sb" id="ceilWhy">${esc(ceilPre.why || '')}</div>`
+    // Screen-reader announcement only (role=alert + .sr-only) - the visible copy above already
+    // states the heading and the max bid once each, so this must never also be on screen.
+    + `<div class="sr-only" id="ceilAlert" role="alert"></div>`
+    + `<div class="ceilacts" id="ceilActs"${ceilPre.dead ? '' : ' hidden'}>`
+    // The buying price as a BUTTON. Tapping it types that cost into the field for the desk - a
+    // deliberate, labelled act with the number on its face, not a silent auto-fill. The number is
+    // the button, because that is what the desk is agreeing to. Labelled "Use Rs X" (not the bare
+    // figure) so the copy above can point at it by its own on-screen words.
+    // Hidden until the script shows it; with no script the link below is the control.
+    + `<button type="button" id="ceilFix" hidden>${
+      ceilPre.costTarget == null ? '' : esc(`Use Rs ${rsFmt(ceilPre.costTarget)}`)}</button>`
+    + (() => {
+      const l = ceilingFixLink(r, { code: 'CEILING_DEAD', costTarget: ceilPre.costTarget, costTargetByType: ceilPre.costTargetByType }, null);
+      return l ? `<noscript><a class="efix" href="${esc(l.href)}">${esc(l.label)}</a></noscript>` : '';
+    })()
+    // The override stays ONLY on the re-price form. On a first capture the desk already has a real
+    // way out - the "Decline this request" control below - so a second, weaker escape here was
+    // noise (product owner: "unnecessary"). On a re-price there is no decline (an armed load cannot
+    // be dismissed), and SuperProcure's published ceilings are not always right, so removing it
+    // there would strand a live load with no way to record a cost at all.
+    + (reprice ? '<button type="button" class="ceilalt" id="ceilSave">Save anyway - nothing will be bid</button>' : '')
+    + '</div></div>';
+  // ZERO-MARGIN inline surfacing (T6 follow-up, 2026-09-11). bidsAtCost/bidsAtCostError further up
+  // are the server-side backstop that has existed since T6; this renders the SAME fact - the band
+  // that will actually govern this submit floors at exactly 0%, so every bid would go out at the
+  // desk's own cost - AT THE FIELD, before submit, instead of only after a full round trip and a
+  // six-line page. HARD, same as the guard it surfaces: no acknowledgement, no fix-cost button -
+  // there is no cost that fixes a 0% margin setting, only someone correcting it off this page.
+  //
+  // Needs no cost to be true (the fact lives in the band alone), so it is shown from first render
+  // rather than gated on typing a number - a desk landing on a dead customer's page should not have
+  // to type a cost to discover that pricing it is pointless.
+  //
+  // WHICH band governs differs by mode, and this mirrors the split exactly: a first CAPTURE that
+  // hasn't touched the margin editor is judged on the record's own resolved band (marginsPct +
+  // the EXPLICIT minMarginPct, which can be a legacy stored 0 invisible in every displayed row -
+  // see effectiveFloorMarginPct) exactly as bidsAtCost judges it at line ~2808. A RE-PRICE submit
+  // always posts every row (parseBandForm(req.body) at line ~2648, unconditionally, whether or not
+  // the desk touched anything), so on that form only the DISPLAYED rows' own lowest number ever
+  // reaches the server - the explicit field is not read on that path, and judging by it here would
+  // desync from what re-pricing this page will actually enforce.
+  const zmFloorPct = reprice
+    ? (bids.length ? Math.min(...bids.map(Number)) : null)
+    : effectiveFloorMarginPct({ marginsPct: r.marginsPct, minMarginPct: r.minMarginPct });
+  const zmZero = zmFloorPct === 0;
+  const zmBlock = `<div class="snote${zmZero ? ' bad' : ''}" id="zmNote"${zmZero ? '' : ' hidden'}>`
+    + `<div class="st" id="zmHead">This customer's margin setting is 0%</div>`
+    + `<div class="sb" id="zmBody">Every bid on this load would go out at cost - the margin setting has to be corrected before this load can be priced.</div>`
+    + `</div>`;
+  // THE COST FIELD. On a per-type form it becomes a HIDDEN #cost holding the blended per-truck
+  // cost, so the band preview, the ladder, the ceiling check and the clerical-error floor all keep
+  // operating on the one number they were written against. The page fills it from the per-type
+  // inputs; the SERVER recomputes the same blend from those inputs and arms off its own figure, so
+  // what the page writes here is display state and never the number that reaches the wire.
+  const costFieldBlock = perTypeCost
+    ? `<input id="cost" name="cost" type="hidden" value="${cost != null ? esc(cost) : ''}">`
+    // The ON RECORD pill IS the save, confirmed - the half G1 says vanishes today - so the panel's
+    // headline does not have to spend a line saying it twice.
+    : `<label for="cost">${costLabel}${isHeld ? '<span class="onrec">On record</span>' : ''}</label>
+`
+      + `<div class="field${ceilPre.dead ? ' bad' : ''}"><span class="rs">Rs</span><input id="cost" name="cost" type="number" min="1" step="1" required autofocus inputmode="numeric" value="${cost != null ? esc(cost) : ''}"${ceilBlock ? ' aria-describedby="ceilNote"' : ''}${ceilPre.dead ? ' aria-invalid="true"' : ''}></div>`;
+  const needsTransit = !!(L.rules && L.rules.loadIsTransitTimeOn);
+  const stickyDays = r.price && r.price.transitDays != null ? r.price.transitDays : null;
+  const transitFixed = reprice && stickyDays != null;
+  const transitBlock = !needsTransit ? '' : `
+<label for="transit_days" style="margin-top:16px">Transit time (days)</label>
+<div class="field tfield"><span class="rs">Days</span><input id="transit_days" name="transit_days" type="number" min="1" max="${MAX_TRANSIT_DAYS}" step="1" inputmode="numeric"${transitFixed ? ` value="${esc(stickyDays)}" disabled` : ' required'}></div>
+<p class="note" style="margin:6px 0 0">${transitFixed
+    ? 'Fixed for this load - SuperProcure reuses the first transit time on every revised bid.'
+    : 'This shipper requires transit time with the rate - a bid without it is rejected. Enter the delivery days; the value stays fixed for this load.'}</p>`;
+  // Ops escape hatch: an awaiting_price request nobody's going to price (load cancelled,
+  // wrong lane) can be declined right from the same link an admin is looking at, instead of
+  // making them hunt it down in the console. Never shown on the reprice form - that surface
+  // stays exactly what it was before this change, no new capability, no new risk.
+  const adminBlock = !reprice ? renderAdminBar(req, r, 'dismiss') : '';
+  // Always rendered (when reprice) so the AJAX success handler can toggle its visibility live -
+  // reverting or setting a fresh override changes whether this is relevant without a reload.
+  const revertBlock = reprice ? `
+<form method="post" action="/price/${esc(publicSeg(r))}" id="revertForm"${ms === 'bid' ? '' : ' style="display:none"'}>
+<input type="hidden" name="revert_override" value="1">
+<button type="submit" style="background:transparent;color:var(--muted-fg);border:1px solid var(--border);box-shadow:none;font-size:13px;text-decoration:underline">Revert to standard margins</button>
+</form>` : '';
+  return priceShell(`${reprice ? 'Re-price' : 'Enter cost'} - ${lane}`, `
+<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">${reprice ? 'Re-price a load already bidding' : 'Load cost entry'}</span>${closeModelLabel ? `<span class="badge ctype">${esc(closeModelLabel)}</span>` : ''}</span>${r.loadId ? `<div class="loadmeta">${idLines}${closeDayLabel ? `<span class="lddate">${closeDayLabel}</span>` : ''}</div>` : ''}</div>
+<h1>${reprice ? `Re-price load #${esc(r.loadId)}` : 'Enter your rate'}</h1>
+${savedFlash}
+<div id="holdSlot">${holdBlock}</div>
+<div id="warnSlot">${warnBlock}</div>
+${renderLoadCard(r, { held: isHeld })}
+${reprice ? '<div class="livepos" id="livepos" role="status" aria-live="polite"></div>' : ''}
+<div class="closewarn" id="closewarn" role="status" aria-live="polite"></div>
+${noteBlock}
+${willNotBidBlock(wontBid)}
+${wontBid ? '' : authDeadBlock(portal)}
+${noForm ? '' : `<form method="post" action="/price/${esc(publicSeg(r))}" id="mainForm">
+${mvControl}
+${zmBlock}
+${costFieldBlock}
+${mvTotalBlock}
+${ceilBlock}
+${transitBlock}
+${bandBlock}
+${ladderWarnBlock}
+${floorStepBlock}
+<div id="dontSlot">${isHeld ? renderPortalWarning(r.hold) : ''}</div>
+<button type="submit"${zmZero || fsPre ? ' disabled' : ''}>${reprice ? 'Re-price' : 'Submit rate'}</button>
+</form>
+${revertBlock}`}
+${noForm ? '' : `<script>(function(){
+var REPRICE=${reprice ? 'true' : 'false'},openStatus=REPRICE?'armed':'awaiting_price',MINCOST=${Number(config.minPlausibleCost) || 0};
+// HARDFLOOR mirrors the server's clerical-error floor for THIS load (0 = disabled, or a PMT load
+// where a per-tonne rate cannot be judged against a rupee floor). Computed server-side and inlined so
+// the page and the POST handler can never disagree about the number; the server re-checks regardless,
+// because a guard that only exists in JavaScript does not exist - the lesson of a93b234 / PR #29,
+// which diagnosed and fixed the four-day outage a broken inline script had caused.
+var HARDFLOOR=${(() => { const f = isPmtBasis(L) ? { floor: 0 } : hardCostFloorFor(L); return Number(f.floor) > 0 ? Number(f.floor) : 0; })()};
+// SHIPPER CEILING, resolved server-side through plausibleCeiling + floor() - the SAME resolution
+// arm() uses, never a second parse of the raw field. CEILSTATE is carried separately from CEILING
+// because "unknown" and "no cap" must not collapse into the same falsy number: the page says
+// different things for each, and treating unknown as absent is what let SIKA 23534893 through.
+var CEILING=${ceilFacts.ceiling != null ? Number(ceilFacts.ceiling) : 'null'},CEILSTATE=${jsonForScript(ceilFacts.state)};
+// The minimum margin an untouched first capture arms with. It can sit below the lowest row, and a
+// cap between the two still gets one bid at the cap, so the ceiling verdict reads it on that path.
+var GUARDPCT=${(() => { const g = effectiveFloorMarginPct({ marginsPct: r.marginsPct, minMarginPct: r.minMarginPct }); return g != null ? Number(g) : 'null'; })()};
+function rowsGovern(){return REPRICE||(over&&over.value==='1');}
+// Edited rows keep the customer's minimum as their guard unless the lowest row goes below it,
+// matching the server's withCustomerMinimum.
+function guardPctNow(){if(!rowsGovern())return GUARDPCT;var lo=lowestRow();if(lo==null)return null;return (CUSTMIN!=null&&CUSTMIN>0&&CUSTMIN<lo)?CUSTMIN:lo;}
+// The customer's minimum. Rows below it may still be sent, but only after the desk says yes to those
+// exact figures; the answer rides the submit as below_min_ack, which the server re-checks.
+var CUSTMIN=${customerMinPct != null && Number.isFinite(Number(customerMinPct)) ? Number(customerMinPct) : 'null'},minAckdAt=null;
+function lowestRow(){var ms=rows.map(function(r){return num(r.querySelector('.mpct').value);});return ms.length?Math.min.apply(null,ms):null;}
+function belowMin(){var lo=lowestRow();return rowsGovern()&&CUSTMIN!=null&&lo!=null&&lo<CUSTMIN;}
+function belowMinAcked(){return belowMin()&&minAckdAt===lowestRow();}
+function belowMinAsk(lo,min,onOk){askConfirm("Below this customer's minimum",lo+"% is below this customer's "+min+"% minimum. Bid this load at "+lo+"% anyway?","Bid at "+lo+"%",onOk);}
+function belowMinConfirm(onOk){
+if(!belowMin()||belowMinAcked()){onOk();return;}
+var lo=lowestRow();belowMinAsk(lo,CUSTMIN,function(){minAckdAt=lo;onOk();});}
+// The ladder line's lead-in, decided SERVER-side and handed over as JSON. It is re-tensed on a
+// portal that cannot bid yet, and the server renders the same phrase into the armed ladder bullet -
+// so a page whose script updates it cannot end up promising something the server-rendered line did
+// not (see ladderLead).
+var PVLEAD=${jsonForScript(ladderLead)};
+var cost=document.getElementById('cost'),over=document.getElementById('useOverride'),foot=document.getElementById('bfoot'),src=document.getElementById('bsrc'),brange=document.getElementById('brange');
+var rows=[].slice.call(document.querySelectorAll('.bidrow')),nf=new Intl.NumberFormat('en-IN');
+var mainForm=document.getElementById('mainForm'),revertForm=document.getElementById('revertForm'),btn=mainForm&&mainForm.querySelector('button');
+// Multi-unit count control. On a TRUCK-basis load this is an editable count (bid-max default, the
+// desk may lower it) that posts as vehicle_count and flows to the bid's vcq; on a PMT load, and on
+// a portal with no per-bid count field, it is read-only (disabled) and never posts. The capture
+// form submits it with the normal POST; the
+// re-price form is an AJAX/JSON submit, so its handler stitches the value into the JSON body below.
+// The SERVER re-validates the count (whole number, 1..total) and rejects an over-total one - this is
+// display/entry only, not the gate.
+var countInput=document.getElementById('vehicle_count');
+// NB: the countdown/cutoff-lock state (closesAt, deadlineAt, locked, gone, LEAD, offset) used
+// to be declared here too and never read - a dead copy of the block in the guard script below.
+// That copy is why the outage hid in review: this script parses, so anyone reading it saw
+// deadlineAt and locked sitting right next to the form and assumed the form was guarded. It was
+// not - the only real guard lives in the next script, and that one had stopped parsing.
+// Keep the guard's state in the guard.
+
+// --- live Rs-mirror as cost/% are typed (unchanged math from the original capture form) ---
+function cval(){var n=parseFloat(String(cost.value).replace(/[^0-9.]/g,''));return isFinite(n)?n:0;}
+// Is the entered cost inside the SOFT low band (under the plausible floor, above the hard one)?
+function inLowCostBand(){var cv=cval();return cv>0&&MINCOST>0&&cv<MINCOST;}
+// Soft fat-finger guard: a cost well under the plausible floor (Rs 2 for a Rs 22,000 load) gets one
+// explicit confirmation before it can arm or re-price, and each submit path then stamps
+// low_cost_ack so the server-side backstop agrees.
+//
+// Callback rather than a return value: the in-app dialog is asynchronous where window.confirm
+// blocked. onOk fires synchronously when the amount is NOT in the low band, so the ordinary
+// submit path is unchanged - only the low-band case defers.
+function lowCostConfirm(onOk){
+if(!inLowCostBand()){onOk();return;}
+askConfirm('Check this rate','Rs '+nf.format(cval())+' looks very low for a freight rate. Submit this amount?','Submit anyway',onOk);
+}
+// HARD clerical-error floor: a missing digit (1,500 for 15,000) is REFUSED, never offered a confirm -
+// a confirm dialog on a plausible-looking number just gets clicked. Returns false to block the submit.
+// Checked BEFORE lowCostConfirm so the hard band can never be waved through by the soft confirm.
+// Sticky (no auto-dismiss) and announced assertively - see showToast. The desk is being asked to
+// read a number and retype, so the message has to still be on screen while they do it.
+// On a per-type form the floor binds each type's rate, as on the server, so this is the lowest rate
+// typed rather than the blend in #cost.
+function floorInput(){var lo=null,lv=0;
+ptRows.forEach(function(row){var inp=ptInput(row),c=num(inp.value);if(c>0&&(lv===0||c<lv)){lv=c;lo=inp;}});return lo;}
+function floorRate(){if(!ptRows.length)return cval();var el=floorInput();return el?num(el.value):0;}
+function hardFloorOk(){var cv=floorRate();if(!(cv>0&&HARDFLOOR>0&&cv<HARDFLOOR))return true;
+showToast('This rate looks too low for this load (Rs '+nf.format(cv)+' entered; the minimum for this load is Rs '+nf.format(HARDFLOOR)+'). Check for a missing digit and re-enter.',true,true);
+var low=ptRows.length&&floorInput();if(low&&low.focus)low.focus();else focusCost();
+return false;}
+// ---- SHIPPER CEILING at entry time -----------------------------------------------------------
+// Three jobs, none of which the old collapsed advisory bullet did:
+//   (a) keep the always-visible ceiling note truthful as the cost is typed - including the PARTIAL
+//       case, where some prices clear the cap and some never will. That case used to be silent:
+//       capLadderToCeiling quietly lowered every over-ceiling rung TO the ceiling and the operator
+//       saw a shorter ladder with no explanation of where their top prices went.
+//   (b) mark the individual band rows whose price can never go out, so the truncation is visible
+//       where the numbers actually are.
+//   (c) STOP a submit that cannot produce a single legal bid, behind a modal the operator has to
+//       act on. The server re-checks the same thing, so this is the fast path, not the gate.
+// Everything here is computed from the SAME cost x (1+pct/100) the rows already display - no second
+// fetch, nothing to await, nothing that can silently not arrive before the submit.
+function ceilBinding(){return CEILSTATE==='known'&&CEILING>0;}
+function rowPrices(cv){return rows.map(function(r){return priceOf(num(r.querySelector('.mpct').value),cv);});}
+// How many of this cost's prices sit ABOVE the cap (they can never go out), and the lowest one
+// (which is the operating floor - if even THAT is above the cap the load is dead at this cost).
+function ceilSplit(cv){var ps=rowPrices(cv).filter(function(p){return p!=null;});
+if(!ps.length)return null;
+var over=ps.filter(function(p){return p>CEILING;}).length;
+return {total:ps.length,over:over,lowest:Math.min.apply(null,ps)};}
+function ceilDead(cv){return !!ceilReason(cv);}
+// WHY it is dead: 'cost' (any bid loses money) | 'margin' (the cost fits, the band does not) | 'pmt'
+// | null. Mirrors the SERVER's plan.reason exactly, against the same two conditions - one
+// definition expressed in two languages, never two definitions.
+function ceilReason(cv){if(CEILSTATE==='pmt_unproven')return 'pmt';
+if(!ceilBinding()||!(cv>0))return null;
+var s=ceilSplit(cv);if(!s||s.lowest<=CEILING)return null;
+var gp=guardPctNow();if(gp!=null&&CEILING>=Math.max(Math.round(cv),Math.round(cv*(1+gp/100))))return null;
+return CEILING<Math.round(cv)?'cost':'margin';}
+// The margin that lands the lowest price ON the ceiling. FLOOR, never round - rounding up puts the
+// price ABOVE the cap. Null when the cost itself is over the cap, because then no margin fixes it.
+// The highest cost at which the WHOLE band still fits under the cap - the buying price this load
+// is worth. Keyed on the TOP margin because that rung binds: if the opening price fits, every rung
+// under it does. FLOOR, never round, or the opening bid lands over the cap.
+// This REPLACED a lower-the-margin suggestion: dropping the last margin does produce one legal bid,
+// but the rungs above it collapse onto the cap and the ladder degenerates to ~no walk-down.
+function ceilCostTarget(){var ms=rows.map(function(r){return num(r.querySelector('.mpct').value);})
+.filter(function(n){return isFinite(n);});
+if(!ms.length||!(CEILING>0))return null;
+var gp=guardPctNow();var top=Math.max.apply(null,gp!=null?ms.concat([gp]):ms);if(!(top>-100))return null;
+var t=Math.floor(CEILING/(1+top/100));
+// Not a corrective at all if the hard cost floor refuses it, or if it does not lower the cost.
+if(!(t>0)||(HARDFLOOR>0&&t<HARDFLOOR))return null;var cv=cval();if(cv>0&&t>=cv)return null;
+if(ptRows.length&&!ceilFixRates(t))return null;return t;}
+${fitRatesToTarget.toString()}
+// Per-type: the rates that reach the target, by the server's own rule.
+function ceilFixRates(t){var rs=[],cs=[];ptRows.forEach(function(row){rs.push(num(ptInput(row).value));cs.push(parseInt(row.getAttribute('data-count'),10)||0);});
+if(!rs.length||rs.some(function(c){return !(c>0);}))return null;return fitRatesToTarget(rs,cs,t,HARDFLOOR>0?HARDFLOOR:0);}
+var ceilErr=false,ceilAckd=false,ceilPrevPct=null;
+function ceilEl(id){return document.getElementById(id);}
+// (a) The FACT text and the row marks. Safe on every keystroke - it never touches the error state.
+function ceilRender(){
+if(CEILSTATE!=='known')return;
+var headEl=ceilEl('ceilHead'),el=ceilEl('ceilVerdict'),whyEl=ceilEl('ceilWhy'),fixBtn=ceilEl('ceilFix');
+if(!el)return;
+var cv=cval();
+rows.forEach(function(r){r.classList.remove('overceil');});
+var ps=rowPrices(cv);
+rows.forEach(function(r,i){if(ps[i]!=null&&ps[i]>CEILING)r.classList.add('overceil');});
+var reason=ceilReason(cv);
+if(headEl)headEl.textContent=reason==='cost'?'Cost too high':reason==='margin'?'Price too high':(headEl.getAttribute('data-neutral')||'');
+if(!(cv>0)){el.textContent='Enter your cost to check your prices fit.';if(whyEl)whyEl.textContent='';if(fixBtn)fixBtn.hidden=true;return;}
+var s=ceilSplit(cv);if(!s){el.textContent='';if(whyEl)whyEl.textContent='';return;}
+if(reason==='cost'||reason==='margin'){
+// Margin: the cap only. The lowest price and the gap were dropped - both restate numbers already on
+// screen in the band below, in the one block the desk reads under a clock.
+el.textContent=reason==='cost'
+?'Max bid is Rs '+nf.format(CEILING)+'; your cost is Rs '+nf.format(Math.round(cv)-CEILING)+' over.'
+:'Max bid is Rs '+nf.format(CEILING)+'.';
+var t=ceilCostTarget();
+if(whyEl)whyEl.textContent=t!=null?('Use Rs '+nf.format(t)+' or less.'):${jsonForScript(CEILING_NO_FIX)};
+if(fixBtn){if(t==null){fixBtn.hidden=true;}else{fixBtn.hidden=false;fixBtn.textContent='Use Rs '+nf.format(t);}}
+return;}
+if(whyEl)whyEl.textContent='';
+if(fixBtn)fixBtn.hidden=true;
+if(s.over>0&&s.over===s.total){el.textContent=(s.total===1?'Your price is':'All '+s.total+' prices are')+' above Rs '+nf.format(CEILING)+'. One bid goes out, at Rs '+nf.format(CEILING)+'.';return;}
+if(s.over>0){el.textContent=s.over+' of '+s.total+(s.over===1?' prices is':' prices are')+' above Rs '+nf.format(CEILING)+'. Bidding starts at Rs '+nf.format(CEILING)+' instead.';return;}
+el.textContent='All '+s.total+' prices are under Rs '+nf.format(CEILING)+'.';}
+// (b) The ERROR state. Entered late (change/blur/blocked submit), cleared early (any input that
+// fixes it). Shake only when asked, and never twice for the same transition.
+function ceilSetError(on,shake){
+ceilErr=on;
+var noteEl=ceilEl('ceilNote'),alertEl=ceilEl('ceilAlert'),actsEl=ceilEl('ceilActs'),
+    headEl=ceilEl('ceilHead'),bodyEl=ceilEl('ceilVerdict'),fieldEl=costWrap;
+if(noteEl)noteEl.classList.toggle('bad',on);
+if(fieldEl)fieldEl.classList.toggle('bad',on);
+cost.setAttribute('aria-invalid',on?'true':'false');
+if(actsEl)actsEl.hidden=!on;
+if(alertEl)alertEl.textContent=on&&headEl&&bodyEl?(headEl.textContent+'. '+bodyEl.textContent):'';
+if(on&&shake&&fieldEl){fieldEl.classList.remove('shake');void fieldEl.offsetWidth;fieldEl.classList.add('shake');}}
+function ceilCommit(){var d=!!ceilReason(cval());
+if(d&&!ceilErr)ceilSetError(true,true);else if(!d&&ceilErr)ceilSetError(false,false);}
+function ceilRelax(){if(ceilErr&&!ceilReason(cval()))ceilSetError(false,false);}
+function syncCeiling(){ceilRender();ceilRelax();}
+// The blocking gate. Modal, not a toast: the desk is being asked to make a decision, and a
+// dismissible banner is exactly the shape that failed. Mirrors lowCostConfirm - the confirmation
+// stamps a real POST field (ceiling_ack) that the SERVER re-checks, so this is a fast path and not
+// the enforcement. Called AFTER hardFloorOk (a missing digit is refused outright and no ack opens
+// that gate) and before the low-cost band.
+// The submit-time gate. It STOPS - it does not ask. A modal on submit is a post-submit message,
+// which is exactly the shape that failed: the desk is already committed by then, and the dialog
+// gets clicked. Returns true when the submit may proceed.
+function ceilingBlocks(){var cv=cval();
+ceilRender();
+if(!ceilReason(cv)||ceilAckd)return false;
+ceilSetError(true,true);
+focusCost();
+return true;}
+// The override lives inside the red block as its own deliberate act, still behind askConfirm and
+// still stamping the ceiling_ack field the SERVER re-checks. Strictly stronger than a submit-time
+// modal: inattention cannot reach it at all, because nothing on the happy path passes through it.
+function ceilOverrideMsg(){var cv=cval(),r=ceilReason(cv);
+if(r==='pmt')return 'This load is priced per tonne and the customer set a ceiling. We cannot tell if it is per tonne or for the whole load. The rate will be saved, but no bid will go out.';
+if(r==='cost')return 'Max bid on this load is Rs '+nf.format(CEILING)+'. Your cost is Rs '+nf.format(Math.round(cv))+'. The rate will be saved, but no bid will go out.';
+var s=ceilSplit(cv);
+return 'Max bid on this load is Rs '+nf.format(CEILING)+'. Your lowest price is Rs '+nf.format(s?s.lowest:0)+'. The rate will be saved, but no bid will go out.';}
+function num(v){var n=parseFloat(String(v).replace(/[^0-9.]/g,''));return isFinite(n)?n:0;}
+function priceOf(p,cv){return cv>0?Math.round(cv*(1+p/100)):null;}
+// The Rs box is a MIRROR - only the % is posted - so a rupee amount the desk types survives just as
+// far as the percent can express it. At one decimal that is 0.1% of cost, Rs 62 on a Rs 62,017 load,
+// which is why a typed 68,000 left as 67,971. Take the SHORTEST precision that reproduces the typed
+// rupee exactly: a value that lands on 9.6 stays 9.6, and only one that needs the digits carries them.
+function pctForRs(rs,cv){var t=Math.round(rs);
+for(var d=1;d<=6;d++){var p=Number(((t/cv-1)*100).toFixed(d));if(priceOf(p,cv)===t)return p;}
+return Number(((t/cv-1)*100).toFixed(6));}
+function markCustom(){if(over)over.value='1';if(src){src.textContent='custom for this load';src.className='bsrc custom';}}
+function syncRs(row,cv,active){var pctIn=row.querySelector('.mpct'),rs=row.querySelector('.mrs'),wrap=rs.parentNode;var price=priceOf(num(pctIn.value),cv);
+if(price!=null){rs.disabled=false;rs.placeholder='';wrap.className='mfield rs';if(rs!==active)rs.value=nf.format(price);}else{rs.disabled=true;rs.placeholder='add cost';wrap.className='mfield rs await';rs.value='';}}
+// The summary names what goes out: under a binding ceiling that is each price capped at it, deduped.
+function sentPrices(ps,cv){if(!ceilBinding()||ceilDead(cv)||ps.some(function(p){return p==null;}))return ps;
+var out=[];ps.forEach(function(p){var v=Math.min(p,CEILING);if(!out.length||v<out[out.length-1])out.push(v);});return out;}
+function footer(){var cv=cval();if(cv>0){var ps=sentPrices(rows.map(function(r){return priceOf(num(r.querySelector('.mpct').value),cv);}),cv);if(foot)foot.style.display='none';if(brange)brange.textContent='Rs '+ps.map(function(x){return nf.format(x);}).join(' → ');}else{if(foot){foot.style.display='';foot.className='bfoot await';foot.textContent='Add your cost above and your prices fill in here.';}if(brange)brange.textContent='';}mvSum();syncCeiling();zmRender();previewLadder();}
+// Multi-truck-type running total: rate x every truck on the load. The element only exists on a
+// multi-type load, and BOTH the count and the unit words come off its own data attributes rather
+// than being written here - so this line cannot disagree with the count control beside it, and
+// this script carries no basis-specific noun onto a page it does not describe. That second half is
+// enforced, not stylistic: the inline script is emitted on EVERY price page, so a vehicle noun
+// written literally here appears in the source of per-tonne pages too, where the units are a
+// tonnage and the noun is exactly the confusion the per-basis labels exist to prevent.
+// PER-CARGO-TYPE RATES. One input per type; #cost is hidden on these loads and holds the BLENDED
+// per-unit cost - sum(rate x count) / total count - so the band, the ladder preview, the ceiling
+// and the clerical-error floor all keep reading the single number they were written against. The
+// blend is left EMPTY until every type has a rate: a partly-filled form must not preview a ladder
+// off a cost nothing was priced at. This block, like every line of this script, is emitted on
+// EVERY price page, which is why it carries no basis-specific noun.
+// The row list is empty on every other page, so nothing below changes shape for a single type.
+var ptRows=[].slice.call(document.querySelectorAll('.mvtr[data-count]'));
+function ptInput(row){return row.querySelector('input[type=number]');}
+function ptTotal(){var s=0;for(var i=0;i<ptRows.length;i++){var c=num(ptInput(ptRows[i]).value);if(!(c>0))return 0;s+=c*(parseInt(ptRows[i].getAttribute('data-count'),10)||0);}return s;}
+function ptSync(){
+if(!ptRows.length)return;
+var trucks=0,ok=true;
+ptRows.forEach(function(row){
+var c=num(ptInput(row).value),u=parseInt(row.getAttribute('data-count'),10)||0,tot=row.querySelector('.mvtt');
+trucks+=u;
+if(c>0&&u>0){if(tot)tot.textContent='Rs '+nf.format(c*u);}else{ok=false;if(tot)tot.textContent='';}});
+var s=ok?ptTotal():0;
+cost.value=(s>0&&trucks>0)?String(Math.round(s/trucks)):'';}
+// The cost field is hidden on a per-type form, so the focus calls that steer the desk back to a
+// bad number have to land on the first rate box instead of on nothing.
+function focusCost(){var el=ptRows.length?ptInput(ptRows[0]):cost;if(el&&el.focus)el.focus();}
+// The .field wrapper the red/shake states are painted onto - absent when #cost is hidden, and the
+// callers already guard on null. Never cost.parentNode blindly: that is the FORM on a per-type
+// page, and marking the whole form invalid is not a state this page has.
+var costWrap=(cost.parentNode&&cost.parentNode.className&&/(^|\\s)field(\\s|$)/.test(cost.parentNode.className))?cost.parentNode:null;
+// ---- ZERO-MARGIN gate, HARD (T6 follow-up, 2026-09-11) -----------------------------------------
+// Mirrors bidsAtCost/effectiveFloorMarginPct server-side. Unlike the ceiling and low-cost gates
+// beside it, there is no acknowledgement and no fix-cost button: no cost the desk could type fixes
+// a 0% customer margin, only someone correcting that setting off this page. So this only ever stops
+// the submit and says so - it never opens a confirm dialog.
+// ZM_INHERITED_ZERO is the fact as the page rendered, used only on a first CAPTURE that hasn't
+// touched the margin editor yet (over.value==='1' flips this to the rows below, matching the
+// server: see the comment on zmFloorPct server-side for why RE-PRICE always reads the rows).
+var ZM_INHERITED_ZERO=${zmZero ? 'true' : 'false'};
+// Seeded from the state the server rendered, so a page that loaded blocked stays blocked until a
+// preview says the step clears - not until the first keystroke happens to arrive.
+var fsBlocked=${fsPre ? 'true' : 'false'};
+function zmFloorZero(){
+if(REPRICE||(over&&over.value==='1')){
+var ms=rows.map(function(r){return num(r.querySelector('.mpct').value);});
+if(!ms.length)return false;
+return Math.min.apply(null,ms)<=0;
+}
+return ZM_INHERITED_ZERO;
+}
+var zmNote=document.getElementById('zmNote');
+function zmRender(){
+var zero=zmFloorZero();
+if(zmNote){zmNote.hidden=!zero;zmNote.classList.toggle('bad',zero);}
+if(costWrap)costWrap.classList.toggle('bad',zero);
+cost.setAttribute('aria-invalid',zero?'true':'false');
+// Both entry gates own the same button, so neither may write it alone: the floor-step block would
+// re-enable a submit the 0% margin holds shut, and the next keystroke would re-disable it.
+if(btn)btn.disabled=zero||fsBlocked;
+return zero;
+}
+// The submit-time stop. Shakes the field like the ceiling gate does, but there is nothing to
+// acknowledge - only a page to leave and come back to once the margin setting is fixed.
+function zmBlocks(){
+var zero=zmRender();
+if(zero&&costWrap){costWrap.classList.remove('shake');void costWrap.offsetWidth;costWrap.classList.add('shake');}
+return zero;
+}
+var mvEl=document.getElementById('mvTotal');
+function mvSum(){if(!mvEl)return;
+// Per-type form: the element is the block's own whole-load figure, and the sum comes off the
+// rows rather than off #cost, so what is shown is the arithmetic of the numbers actually typed
+// and not a re-derivation from the blend.
+if(ptRows.length){var s=ptTotal();mvEl.textContent=s>0?'Rs '+nf.format(s):'';return;}
+var cv=cval(),u=parseInt(mvEl.getAttribute('data-units'),10);
+if(!(cv>0)||!(u>0)){mvEl.innerHTML='';return;}
+mvEl.innerHTML='Rs '+nf.format(cv)+' '+mvEl.getAttribute('data-per')+' across '+u+' '+mvEl.getAttribute('data-unit')+' is <b>Rs '+nf.format(cv*u)+'</b> for the whole load.';}
+function syncAll(){ptSync();var cv=cval();rows.forEach(function(r){syncRs(r,cv);});footer();}
+// Recomputes the ladder bullet via footer() (the one hook every price edit already calls),
+// fetching what /preview would build off the on-screen numbers. Debounced; stale responses
+// dropped by sequence number.
+var pvSeq=0,pvTimer=null;
+// Finds (or builds) the ladder bullet and its host list. Returns null when there is no host to
+// attach to, in which case the caller has nothing to render into.
+function pvEl(){var ul=document.querySelector('.bfacts');
+if(!ul){ul=document.createElement('ul');ul.className='bfacts';var f=document.getElementById('bfoot');if(f&&f.parentNode)f.parentNode.insertBefore(ul,f.nextSibling);else return null;}
+var el=document.getElementById('pvLadder');
+if(!el){el=document.createElement('li');el.id='pvLadder';ul.appendChild(el);}
+return el;}
+// THE SHORTFALL BLOCK. Server-composed copy, so the sentences have one home; this end only places
+// them, puts the corrective figure on the button, and wires the two levers the sentences name.
+var lwBox=document.getElementById('ladderWarn'),lwFact=document.getElementById('lwFact'),
+lwAct=document.getElementById('lwAction'),lwActs=document.getElementById('lwActs'),
+lwUse=document.getElementById('lwUse'),lwSpread=document.getElementById('lwSpread'),lwTarget=null;
+// Hidden on EVERY state that is not a shortfall, including the ones that return early: a stale amber
+// warning about a cost the desk has since cleared or replaced is worse than none.
+function lwHide(){if(lwBox)lwBox.hidden=true;lwTarget=null;}
+function lwRender(sh){if(!lwBox)return;
+if(!sh){lwHide();return;}
+lwFact.textContent=sh.fact;lwAct.textContent=sh.action||'';lwAct.hidden=!sh.action;
+lwTarget=(sh.costTarget!=null&&isFinite(sh.costTarget))?sh.costTarget:null;
+// No target means the only lever left is spreading the prices, and a button offering a number we do
+// not have would be an instruction to type nothing.
+if(lwUse){if(lwTarget==null){lwUse.hidden=true;}else{lwUse.hidden=false;lwUse.textContent='Use Rs '+nf.format(lwTarget);}}
+if(lwActs)lwActs.hidden=!sh.action;
+lwBox.hidden=false;}
+// Opening the rows is part of BOTH levers. The prices that will go out are listed in there, and a tap
+// that rewrote a row behind a closed expander would be a change to the desk's own numbers that the
+// desk never saw happen.
+function lwOpen(){var d=document.querySelector('details.band');if(d)d.open=true;}
+if(lwUse)lwUse.addEventListener('click',function(){
+var cv=cval();
+if(lwTarget==null||!rows.length||!(cv>0))return;
+var row=rows[rows.length-1],pctIn=row.querySelector('.mpct');
+// Through pctForRs, exactly as typing the figure into that row's own rupee box does - the margin
+// percent is what the form posts, so the price has to land back in percent space or the submit
+// carries a number the desk can see and the server never receives.
+pctIn.value=pctForRs(lwTarget,cv);
+markCustom();lwOpen();syncRs(row,cv);footer();});
+if(lwSpread)lwSpread.addEventListener('click',function(){
+lwOpen();
+var row=rows.length?rows[rows.length-1]:null,el=row?row.querySelector('.mrs'):null;
+if(el&&!el.disabled&&el.focus)el.focus();});
+// THE FLOOR-STEP BLOCK. Same server-composed copy and same two levers as the shortfall above, with
+// one difference that is the whole point of it: this one holds the submit shut, so every path that
+// hides it has to release the button through zmRender rather than writing btn.disabled itself.
+var fsBox=document.getElementById('floorStep'),fsFact=document.getElementById('fsFact'),
+fsAct=document.getElementById('fsAction'),fsActs=document.getElementById('fsActs'),
+fsUse=document.getElementById('fsUse'),fsSpread=document.getElementById('fsSpread'),
+fsTarget=null,fsRow=null;
+function fsRender(fs){if(!fsBox)return;
+if(!fs){fsBox.hidden=true;fsBlocked=false;fsTarget=null;fsRow=null;zmRender();return;}
+fsFact.textContent=fs.fact;fsAct.textContent=fs.action;
+fsTarget=(fs.priceTarget!=null&&isFinite(fs.priceTarget))?fs.priceTarget:null;
+fsRow=(fs.rowIndex!=null&&rows[fs.rowIndex])?fs.rowIndex:null;
+// The correction RAISES the price above the last one. A figure with no row to put it in is an
+// instruction the desk has to carry out by hand, so the button goes and the sentence stands alone.
+if(fsUse){if(fsTarget==null||fsRow==null){fsUse.hidden=true;}else{fsUse.hidden=false;fsUse.textContent='Use Rs '+nf.format(fsTarget);}}
+if(fsActs)fsActs.hidden=false;
+fsBox.hidden=false;fsBlocked=true;zmRender();}
+if(fsUse)fsUse.addEventListener('click',function(){
+var cv=cval();
+if(fsTarget==null||fsRow==null||!rows[fsRow]||!(cv>0))return;
+var row=rows[fsRow],pctIn=row.querySelector('.mpct');
+pctIn.value=pctForRs(fsTarget,cv);
+markCustom();lwOpen();syncRs(row,cv);footer();});
+if(fsSpread)fsSpread.addEventListener('click',function(){
+lwOpen();
+var row=(fsRow!=null&&rows[fsRow])?rows[fsRow]:(rows.length?rows[rows.length-1]:null),
+el=row?row.querySelector('.mrs'):null;
+if(el&&!el.disabled&&el.focus)el.focus();});
+// The submit-time stop. Nothing to acknowledge here either: the correction is a price on this page
+// and the block names it, so the only way past is to make the change.
+function fsBlocks(){
+if(!fsBlocked)return false;
+if(fsBox&&fsBox.scrollIntoView)fsBox.scrollIntoView({block:'center'});
+return true;
+}
+function previewLadder(){var cv=cval();
+if(pvTimer)clearTimeout(pvTimer);
+var li=document.getElementById('pvLadder');
+if(!(cv>0)){if(li)li.remove();lwHide();fsRender(null);return;}
+// Below the hard floor the server REFUSES this cost, so rendering the ladder line here
+// would promise an outcome the submit cannot deliver - a ladder for a number that never leaves the
+// building. Say what actually happens instead, skip the /preview call entirely, and bump pvSeq so
+// an already in-flight response cannot land on top of this line.
+// A per-type form is judged on its lowest rate, as the submit is; this only ever lowers cv into the
+// early return below.
+var fr=floorRate();if(HARDFLOOR>0&&fr>0&&fr<HARDFLOOR)cv=fr;
+if(HARDFLOOR>0&&cv<HARDFLOOR){pvSeq++;lwHide();fsRender(null);var e0=pvEl();
+if(e0)e0.innerHTML='No prices can go out at this rate: Rs '+nf.format(cv)+' is below the minimum for this load (Rs '+nf.format(HARDFLOOR)+'). Check for a missing digit and re-enter.';
+return;}
+pvTimer=setTimeout(function(){var seq=++pvSeq;
+// Untouched rows on a first capture arm the request's own band, minimum included, so the preview
+// must plan that band rather than rebuild one whose minimum is its lowest row.
+var ms=rowsGovern()?rows.map(function(r){return num(r.querySelector('.mpct').value);}).join(','):'';
+// The per-type rates ride along on a per-type form: every rung is scaled onto each type's own rate
+// before it is sent, and the customer's minimum gap applies to each of those amounts, so a preview
+// built on the blend alone would promise attempts the wire cannot make.
+var ct=ptRows.length?ptRows.map(function(r){return num(ptInput(r).value);}).join(','):'';
+fetch(location.pathname+'/preview?cost='+encodeURIComponent(cv)+(ms?('&m='+encodeURIComponent(ms)):'')+(ct?('&ct='+encodeURIComponent(ct)):'')).then(function(r){return r.ok?r.json():null;}).then(function(j){
+if(seq!==pvSeq||!j)return;
+if(!j.willNotBid&&(!j.ladder||!j.ladder.length))return;
+var el=pvEl();if(!el)return;
+// #113's voice scrub is authoritative on the per-tonne string - first person, never the machine
+// noun it banned. (Naming that noun even inside a comment trips the guard test, because the whole
+// inline script is served to the desk; this comment tripped it once already.) #116's string is
+// authoritative on the ceiling case, now split into its two real reasons.
+if(j.willNotBid==='per_tonne_ceiling'){lwHide();fsRender(null);el.innerHTML='No prices can go out on this load: it is priced per tonne AND the customer has set a price ceiling (Rs '+nf.format(j.ceiling)+'), and we cannot yet tell whether that ceiling is per tonne or for the whole load. Rather than guess, we will not bid it. Quote this one manually on SuperProcure.';return;}
+if(j.willNotBid==='unsupported_rule'){lwHide();fsRender(null);el.innerHTML="We don't bid loads priced this way yet. Quote it by hand on the portal.";return;}
+if(j.willNotBid==='platform_stack_unavailable'){lwHide();fsRender(null);el.textContent=j.notice;return;}
+if(j.willNotBid){lwHide();fsRender(null);var cvp=cval();
+el.innerHTML=(CEILING!=null&&CEILING<Math.round(cvp))
+?'No prices can go out: max bid on this load is Rs '+nf.format(j.ceiling)+', below your cost of Rs '+nf.format(Math.round(cvp))+'.'
+:'No prices can go out: max bid on this load is Rs '+nf.format(j.ceiling)+', below your lowest price.';
+return;}
+// THREE STATES, THREE PLACES. A SHORTFALL goes to the amber block above Submit and leaves this line
+// listing what will actually be sent - the count in that block and the prices on this line are then
+// the same story told once each, instead of a paragraph that tried to be both. A NOTICE (prices
+// moved, none lost) replaces the line, because the sentence names the prices itself. A CAVEAT is
+// appended UNDER whichever of the two rendered: it is a fact we are missing, not a changed plan, and
+// conflating it with a notice hid the price list on every keystroke for any load whose minimum gap is
+// not known. All three are composed on the server so the copy has one home, and all three are set as
+// text rather than markup because they are prose about the desk's own numbers.
+lwRender(j.shortfall);
+// Independent of the shortfall above and checked on every reply: a plan can send every price the
+// desk typed and still have its last step under the minimum, which is the case no count on this
+// page can see.
+fsRender(j.floorStep);
+// fittingPrices, never the ladder: a grid snap or a ceiling cap can re-open a gap the derivation
+// closed, and this line is a promise about the board.
+var send=(j.fittingPrices&&j.fittingPrices.length)?j.fittingPrices:j.ladder;
+if(j.notice){el.textContent=j.notice;}
+else{el.innerHTML=PVLEAD+' (<b>'+send.length+'</b>): '+send.map(function(x){return 'Rs '+nf.format(x);}).join(' → ')+'.';}
+if(j.caveat){var cv=document.createElement('div');cv.className='pvcaveat';cv.textContent=j.caveat;el.appendChild(cv);}
+}).catch(function(){});},350);}
+cost.addEventListener('input',syncAll);
+// Every per-type rate drives the same chain a single cost does: it re-blends #cost, then the band,
+// the ladder preview, the totals and the ceiling verdict all recompute from there. Same
+// reward-early/punish-late split as the cost field - input only ever clears the red state, change
+// and blur are what enter it.
+ptRows.forEach(function(row){var inp=ptInput(row);
+inp.addEventListener('input',syncAll);
+inp.addEventListener('change',function(){ceilRender();ceilCommit();});
+inp.addEventListener('blur',function(){ceilRender();ceilCommit();});});
+previewLadder();
+rows.forEach(function(row){var pctIn=row.querySelector('.mpct'),rs=row.querySelector('.mrs');
+pctIn.addEventListener('input',function(){markCustom();syncRs(row,cval(),pctIn);footer();});
+rs.addEventListener('input',function(){var cv=cval();if(cv>0){pctIn.value=pctForRs(num(rs.value),cv);markCustom();footer();}});});
+// "Reward early, punish late": syncAll (on input) only ever CLEARS the red state via ceilRelax.
+// The state is ENTERED on change/blur, so typing "15000" is never scolded at "1" or "150". No
+// debounce is involved - the verdict is arithmetic on values already in the DOM, so a timer would
+// buy nothing and still punish someone who paused mid-number.
+cost.addEventListener('change',function(){ceilRender();ceilCommit();});
+cost.addEventListener('blur',function(){ceilRender();ceilCommit();});
+rows.forEach(function(row){var p=row.querySelector('.mpct');if(p)p.addEventListener('change',function(){ceilRender();ceilCommit();});});
+(function(){
+var fixBtn=ceilEl('ceilFix'),saveBtn=ceilEl('ceilSave');
+// The button TYPES the buying price into the cost field. Deliberate and labelled - the number is
+// on the button's own face, so the desk is agreeing to a figure it can read before it lands.
+// That is the difference from a silent auto-fill: the machine proposes, the desk commits.
+// It stays a claim the desk owns, which matters because price.cost is what the audit trail and
+// the WhatsApp receipt record as what the truck cost BRL.
+if(fixBtn)fixBtn.addEventListener('click',function(){var t=ceilCostTarget();if(t!=null)useCostTarget(t);});
+if(saveBtn)saveBtn.addEventListener('click',function(){
+askConfirm('Nothing will be bid',ceilOverrideMsg(),'Save anyway',function(){
+ceilAckd=true;
+if(mainForm.requestSubmit)mainForm.requestSubmit();else mainForm.submit();});});
+})();
+function useCostTarget(t){
+// On a per-type form there is no single box to type into, so every rate is scaled by the SAME
+// factor that brings the blend to the target. Scaling keeps the relative pricing the desk chose -
+// re-typing one number would silently re-blend the load - and it FLOORS, because rounding up puts
+// the blend back over the cap this button exists to get under.
+if(ptRows.length){var fit=ceilFixRates(t);if(!fit)return;
+ptRows.forEach(function(row,i){ptInput(row).value=String(fit[i]);});}
+else cost.value=String(t);
+// Re-run the whole chain the way a real keystroke would, so the band, the ladder preview and the
+// footer all move together - then re-judge. The block goes from red to the neutral amber note by
+// itself, because the verdict is recomputed from the new value rather than assumed.
+syncAll();
+ceilRender();ceilCommit();
+focusCost();}
+// A cost or rows typed from a refusal's link are the desk's to submit once. A later reload must show
+// what is on record, not the link's figures.
+function clearPrefillFromUrl(){if(typeof history==='undefined'||!history.replaceState)return;var q=new URLSearchParams(location.search),keys=[];
+q.forEach(function(v,k){keys.push(k);});
+var gone=keys.filter(function(k){return k==='cost'||k==='below_min_ack'||/^cost_type_\\d+$/.test(k)||/^m_\\d+$/.test(k);});
+if(!gone.length)return;gone.forEach(function(k){q.delete(k);});var s=q.toString();
+history.replaceState(null,'',location.pathname+(s?'?'+s:'')+location.hash);}
+clearPrefillFromUrl();
+// The link's acknowledgement is for a no-script submit. With script the page's own confirmation
+// takes over from it, so it is adopted for the rows as opened and the hidden copy is not posted.
+function adoptPrefillAck(){var pa=document.getElementById('prefillAck');if(!pa)return;pa.disabled=true;if(belowMin())minAckdAt=lowestRow();}
+adoptPrefillAck();
+syncAll();
+
+// --- in-app confirm dialog (replaces the blocking browser confirm) ---
+// Focus starts on the confirm button, Tab cycles between the two actions only, Escape and a
+// click on the backdrop both cancel, and focus returns to whatever was active before.
+var maskEl=null;
+function askConfirm(title,msg,okLabel,onOk){
+if(maskEl)return;
+var prevFocus=document.activeElement;
+var m=document.createElement('div');m.className='mask';
+var d=document.createElement('div');d.className='mdl';
+// alertdialog + describedby, not dialog + label: focus opens on the confirm button, so a screen
+// reader reads the dialog name and that button and stops. Without describedby the message is
+// skipped - and here the message carries the rupee amount being questioned, so the desk would be
+// asked to confirm a number it was never told.
+d.setAttribute('role','alertdialog');d.setAttribute('aria-modal','true');
+var h=document.createElement('h2');
+var ic=document.createElement('span');ic.innerHTML=${jsonForScript(ICON_ALERT)};h.appendChild(ic.firstChild);
+var ht=document.createElement('span');ht.id='cfmTitle';ht.textContent=title;h.appendChild(ht);d.appendChild(h);
+var p=document.createElement('p');p.id='cfmBody';p.textContent=msg;d.appendChild(p);
+d.setAttribute('aria-labelledby','cfmTitle');d.setAttribute('aria-describedby','cfmBody');
+var acts=document.createElement('div');acts.className='acts';
+var no=document.createElement('button');no.type='button';no.className='no';no.textContent='Go back';
+var yes=document.createElement('button');yes.type='button';yes.className='yes';yes.textContent=okLabel;
+acts.appendChild(no);acts.appendChild(yes);d.appendChild(acts);m.appendChild(d);
+document.body.appendChild(m);maskEl=m;
+requestAnimationFrame(function(){m.classList.add('show');});
+function close(){
+document.removeEventListener('keydown',onKey);
+m.classList.remove('show');
+setTimeout(function(){if(m.parentNode)m.remove();if(maskEl===m)maskEl=null;if(prevFocus&&prevFocus.focus)prevFocus.focus();},150);
+}
+function onKey(ev){
+if(ev.key==='Escape'){ev.preventDefault();close();return;}
+if(ev.key!=='Tab')return;
+ev.preventDefault();
+(document.activeElement===yes?no:yes).focus();
+}
+document.addEventListener('keydown',onKey);
+no.addEventListener('click',close);
+m.addEventListener('mousedown',function(ev){if(ev.target===m)close();});
+yes.addEventListener('click',function(){close();onOk();});
+yes.focus();
+}
+
+// --- timed-dismiss popup (replaces reloading the page to show a banner) ---
+var toastEl=null,toastTimer=null;
+// sticky = do not auto-dismiss. Used for a BLOCKING refusal: the desk has to read a number off it
+// and retype the cost, which 3.5 seconds does not cover - the message would vanish mid-correction
+// and take the minimum with it. The close button still dismisses it.
+function showToast(msg,isErr,sticky,action){
+if(toastEl){toastEl.remove();toastEl=null;}
+if(toastTimer)clearTimeout(toastTimer);
+var t=document.createElement('div');
+t.className='toast'+(isErr?' err':'');
+// Announce it. The page already uses this pattern a few elements up (#closewarn is role="status"
+// aria-live="polite"); an error that BLOCKS the submit is escalated to assertive so a screen reader
+// interrupts instead of queueing it behind whatever it is currently reading.
+t.setAttribute('role',isErr?'alert':'status');
+t.setAttribute('aria-live',isErr?'assertive':'polite');
+var icon=document.createElement('span');icon.innerHTML=isErr?${jsonForScript(ICON_ALERT)}:${jsonForScript(ICON_CHECK)};
+t.appendChild(icon.firstChild);
+var tx=document.createElement('span');tx.className='tx';tx.textContent=msg;t.appendChild(tx);
+if(action){var ab=document.createElement('button');ab.type='button';ab.className='ta';ab.textContent=action.label;
+ab.addEventListener('click',function(){dismiss();action.run();});t.appendChild(ab);}
+var tc=document.createElement('button');tc.type='button';tc.className='tc';tc.setAttribute('aria-label','Dismiss');tc.textContent='\\u00d7';
+t.appendChild(tc);
+document.body.appendChild(t);
+toastEl=t;
+requestAnimationFrame(function(){t.classList.add('show');});
+function dismiss(){t.classList.remove('show');setTimeout(function(){if(t.parentNode)t.remove();if(toastEl===t)toastEl=null;},200);}
+tc.addEventListener('click',dismiss);
+if(!sticky)toastTimer=setTimeout(dismiss,3500);
+}
+
+// A ceiling refusal carries the corrective cost, and the toast that shows it gets the same one-tap
+// "Use Rs X" the note has, since the note itself can read "fits" when only the server refused.
+function ceilToastAction(d){var t=d&&d.code==='CEILING_DEAD'?Number(d.costTarget):NaN;
+if(!(t>0))return null;return {label:'Use Rs '+nf.format(t),run:function(){useCostTarget(t);}};}
+
+// --- AJAX re-price/revert submit (reprice only; the one-time capture form below keeps its
+// normal navigation to the "Cost saved" page - it only ever happens once, a dead end is fine
+// there. Re-pricing is repeatable, so staying on the SAME form with a popup confirmation - no
+// reload, no back-button weirdness - is the point). ---
+if(REPRICE&&mainForm){
+var origCost=cost.value,origMargins=rows.map(function(row){return row.querySelector('.mpct').value;});
+function applyUpdated(updated){
+if(updated.price&&updated.price.cost!=null)cost.value=updated.price.cost;
+// transit-days recovery landed -> the field becomes the fixed (sticky) display, same as a
+// fresh page render would show it; it is never posted again.
+var tin2=document.getElementById('transit_days');
+if(tin2&&updated.price&&updated.price.transitDays!=null){tin2.value=updated.price.transitDays;tin2.disabled=true;tin2.removeAttribute('required');}
+var marginsPct=updated.marginsPct||[];
+rows.forEach(function(row,i){if(marginsPct[i]!=null)row.querySelector('.mpct').value=marginsPct[i];});
+var rsNow=mainForm.querySelector('input[name=rows_shown]');if(rsNow&&marginsPct.length)rsNow.value=marginsPct.join(',');
+if(over)over.value='';
+if(src){
+var ms2=updated.marginSource||'default';
+src.textContent=ms2==='bid'?'custom for this load':(String(ms2).indexOf('customer:')===0?'this customer\\u2019s margins':'default margins');
+src.className='bsrc'+(ms2==='default'?' hide':'')+(ms2==='bid'?' custom':'');
+}
+if(revertForm)revertForm.style.display=(updated.marginSource==='bid')?'':'none';
+syncAll();
+origCost=cost.value;origMargins=rows.map(function(row){return row.querySelector('.mpct').value;});
+}
+// CW-225. The panel markup is built SERVER-side and handed over whole - it is money copy and it
+// exists in exactly one place. Everything else here is the rest of the page catching up: on this
+// route the re-price posts over fetch, so the block promising "saving updates the prices below right
+// away" and the heading promising "bids will go out" are both already drawn when the hold arrives.
+// The prices stay visible - the desk still needs to see what it saved - only the tense changes.
+function showHold(html,warning){
+var slot=document.getElementById('holdSlot');if(slot)slot.innerHTML=html;
+// The portal warning is not in the panel any more - it sits on the struck ladder box it is about -
+// so the AJAX path has to place it there too, or a hold that arrived without a reload would lose
+// the one sentence that cost 2 of 3 revision attempts when it was missing.
+var ds=document.getElementById('dontSlot');if(ds&&warning)ds.innerHTML=warning;
+var w=document.getElementById('warnSlot');if(w)w.style.display='none';
+var f=document.querySelector('.flash.ok-flash');if(f)f.style.display='none';
+var c=document.querySelector('.card');if(c)c.classList.add('heldpage');
+var bh=document.getElementById('bandHead');if(bh)bh.textContent='On hold - not being sent';
+if(brange)brange.classList.add('dead');
+var cut=document.querySelector('.cutoff');if(cut)cut.style.display='none';
+var lbl=document.querySelector('label[for=cost]');
+if(lbl&&!lbl.querySelector('.onrec')){var p=document.createElement('span');p.className='onrec';p.textContent='On record';lbl.appendChild(p);}
+if(slot)slot.scrollIntoView({block:'start',behavior:'smooth'});
+}
+// CW-225 resume. DELEGATED, because the panel is replaced wholesale by showHold and a listener bound
+// to the button would be thrown away with the markup it was bound to.
+//
+// The first two branches are presentation: the confirm REPLACES the expanded body rather than opening
+// under it, so the second tap never grows the panel and "Keep on hold" goes straight back. The third
+// is the money one, and it decides nothing - it posts and lets the server restore the plan. On success
+// it RELOADS rather than patching this page: resume ends the held state, and the page that follows is
+// the ordinary bidding page the server renders from the durable record, not a held page with pieces
+// removed by hand.
+document.addEventListener('click',function(ev){
+var t=ev.target&&ev.target.closest?ev.target.closest('#askResume,#cancelResume,#doResume'):null;
+if(!t)return;
+ev.preventDefault();
+var hs=document.getElementById('holdState'),cs=document.getElementById('confirmState');
+if(t.id==='askResume'){if(hs)hs.hidden=true;if(cs)cs.hidden=false;return;}
+if(t.id==='cancelResume'){if(cs)cs.hidden=true;if(hs)hs.hidden=false;return;}
+var label=t.textContent;
+var fail=function(msg){t.disabled=false;t.textContent=label;showToast(msg,true,true);};
+t.disabled=true;t.textContent='Resuming...';
+fetch(location.pathname.replace(/\\/+$/,'')+'/resume',{method:'POST',headers:{'content-type':'application/json'},body:'{}'})
+.then(function(res){return res.json().catch(function(){return null;}).then(function(data){return{ok:res.ok,data:data};});})
+.then(function(r){
+if(r.ok&&r.data&&r.data.ok===true&&!r.data.held){location.reload();return;}
+// Still held after a resume means the server re-judged the restored plan and refused to confirm
+// bidding. Draw the panel it sent back rather than composing a verdict here.
+var held=r.data&&r.data.held;
+if(held&&held.panel){t.disabled=false;t.textContent=label;showHold(held.panel,held.portalWarning);return;}
+fail((r.data&&r.data.error)||'Could not resume - please reload and try again.');
+})
+.catch(function(){fail('Could not resume - please reload and try again.');});
+});
+function submitJson(body,btnEl,isRevert){
+var restoreLabel=isRevert?'Revert to standard margins':'Re-price';
+if(btnEl){btnEl.disabled=true;btnEl.textContent='Saving...';}
+var started=Date.now();
+fetch(location.pathname,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)})
+.then(function(res){return res.json().catch(function(){return null;}).then(function(data){return{ok:res.ok,data:data};});})
+.then(function(r){
+var elapsed=Date.now()-started,minDelay=350;
+var finish=function(){
+if(btnEl){btnEl.disabled=false;btnEl.textContent=restoreLabel;}
+// The page's own copy of the customer minimum can be missing or stale; the server's figures win.
+var bm=r.data&&r.data.code==='BELOW_MINIMUM'&&r.data.belowMinimum;
+if(bm&&!body.below_min_ack){belowMinAsk(bm.marginPct,bm.customerMinPct,function(){body.below_min_ack='1';submitJson(body,btnEl,isRevert);});return;}
+if(!r.ok||!r.data||r.data.ok!==true){var fix=ceilToastAction(r.data);showToast((r.data&&r.data.error)||'Could not save - please try again.',true,!!fix,fix);return;}
+applyUpdated(r.data.request);
+// HELD IS ANSWERED FIRST, and with the panel rather than a toast. A revert to the inherited band is
+// one of the two ways to land here - it RAISES the floor on a load whose band the desk had lowered,
+// with nobody typing a number - so anything answering ahead of this would confirm a save that will
+// never bid.
+var held=r.data&&r.data.held;
+if(held&&held.panel){showHold(held.panel,held.portalWarning);return;}
+// Otherwise the SERVER's verdict, never one composed here. It is the only place that knows whether
+// this save is ceiling-dead, and it words the toast, the full-page confirmation and both console
+// routes identically. Composing a message here is what let a revert on a held load - which returned
+// before the check even ran - be confirmed as bidding.
+showToast(r.data.savedMsg||'Saved.',!!r.data.savedIsError,!!r.data.savedSticky);
+};
+if(elapsed<minDelay)setTimeout(finish,minDelay-elapsed);else finish();
+})
+.catch(function(){
+if(btnEl){btnEl.disabled=false;btnEl.textContent=restoreLabel;}
+showToast('Network error - please retry.',true);
+});
+}
+mainForm.addEventListener('submit',function(e){
+e.preventDefault();
+if(!hardFloorOk())return;
+if(zmBlocks())return;           // HARD: no ack, no dialog - nothing here submits at 0% margin.
+if(fsBlocks())return;           // HARD: the last price may not go out - correct it here.
+if(ceilingBlocks())return;      // STOP at the field. No modal, no post-submit message.
+belowMinConfirm(function(){lowCostConfirm(function(){
+var body={cost:cost.value};
+rows.forEach(function(row,i){body['m_'+i]=row.querySelector('.mpct').value;});
+// The rows this page showed: the server compares the posted rows with them, not with the stored band.
+var rsIn=mainForm.querySelector('input[name=rows_shown]');if(rsIn&&rsIn.value)body.rows_shown=rsIn.value;
+if(belowMinAcked())body.below_min_ack='1';
+// Per-truck-type rates on a re-price. The blended cost above rides along for the band preview's
+// own bookkeeping, but the server recomputes the blend from THESE and arms off its own figure.
+ptRows.forEach(function(row,i){var inp=ptInput(row);if(inp&&!inp.disabled)body['cost_type_'+i]=inp.value;});
+// Editable truck count rides the JSON body on a re-price (disabled/PMT input never posts).
+if(countInput&&!countInput.disabled)body.vehicle_count=countInput.value;
+if(cval()>0&&cval()<MINCOST)body.low_cost_ack='1';
+// Stamped only when the desk deliberately used "Save anyway" in the red block. Not derived from
+// ceilDead() any more: that stamped the ack on every dead save, which meant a submit that merely
+// got past the modal carried the override. The server re-derives the verdict and refuses without
+// this field, so a stale or absent flag can only ever fail closed.
+if(ceilAckd)body.ceiling_ack='1';
+// transit-days recovery only: the field is editable on a re-price form solely when this
+// transit-required load has no days on record (set-once server-side); a fixed (disabled)
+// display is never posted - transit time is sticky per load on SuperProcure.
+var tin=document.getElementById('transit_days');
+if(tin&&!tin.disabled)body.transit_days=tin.value;
+submitJson(body,btn,false);
+});});
+});
+if(revertForm){
+revertForm.addEventListener('submit',function(e){
+e.preventDefault();
+submitJson({revert_override:'1'},revertForm.querySelector('button'),true);
+});
+}
+}else if(mainForm){
+mainForm.addEventListener('submit',function(e){
+if(!hardFloorOk()){e.preventDefault();return;}
+if(zmBlocks()){e.preventDefault();return;}  // HARD: no ack, no dialog.
+if(fsBlocks()){e.preventDefault();return;}  // HARD: the last price may not go out.
+function go(){
+if(inLowCostBand()){var h=document.createElement('input');h.type='hidden';h.name='low_cost_ack';h.value='1';mainForm.appendChild(h);}
+// Stamped only on a deliberate "Save anyway", never merely because the load is dead.
+if(ceilAckd){var hc=document.createElement('input');hc.type='hidden';hc.name='ceiling_ack';hc.value='1';mainForm.appendChild(hc);}
+if(belowMinAcked()){var hm=document.createElement('input');hm.type='hidden';hm.name='below_min_ack';hm.value='1';mainForm.appendChild(hm);}
+if(btn){btn.disabled=true;btn.textContent='Saving...';}
+}
+// This form posts natively. The confirmation is asynchronous, so the low-band case has to
+// stop this submit and re-issue it on OK - form.submit() does not re-fire this listener,
+// so go() stamps the ack and disables the button itself rather than recursing.
+// Ceiling first, then the low-cost band. A load that cannot be bid at all is a different and
+// more decisive fact than a suspiciously low number, and keeping them ordered keeps both gates
+// rather than letting whichever fires first swallow the other.
+//
+// The ceiling now STOPS rather than asking. The desk fixes it at the field (or takes the explicit
+// "Save anyway" in the red block, which sets ceilAckd and re-submits through here).
+if(ceilingBlocks()){e.preventDefault();return;}
+if(belowMin()&&!belowMinAcked()){
+e.preventDefault();
+belowMinConfirm(function(){lowCostConfirm(function(){go();mainForm.submit();});});
+return;
+}
+if(inLowCostBand()){
+e.preventDefault();
+lowCostConfirm(function(){go();mainForm.submit();});
+return;
+}
+go();
+});
+}
+})();</script>`}
+<p class="lock">${ICON_LOCK}<span>This link is unique to you. Please don't share it.</span></p>
+${adminBlock}
+<script>(function(){
+var REPRICE=${reprice ? 'true' : 'false'},openStatus=REPRICE?'armed':'awaiting_price';
+// Every user-facing string is handed over as JSON, never hand-quoted into a literal here.
+// Hand-quoting is what broke this script: a backslash-escaped apostrophe inside a Node template
+// literal has its backslash consumed at render time, so the browser received a bare apostrophe
+// that closed the string early - SyntaxError, and the whole guard (countdown, cutoff lock,
+// /state poll) silently stopped running for four days. JSON.stringify cannot get that wrong.
+// scripts/test-price-page-js.js enforces both halves: the emitted JS must parse, and this file
+// must contain no backslash-escaped apostrophes at all.
+var MSG=${jsonForScript({
+  armed: "A teammate already entered a cost for this load - it's already covered. Nothing more to do here.",
+  closed: 'This auction has ended.',
+  skipped_no_price: 'The pricing cutoff passed before a cost was entered.',
+  dismissed: 'An operator declined this load.',
+  stopped: 'An operator paused bidding on this load.',
+  stopped_held: 'This load is not being bid. It was not stopped by an operator.',
+  held: 'This load was put on hold on another screen. It is not being bid.',
+  _repriced: "This load's status has changed.",
+  _default: 'This price request is no longer open.',
+})};
+var CW_TEXT=${jsonForScript({
+  amberCapture: 'Closing soon - enter your cost now to leave time to place it.',
+  redCapture: 'Very close to close - a cost now is best-effort. It is recorded and armed, but may not reach the platform in time.',
+  amberReprice: 'Closing soon - re-price now to leave time to re-place.',
+  redReprice: 'Very close to close - a re-price now is best-effort. It is saved and armed, but may not reach the platform in time.',
+})};
+// CW-225. The countdown, the lock and the panel live in DIFFERENT script blocks on this page, so
+// the held state is carried on the CARD rather than in a variable neither block can see. The AJAX
+// submit sets that class the moment a hold comes back, which is what lets this block flip without a
+// reload.
+var heldCard=document.querySelector('.card');
+function isHeld(){return !!(heldCard&&heldCard.classList&&heldCard.classList.contains('heldpage'));}
+// The close, formatted SERVER-side in the portal's own timezone. Formatting it here would render
+// this page's one remaining time in whatever zone the phone happens to be set to.
+var CLOSE_LABEL=${jsonForScript(fmtClock(effectiveCloseAt(r.load || {})) || '')};
+// The panel after the auction ends. Every string comes off the panel's own data- attributes, so the
+// closed wording has one author (holdCopy) and this cannot drift from it. It claims nothing about
+// the outcome, because at this surface there is none to claim.
+function holdClosed(){
+var pn=document.getElementById('holdPanel');if(!pn)return;
+var set=function(id,attr){var el=document.getElementById(id),v=pn.getAttribute(attr);if(el&&v)el.textContent=v;};
+set('hPill','data-c-pill');set('hAct','data-c-act');
+// The way out goes with the tense. Resume puts a cost back on a live ladder, and there is no live
+// ladder past the close - the server refuses it there, so leaving the button up would offer the desk
+// an action that can only come back as an error.
+var ra=document.getElementById('hResumeActs');if(ra)ra.hidden=true;
+var cf=document.getElementById('confirmState');if(cf)cf.hidden=true;
+var hs=document.getElementById('holdState');if(hs)hs.hidden=false;
+}
+var stateUrl=location.pathname.replace(/\\/+$/,'')+'/state';
+var cd=document.getElementById('cd'),cw=document.getElementById('closewarn'),mainForm=document.getElementById('mainForm'),btn=mainForm&&mainForm.querySelector('button'),input=document.getElementById('cost');
+var lp=document.getElementById('livepos');
+var closesAt=Number(cd&&cd.getAttribute('data-closes'))||0,deadlineAt=Number(cd&&cd.getAttribute('data-deadline'))||0;
+// LEAD: how long BEFORE the danger zone (deadlineAt) to start showing the amber "closing soon" cue.
+// Display only - nothing here gates submission; the only wall is the real close (closesAt), enforced
+// server-side (capture()/setBidOverride() refuse only past close). Past deadlineAt the banner goes
+// red ("best-effort, may not land") but the form stays open right to the close.
+var offset=0,locked=false,gone=false,LEAD=120000;
+// The button's own copy, captured before anything can overwrite it, so a form reopened by a later
+// close comes back with the label it shipped with rather than a second hardcoded string.
+var btnLabel=btn?btn.textContent:'';
+function now(){return Date.now()+offset;}
+function clearCloseWarn(){if(cw){cw.className='closewarn';cw.textContent='';}}
+function lock(msg){if(locked)return;locked=true;if(input)input.disabled=true;if(btn){btn.disabled=true;btn.textContent='Auction closed';}if(cd){cd.classList.remove('soon');cd.textContent=isHeld()?('Auction closed'+(CLOSE_LABEL?(' at '+CLOSE_LABEL):'')+'.'):msg;}
+// The panel goes past tense with the page, so nothing on screen is left promising in the present
+// after the auction it describes has ended. The Adjust affordance and the revert link go with it -
+// there is nothing left to adjust, and both would open onto dead inputs.
+if(isHeld()){holdClosed();var bh=document.getElementById('bandHead');if(bh)bh.textContent='Never sent - this load was on hold';var rf=document.getElementById('revertForm');if(rf)rf.style.display='none';var adj=document.querySelector('.band .badj');if(adj)adj.style.display='none';}
+clearCloseWarn();}
+// A close can move FORWARD while this page is open (priceRequests.effectiveCloseAt): a portal whose
+// posted close is provisional extends the auction, and /state then serves a later wall. Without this
+// the lock is permanent and the desk loses the only surface it can price a still-running load from -
+// the very load this whole mechanism exists for. It does NOT weaken the lock: the only thing that
+// reopens the form is the server publishing a strictly LATER close, which it does only for a live
+// auction, so a load that has genuinely ended locks and stays locked.
+function reopen(){if(!locked)return;locked=false;if(input)input.disabled=false;if(btn){btn.disabled=false;btn.textContent=btnLabel;}tick();}
+function handled(status,held){
+if(gone)return;gone=true;
+var msg=(status==='armed'&&!REPRICE)?MSG.armed:((status==='stopped'&&held)?MSG.stopped_held:(MSG[status]||(REPRICE?MSG._repriced:MSG._default)));
+if(input)input.disabled=true;if(btn){btn.disabled=true;btn.textContent='No longer open';}
+var b=document.createElement('div');b.className='flash';b.innerHTML='<b>'+msg+'</b><br>Opening the latest status...';
+var card=document.querySelector('.card');if(card)card.insertBefore(b,card.firstChild);
+setTimeout(function(){location.reload();},2500);
+}
+function tick(){
+if(gone||!cd)return;
+// The number that GOVERNS is the real close. deadlineAt is no longer a wall - a late cost/re-price
+// is accepted best-effort right up to closesAt (the engine snipes the floor into whatever window is
+// left) - so count down to closesAt and lock only when the AUCTION actually closes. Past deadlineAt
+// (the lead before close) the form STAYS OPEN but the banner goes red: submitting now is best-effort
+// and may not reach the platform in time. closesAt is the wall; deadlineAt is the danger line. Fall
+// back to deadlineAt as the wall only if a snapshot carries no closesAt.
+var wall=closesAt||deadlineAt;
+if(wall&&(wall-now())<=0){lock(REPRICE?'Auction closed - bidding on this load has finished.':'Auction closed - this load can no longer be priced.');return;}
+if(!wall){cd.style.display='none';return;}
+var m=wall-now();if(m<=0){cd.textContent='Auction closed';return;}
+var s=Math.floor(m/1000),h=Math.floor(s/3600),n=Math.floor((s%3600)/60),x=s%60;
+var danger=deadlineAt&&now()>=deadlineAt,soon=!danger&&deadlineAt&&(deadlineAt-now())<=LEAD;
+var left=(h?h+'h ':'')+((h||n)?n+'m ':'')+x+'s';
+// A held load's clock is information, not urgency: there is no bid coming that could be late. The
+// countdown stays - a reversal would need it, and a page that stops telling the desk when the load
+// closes has been given less - but it drops the amber and says plainly that we are not bidding it.
+if(isHeld()){cd.textContent='Auction closes in '+left+'. We are not bidding it.';cd.classList.remove('soon');clearCloseWarn();setTimeout(tick,1000);return;}
+cd.textContent=(danger?'Closing now - ':(soon?'Closing soon - ':''))+left+' to close';
+if(danger||soon)cd.classList.add('soon');else cd.classList.remove('soon');
+if(cw){
+if(danger){cw.className='closewarn red';cw.textContent=REPRICE?CW_TEXT.redReprice:CW_TEXT.redCapture;}
+else if(soon){cw.className='closewarn amber';cw.textContent=REPRICE?CW_TEXT.amberReprice:CW_TEXT.amberCapture;}
+else{cw.className='closewarn';cw.textContent='';}
+}
+setTimeout(tick,1000);
+}
+// The live position, on the page the bid bubble's link promises it on. Rank ALONE, never a dash
+// and never a placeholder: before the first rank arrives there is no position to report, and an
+// empty slot says that honestly where "-" reads as a value. Plain words, because the reader is the
+// desk - "1 of 6" beats "L1", and the bid we last sent is the other half of the same sentence.
+function rs(n){try{return Number(n).toLocaleString('en-IN');}catch(e){return String(n);}}
+function renderPos(s){
+if(!lp)return;
+var rank=(s&&s.myRank!=null)?Number(s.myRank):null;
+var price=(s&&s.lastBidPrice!=null)?Number(s.lastBidPrice):null;
+if(rank==null&&price==null){lp.className='livepos';lp.textContent='';return;}
+var parts=[];
+if(rank!=null)parts.push(rank===1?'We are the lowest bid right now':('We are at number '+rank+' right now'));
+if(price!=null)parts.push('our last bid was Rs '+rs(price));
+lp.className='livepos on';
+lp.textContent=parts.join(' - ')+'.';
+}
+function poll(){
+fetch(stateUrl).then(function(r){if(!r.ok)throw new Error('bad');return r.json();}).then(function(s){
+offset=(s.serverTime||Date.now())-Date.now();
+if(s.closesAt){var moved=s.closesAt>closesAt;closesAt=s.closesAt;if(moved)reopen();}
+if(s.deadlineAt)deadlineAt=s.deadlineAt;
+renderPos(s);
+if(s.status&&s.status!==openStatus)handled(s.status,s.heldReason);
+else if(REPRICE&&s.onHold&&!isHeld())handled('held');
+}).catch(function(){}).then(function(){if(!gone)setTimeout(poll,4000);});
+}
+tick();poll();
+})();</script>`, isHeld ? 'heldpage' : '');
+}
+function renderCaptured(r, ladder) {
+  const open = ladder ? ladder[0] : null, floor = ladder ? ladder[ladder.length - 1] : null;
+  const L = r.load || {};
+  // Danger zone: the cost landed inside the lead before close (past deadlineAt, still before the real
+  // close - a later one would have been refused). It IS recorded and armed, but there may not be
+  // enough runway for the bot to place it, so say that honestly instead of a flat "bidding will start".
+  const danger = !!(r.deadlineAt && Date.now() >= r.deadlineAt && (!L.closesAt || Date.now() < L.closesAt));
+  // A cost saved through the ceiling override arms nothing. Saying "bidding will start
+  // automatically" on that page is the same lie as the re-price flash, one screen further on.
+  const stack = stackForRequest(r);
+  const deadPlan = ceilingDeadPlan(stack && stack.engine, L,
+    r.price && r.price.cost, { marginsPct: r.marginsPct, minMarginPct: r.minMarginPct });
+  // THE CONFIRMATION MUST ECHO WHAT WAS TYPED (CW-213). `r.price.cost` is the truck-weighted mean the
+  // ladder is built from, and confirming it as "Cost" told a desk that had just entered 45,000 and
+  // 28,000 that their saved cost was 39,333 - a number they never typed, below both they did, on the
+  // page whose entire job is to confirm the entry. The WhatsApp receipt states each entered rate; this
+  // is the same claim on the surface the desk sees first, so it states it the same way.
+  //
+  // Gated on the SAME capability the arming path gates on (armFromRequest, priceRequests.js), never on
+  // the stored vector alone: capture records costByType for any multi-type load, but a platform that
+  // cannot bid per line is armed at the blend - and a card promising per-type prices on a load bid at
+  // one rate is the original defect with a confident page in front of it.
+  const perTypeBiddable = !(stack && stack.engine && stack.engine.caps
+    && stack.engine.caps.multiCargoBidSupported === false);
+  const byType = (perTypeBiddable && r.price && r.price.costByType
+    && Array.isArray(r.price.costByType.types) && r.price.costByType.types.length > 1)
+    ? r.price.costByType.types : null;
+  const base = byType ? Number(r.price.cost) : null;
+  // Length-checked, not just non-null: an empty ladder is truthy, and printed "Rs undefined" before.
+  const showRungs = !!(ladder && ladder.length);
+  // THE ARITHMETIC THE WIRE ACTUALLY USES, not a percentage of it (gocometAdapter.js:486-490). The
+  // rung is re-applied per line as a multiplier over that type's OWN cost, and the floor is
+  // max(own cost, scaled band floor) - the max is load-bearing, not decoration: on a zero-floor
+  // customer the scaled figure lands BELOW the rate the desk typed, so a card that scaled a
+  // percentage would promise to bid under their own cost. These are the only figures on this page
+  // the desk can check against what they entered.
+  const perLine = (t) => ({
+    open: Math.round(open * t.cost / base),
+    floor: Math.max(t.cost, Math.round(floor * t.cost / base)),
+  });
+  // Suppressed on a ceiling-dead plan: that card's whole point is that NOTHING will be bid, so an
+  // "opens at" beside it would contradict the sentence above it.
+  const rateList = !byType ? '' : `<ul class="rates">${byType.map((t) => {
+    const p = (showRungs && !deadPlan && base > 0) ? perLine(t) : null;
+    return `<li><b>Rs ${esc(rsFmt(t.cost))}</b> per truck, ${esc(t.label)} &times; ${esc(t.count)}`
+      + (p ? ` - opens at <b>Rs ${esc(rsFmt(p.open))}</b>, never below Rs ${esc(rsFmt(p.floor))}` : '')
+      + '</li>';
+  }).join('')}</ul>`;
+  // "Your rates" plural, and NO rupee total: the desk entered N numbers and the load has no single
+  // cost, so naming one here would re-create the defect in a different sentence.
+  const costPhrase = byType ? `Your rates for load ${esc(r.loadId)}` : `Cost <b>Rs ${esc(r.price.cost)}</b> for load ${esc(r.loadId)}`;
+  const wasWere = byType ? 'are' : 'is';
+  // Blended-space rungs are suppressed on the per-type path - no truck is quoted at either of them,
+  // and each rate line above already carries its own pair. The single-rate wording is untouched.
+  const contract = (!showRungs || byType) ? ''
+    : `<p class="note">It will open at <b>Rs ${esc(open)}</b> and never bid below <b>Rs ${esc(floor)}</b>.</p>`;
+  // "Rates saved", plural, on the per-type path: "Cost saved" names a single cost this load does not
+  // have, and reads to a Director skimming the screen as a saving achieved rather than a cost stored.
+  const noun = byType ? 'Rates' : 'Cost';
+  const heading = deadPlan ? `${noun} saved - nothing will be bid` : danger ? `${noun} recorded - armed` : `${noun} saved`;
+  // Only ONE of these two figures is safe on a per-type load. The ceiling is the customer's published
+  // cap off the load's own rules (planPreview), true whatever the load was priced with.
+  // `deadPlan.floor` is buildBandLadder's operating floor over the BLEND (pricing.js:113-115), while
+  // the wire holds each line at max(own rate, scaled floor) (gocometAdapter.js:487-490) - a different
+  // number per type and none of them this one, so the per-type branch does not name it.
+  //
+  // AND IT MUST NOT COMPARE THE CAP TO THE RATES EITHER, which is the subtler trap: the refusal is
+  // decided on the blended ladder (capAt < plan.floor), a whole-load fact, but the rates printed
+  // directly below this sentence are per line, and a cheap line's floor can sit UNDER the cap while
+  // the load is still refused - 40,000 scales to 42,000 against an 80,000 cap on the 1,00,000 +
+  // 40,000 fixture. So the per-type wording stays at load level; a per-line comparative would be
+  // false about a number on the same screen. Both branches say what the figure IS rather than
+  // labelling it, because a labelled one is what the desk could not place.
+  const deadWhy = !deadPlan ? '' : (byType
+    ? `Nothing will be bid - max bid on this load is Rs ${esc(rsFmt(deadPlan.ceiling))}, and the load as a whole prices above that.`
+    : `Nothing will be bid - max bid on this load is Rs ${esc(rsFmt(deadPlan.ceiling))}, and the least we would bid is Rs ${esc(rsFmt(deadPlan.floor))}.`);
+  return priceShell(heading, `
+<div class="ok">${ICON_CHECK}</div>
+<h1>${heading}</h1>
+<p class="big">${deadPlan
+    ? `${costPhrase} ${wasWere} recorded. ${deadWhy} Quote it by hand on SuperProcure if you want it.`
+    : danger
+      ? `${costPhrase} ${wasWere} recorded and the bid is armed. This is very close to the platform's close, so the bid may not land in time - track it to see if it landed.`
+      : `${costPhrase}. Bidding will start automatically.`}</p>
+${rateList}
+${r.price.transitDays != null ? `<p class="note">Transit time <b>${esc(r.price.transitDays)} day${r.price.transitDays === 1 ? '' : 's'}</b> goes out with every bid on this load (it stays fixed).</p>` : ''}
+${contract}
+<a class="btn" href="/track/${esc(publicSeg(r))}">Track the live bid</a>
+<p class="note">Or close this page - the bidding runs on its own either way.</p>`);
+}
+
+/**
+ * Answer a shipper Target Rate. Decides, submits at most one bid, and closes the watch record.
+ *
+ * The watch is marked answered even when the submit FAILED. The desk has answered - so the
+ * "window closed unanswered" alert and the restart re-ask must both stop, or the desk is told
+ * they ignored a load they actually priced. The failure is not swallowed: it rides the outcome
+ * onto the page and the confirmation message.
+ */
+const SENDING_OFF_CODES = new Set(['WRITE_DISABLED', 'PLATFORM_STACK_UNAVAILABLE', 'PLATFORM_BIDDING_DISABLED']);
+// Bid Command's own verdicts on the desk's number, which the answer page states (owner ruling 26 Sep:
+// the page owns these, WhatsApp does not repeat them). The portal's refusal and the send failures
+// still go out.
+const TARGET_REFUSED_ON_PAGE = new Set(['below_cost', 'below_floor', 'not_below_quote', 'multi_line', 'window_closed']);
+
+async function answerTargetRate(request) {
+  let outcome;
+  if (!config.gocomet.targetPriceEnabled) {
+    outcome = { action: 'refuse', submitted: false, price: null, floor: null, trueCost: null,
+      reason: 'target_price_off', message: 'sending target rates is switched off' };
+    log(`[price] target-rate answer for load ${request.loadId} not sent: GC_TARGET_PRICE is off`);
+  } else {
+    try {
+      const stack = requireStackForRequest(request);
+      outcome = await submitTargetRate({
+        adapter: stack.adapter,
+        request,
+        cost: request.price.cost,
+        marginsPct: request.price.marginsPct,
+        minMarginPct: request.price.minMarginPct,
+      });
+    } catch (e) {
+      outcome = { action: 'refuse', submitted: false, price: null, floor: null, trueCost: null,
+        reason: 'submit_failed', message: (e && e.message) || String(e),
+        code: (e && e.code) || null, sendingOff: SENDING_OFF_CODES.has(e && e.code) };
+      log(`[price] target-rate submit failed for load ${request.loadId}: ${outcome.message}`);
+    }
+  }
+  if (targetPriceWatch) {
+    try {
+      targetPriceWatch.answer(TargetPriceWatch.recordId(request.loadId, request.negotiationRound),
+        { price: outcome.price, outcome: outcome.submitted ? 'submitted' : outcome.reason });
+    } catch (e) {
+      log(`[price] target-rate watch could not be marked answered for ${request.loadId}: ${e && e.message}`);
+    }
+  }
+  // Terminal, so the record can never reopen as a re-price. Best-effort: the bid has already been
+  // sent or refused by this point, and failing the desk's page over a bookkeeping write would be
+  // the wrong trade.
+  await requests.settleTargetPrice(request.id, outcome)
+    .catch((e) => log(`[price] target-rate settle failed for ${request.loadId}: ${e && e.message}`));
+  return outcome;
+}
+
+/**
+ * The page the desk lands on after answering a target rate. Deliberately NOT renderCaptured:
+ * that one promises "bidding will start automatically" and describes a ladder, and neither is
+ * true here - this is one bid, already sent or already refused, with nothing left running.
+ */
+function renderTargetAnswered(r, outcome) {
+  const target = rsFmt(r.targetPricePerUnit);
+  if (outcome.submitted) {
+    return priceShell('Sent at the customer rate', `
+<div class="ok">${ICON_CHECK}</div>
+<h1>Sent at the customer rate</h1>
+<p class="big">We quoted <b>Rs ${esc(target)}</b> on load ${esc(r.loadId)} - the rate the customer asked for.</p>
+<p class="note">Nothing else runs on this load. The customer's offer decides it from here.</p>`);
+  }
+  const before = (r.targetDeadlineMs && Date.now() < r.targetDeadlineMs) ? ` before ${esc(fmtClock(r.targetDeadlineMs))}` : '';
+  // A failed send that was not refused up front may still have landed, so it is never reported as
+  // "not sent".
+  if (outcome.reason === 'submit_failed' && !outcome.sendingOff) {
+    return priceShell('Not confirmed', `
+<div class="ok">${ICON_ALERT}</div>
+<h1>Not confirmed</h1>
+<p class="big">Your cost is saved for load ${esc(r.loadId)}. We could not confirm the customer's rate of Rs ${esc(target)} reached the portal.</p>
+<p class="note">Check the load on the portal. ${Number(r.standingPricePerUnit) > 0
+    ? `If our quote there is still Rs ${esc(rsFmt(r.standingPricePerUnit))}, accept their Rs ${esc(target)} by hand${before}.`
+    : `If our quote there is not yet Rs ${esc(target)}, accept it by hand${before}.`}</p>`);
+  }
+  const why = {
+    below_cost: `Their rate is below what this load costs us. Every bid at that number loses money.`,
+    below_floor: `Their rate is above cost but below the lowest price we accept on this load.`,
+    multi_line: `This load has ${esc(r.chargeLineCount)} vehicle types and their rate covers all of them together, so there is no single number to send. Enter it on the portal by hand if you want it.`,
+    not_below_quote: `We already quoted Rs ${esc(rsFmt(r.standingPricePerUnit))}, at or under their Rs ${esc(target)}, so there is nothing to send. Our quote stands.`,
+    window_closed: `Their offer had already lapsed when this was submitted, so nothing was sent.`,
+    rejected: `${esc(outcome.message || 'The portal refused it.')} Enter it on the portal by hand if you still want the load.`,
+    target_price_off: `Sending target rates is switched off, so nothing went to the customer. To take the load, accept Rs ${esc(target)} on the portal by hand${before}.`,
+    submit_failed: `Sending is switched off on this portal, so nothing went to the customer. To take the load, accept Rs ${esc(target)} on the portal by hand${before}.`,
+    no_target: `No usable customer rate was read for this load, so nothing was sent.`,
+    bad_band: `The price settings on this load could not be read, so nothing was sent.`,
+  }[outcome.reason] || esc(outcome.message || 'Nothing was sent.');
+  const floorLine = (outcome.reason === 'below_floor' || outcome.reason === 'below_cost')
+    ? `<p class="note">They want Rs ${esc(target)}. The lowest price we accept here is Rs ${esc(rsFmt(outcome.floor))}${
+      outcome.trueCost != null ? `, and the load costs Rs ${esc(rsFmt(outcome.trueCost))}` : ''}.</p>`
+    : '';
+  return priceShell('Not sent', `
+<div class="ok">${ICON_ALERT}</div>
+<h1>Not sent</h1>
+<p class="big">Your cost is saved for load ${esc(r.loadId)}, and we did <b>not</b> quote the customer's rate. ${why}</p>
+${floorLine}
+<p class="note">Nothing is running on this load.</p>`);
+}
+
+// compact load box shared by the status + track pages (the form keeps its fuller block)
+function loadSummaryHtml(r) {
+  const L = loadFor(r);
+  const lane = `${esc(laneEnd(L, 'origin'))} -> ${esc(laneEnd(L, 'destination'))}`;
+  const closes = effectiveCloseAt(L) ? new Date(effectiveCloseAt(L)).toLocaleString() : '?';
+  // Carry the cutoff here too: this compact card is what the expired / "too late" / track pages
+  // show, and those are exactly the pages someone lands on while asking "but it said 2:45?".
+  //
+  // ONLY WHERE NO COST WAS ENTERED. The line is past tense and states a deadline as though it were
+  // missed, and it used to render on the mere existence of deadlineAt with no reference to whether
+  // anything was captured. On 25118167 the cost went in at 16:41 IST, two and a half minutes inside
+  // a 16:43:30 cutoff, and the load's own page still told the desk "Cost had to be entered by
+  // 4:43 PM" while the bot was bidding it - one of the three surfaces that made one load read as
+  // three conflicting states. A priced load has no missed deadline to report, so it reports none.
+  const costEntered = !!(r.price && r.price.cost != null);
+  const cutoff = (r.deadlineAt && !costEntered) ? fmtClock(r.deadlineAt) : '';
+  // Same tri-state gate as the price card, via the same function - this line used to read
+  // `${L.softClose ? 'soft close' : 'hard close'}` and so asserted "hard close" on any load
+  // whose extend time SuperProcure never sent. That is worse here than on the price card: by
+  // the comment above, these are the pages someone lands on while already disputing the timing
+  // ("but it said 2:45?"), so a wrong close-model word arrives exactly when it will be believed
+  // and argued from. Unverified now says nothing rather than something false.
+  const cm = closeModelOf(L);
+  return `<div class="load">
+<div class="lane">${lane}</div>
+<div class="sub">Load #${esc(r.loadId)} &middot; ${esc((r.customer && r.customer.label) || L.companyName)} &middot; ${esc(L.equipment)} &times; ${esc(L.units)}${fmtWeight(L.weight, L.weightUnit) ? ` &middot; ${fmtWeight(L.weight, L.weightUnit)}` : ''}<br>Closes ${esc(closes)}${cm ? ` &middot; ${cm} close` : ''}${cutoff ? `<br>Cost had to be entered by ${esc(cutoff)}` : ''}</div>
+</div>`;
+}
+
+/**
+ * Friendly page for a request that is no longer open (closed / expired / dismissed / stopped).
+ * GET and a raced POST both land here - the pricing team must never see a raw error for
+ * a state that just means "already handled". Deliberately never says WHO captured the
+ * cost (no per-operator identity exists yet) and never shows the cost amount on THESE
+ * terminal states (the link may be forwarded; only the original submit confirms it).
+ * 'armed' is handled separately by renderPriceForm(req, r, {reprice:true}) - that link doubles
+ * as the re-price surface for as long as the bot is bidding, so it DOES show (and lets you
+ * edit) the captured cost on every visit, by design; every path that used to land here for
+ * an armed request now delegates there instead.
+ *
+ * 'stopped' and 'dismissed' are NOT permanently dead: an operator paused/declined them on
+ * purpose and may want to undo that from the exact link they're already looking at, instead
+ * of hunting the load down in the console. Each gets an admin-gated action bar (renderAdminBar) -
+ * a signed-in admin sees a working button; anyone else sees a "log in to manage" pointer.
+ */
+function renderRequestStatus(req, r, outcome, opts) {
+  // The customer minimum rides through to the re-price page, whose ceiling verdict judges edited
+  // rows against it exactly as the server does (withCustomerMinimum). Resolved by the async caller.
+  if (r.status === 'armed') return renderPriceForm(req, r, { reprice: true, customerMinPct: opts && opts.customerMinPct });
+  const summary = loadSummaryHtml(r);
+  const brand = brandBar;
+  if (r.status === 'closed') {
+    if (outcome && outcome.won != null) {
+      const verdict = outcome.won ? 'We won this load' : 'We did not win this load';
+      const rank = outcome.finalRank != null ? ` Final rank ${esc(outcome.finalRank)}.` : '';
+      const bid = outcome.lastBidPrice != null ? `<p class="note">Our last bid: <b>Rs ${esc(outcome.lastBidPrice)}</b>.</p>` : '';
+      return priceShell('Auction ended', `
+${brand('Load cost entry')}
+<h1>Auction ended</h1>
+<p class="big"><b>${verdict}.</b>${rank}</p>
+${summary}
+${bid}`);
+    }
+    return priceShell('Auction ended', `
+${brand('Load cost entry')}
+<h1>Auction ended</h1>
+<p class="big">Bidding on this load has closed.</p>
+${summary}`);
+  }
+  if (r.status === 'skipped_no_price') {
+    // Name the cutoff. The old copy gave only "expired", while the card beside it showed the
+    // CLOSE time - so the page read as "it expired before 2:45", which is not what happened and
+    // is precisely the complaint this PR came from. The cutoff is the fact that explains it.
+    const cutoff = fmtClock(r.deadlineAt);
+    const closesAt = r.load && r.load.closesAt;
+    const hasGap = !!(r.deadlineAt && closesAt && r.deadlineAt < closesAt);
+    const closes = hasGap ? fmtClock(closesAt) : '';
+    const gap = hasGap ? fmtGap(closesAt - r.deadlineAt) : '';
+    return priceShell('Cutoff passed', `
+${brand('Load cost entry')}
+<h1>Cutoff passed</h1>
+<p class="big">No cost was entered before the${cutoff ? ` <b>${esc(cutoff)}</b>` : ''} pricing cutoff, so this load was not bid.</p>
+${summary}
+<p class="note">${cutoff && closes
+      ? `Costs have to land by ${esc(cutoff)} rather than ${esc(closes)}: the auction runs to ${esc(closes)}, and bidding needs${gap ? ` the last ${esc(gap)}` : ' that last stretch'} to place and improve the bid. `
+      : ''}Bidding never starts without a captured cost.</p>`);
+  }
+  if (r.status === 'dismissed') {
+    // restore() 410s once the auction has closed, AND on a placeholder close it can never reach
+    // (a dismissed load can be restored + priced best-effort right up to then, same as any late
+    // cost). dismissed is never swept to 'closed' by finalizeClosed and sticks around for days
+    // before pruning, so neither case is a brief race - mirror the stopped branch below and never
+    // offer a button guaranteed to fail.
+    const closesAt = effectiveCloseAt(r.load);
+    const lapsed = !!(closesAt && (Date.now() >= closesAt || isPlaceholderClose(closesAt)));
+    return priceShell('Request closed', `
+${brand('Load cost entry')}
+<h1>Request closed</h1>
+<p class="big">An operator declined this load - no cost is needed.</p>
+${summary}
+${lapsed ? '' : renderAdminBar(req, r, 'restore')}`);
+  }
+  if (r.status === 'stopped') {
+    // finalizeClosed() sweeps a stopped request to 'closed' once closesAt passes (next
+    // discovery tick, <=30s later) - so "lapsed" is a brief window, but rearm() itself also
+    // guards this (GONE), and offering a button that's certain to 410 is worse than not
+    // offering one. Same permanently-closed copy as the 'closed' branch above, on purpose.
+    const closesAt = effectiveCloseAt(r.load);
+    const lapsed = !!(closesAt && Date.now() >= closesAt);
+    if (lapsed) {
+      return priceShell('Auction ended', `
+${brand('Load cost entry')}
+<h1>Auction ended</h1>
+<p class="big">Bidding on this load has closed.</p>
+${summary}`);
+    }
+    // WHO STOPPED IT. 'stopped' is reached two ways and they are not the same event: an operator
+    // pausing an armed load (stop()), and the system parking a captured cost it cannot bid yet
+    // (holdUnbiddable, which is the only writer of heldReason). Both used to render "an operator
+    // paused bidding on this load" - so a desk member who priced a load correctly was shown a page
+    // blaming a colleague for a decision nobody made, and the real reason was nowhere on it.
+    // heldReason exists on the record for exactly this; read it rather than inferring.
+    if (r.heldReason) {
+      const held = r.heldReason === 'platform_bidding_disabled'
+        ? 'Your cost is saved. This portal is not live for bidding yet, so we will not bid this load. Your price is kept and will be used when this portal goes live.'
+        : r.heldReason === 'tick_fault_handoff'
+          ? 'Your cost is saved. We could not check this load reliably, so we stopped bidding it and asked the desk to bid it by hand on the portal.'
+          : 'Your cost is saved. We are not bidding this load at the moment - this was not stopped by an operator.';
+      return priceShell('Not bidding this load', `
+${brand('Load cost entry')}
+<h1>Not bidding this load</h1>
+<p class="big">${esc(held)}</p>
+${summary}
+${renderAdminBar(req, r, 'reopen')}`);
+    }
+    return priceShell('Bidding paused', `
+${brand('Load cost entry')}
+<h1>Bidding paused</h1>
+<p class="big">An operator paused bidding on this load. It's still within its pricing window and can be resumed.</p>
+${summary}
+${renderAdminBar(req, r, 'reopen')}`);
+  }
+  // unknown/future status: still a page, never a raw error string
+  return priceShell('Request not open', `
+${brand('Load cost entry')}
+<h1>Request not open</h1>
+<p class="big">This price request is no longer open (status: ${esc(r.status)}).</p>
+${summary}`);
+}
+
+// The one-time capture form's non-JS POST fallback on a rejected submit (a bad cost, a
+// scope check failing, an arm failure) - same branded shell as every other page here rather
+// than a raw unstyled error string, with a link back to the still-open form so retrying
+// doesn't mean re-navigating from scratch. Re-price never hits this: its submit is AJAX and
+// renders the error as a toast instead (see submitJson in renderPriceForm's client script).
+// `saved` is the one refusal where the change IS on record (a re-price whose put-back failed), so
+// the heading and label must not claim otherwise.
+function renderCaptureError(r, message, { saved = false, fix = null, head: headAs = null, label: labelAs = null } = {}) {
+  const summary = loadSummaryHtml(r);
+  const brand = brandBar;
+  const head = headAs || (saved ? 'Not bidding this load' : 'Could not save');
+  const label = labelAs || (saved ? 'Not bidding' : 'Not saved');
+  const fixHtml = fix ? `<a class="efix" href="${esc(fix.href)}">${esc(fix.label)}</a>` : '';
+  return priceShell(head, `
+${brand('Load cost entry')}
+<h1>${head}</h1>
+<div class="enote"><div class="st">${label}</div><div class="sb">${esc(message)}</div>${fixHtml}<a class="back" href="/price/${esc(publicSeg(r))}">&larr; Back to the form</a></div>
+${summary}`);
+}
+
+// A cost typed on the one-field form and posted after the load was armed (a stale tab, a back and
+// resubmit) is not the armed cost, so it was dropped. Null when nothing was typed or it matches.
+function droppedCostOnArmed(body, reqDoc) {
+  let typed = Number(body && (body.cost ?? body.amount));
+  const byType = readCostByType(body);
+  if (byType) {
+    try { typed = (normalizeCostByType(byType, reqDoc.load && reqDoc.load.cargoTypes) || {}).cost; } catch (_) { typed = NaN; }
+  }
+  const armed = Number(reqDoc.price && reqDoc.price.cost);
+  if (!(Number.isFinite(typed) && typed > 0) || !(armed > 0) || Math.round(typed) === Math.round(armed)) return null;
+  return `Rs ${fmtRs(typed)} not saved: already priced at Rs ${fmtRs(armed)}. Use Re-price to change it.`;
+}
+
+// A link, not a script button, so it works on the no-script page: it opens the form with the
+// corrective already typed, and the desk still submits it.
+// The rows the desk posted ride along, so the reopened form is exactly what the figure was computed
+// against; their below-minimum acknowledgement rides with them.
+function ceilingFixLink(r, e, body) {
+  if (!e || e.code !== 'CEILING_DEAD' || e.costTarget == null) return null;
+  const q = Array.isArray(e.costTargetByType)
+    ? e.costTargetByType.map((c, i) => `cost_type_${i}=${c}`)
+    : [`cost=${e.costTarget}`];
+  const rows = [];
+  for (let i = 0; body && body[`m_${i}`] != null; i++) rows.push(`m_${i}=${encodeURIComponent(body[`m_${i}`])}`);
+  if (rows.length) q.push(...rows, ...(belowMinAcked(body) ? ['below_min_ack=1'] : []));
+  return { href: `/price/${publicSeg(r)}?${q.join('&')}`, label: `Use Rs ${rsFmt(e.costTarget)}` };
+}
+
+// The cost a ceiling refusal's link types into the form. Whole rupees only; anything else is ignored.
+function prefilledCosts(req) {
+  const q = (req && req.query) || {};
+  const whole = (v) => (typeof v === 'string' && /^[1-9]\d{0,8}$/.test(v) ? Number(v) : null);
+  const byType = [];
+  for (let i = 0; `cost_type_${i}` in q; i++) byType.push(whole(q[`cost_type_${i}`]));
+  const rows = [];
+  for (let i = 0; `m_${i}` in q; i++) rows.push(typeof q[`m_${i}`] === 'string' && /^\d{1,3}(\.\d{1,6})?$/.test(q[`m_${i}`]) ? q[`m_${i}`] : null);
+  const rowsOk = rows.length > 0 && rows.every((v) => v != null);
+  return { cost: whole(q.cost), byType: byType.length && byType.every((c) => c != null) ? byType : null,
+    rows: rowsOk ? rows : null, ack: rowsOk && q.below_min_ack === '1' };
+}
+
+// The read-only live-bid page. Server renders the static shell; a small inline poller
+// (plain JS, no SPA) refreshes /track/:token/state and ticks a skew-corrected countdown.
+function renderTrackPage(r) {
+  const L = loadFor(r);
+  const lane = `${esc(laneEnd(L, 'origin'))} -> ${esc(laneEnd(L, 'destination'))}`;
+  return priceShell(`Live bid - ${lane}`, `
+<div class="brand"><span class="chip">${ICON_TRUCK}</span><span class="bt"><span class="t">Bid Command</span><span class="s">Live bid status</span></span></div>
+<h1>Live bid status</h1>
+${loadSummaryHtml(r)}
+<div class="stat" id="stat"><div class="row"><span class="k">Status</span><span class="v">Loading...</span></div></div>
+<div class="cd" id="cd" data-closes="${Number(L.closesAt) || 0}"></div>
+<p class="note">Read-only view - it refreshes by itself. Bidding is handled automatically; there is nothing to do here.</p>
+<script>(function(){
+var stateUrl=location.pathname.replace(/\\/+$/,'')+'/state';
+var cd=document.getElementById('cd'),stat=document.getElementById('stat');
+var closesAt=Number(cd.getAttribute('data-closes'))||0,offset=0,done=false;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function row(k,v){return '<div class="row"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>';}
+function num(n){try{return Number(n).toLocaleString('en-IN');}catch(e){return String(n);}}
+function fmtTime(ms){var d=new Date(ms),h=d.getHours(),n=d.getMinutes(),ap=h<12?'am':'pm';h=h%12;if(h===0)h=12;return h+':'+(n<10?'0'+n:n)+' '+ap;}
+// One label per canonical status, decided server-side. The page states the verdict it is given
+// rather than re-deriving any part of the rule, which is how it came to disagree with every other
+// surface about a load that never bid.
+var RESULT=${JSON.stringify({ won: 'WON', lost: 'Lost', no_bid: exportModel.resultLabel('no_bid'), closed_unknown: exportModel.CLOSED_UNKNOWN_LABEL })};
+function render(s){
+var rows='';
+if(s.outcome){
+done=true;
+rows+=row('Result',esc(RESULT[s.outcome.resultStatus]||s.outcome.resultStatus));
+if(s.outcome.finalRank!=null)rows+=row('Final rank',esc(s.outcome.finalRank));
+if(s.outcome.lastBidPrice!=null)rows+=row('Our last bid','Rs '+num(s.outcome.lastBidPrice));
+}else if(s.engine&&s.engine.lastBidPrice==null&&s.engine.lastSecondsCloseMs!=null){
+rows+=row('Status','Bids go in only in the last seconds before close ('+fmtTime(s.engine.lastSecondsCloseMs)+')');
+}else if(s.engine&&s.engine.lastBidPrice==null&&s.engine.firstBidByMs!=null){
+// CW-229: the establish hold on a non-allowlisted soft-close load opens a window with no bid
+// on the board yet. The bare "Bidding live" / "Last bid -" trio reads as a stalled system in
+// that window; name the wait and the bound instead.
+rows+=row('Status','First bid goes in by '+fmtTime(s.engine.firstBidByMs));
+}else if(s.engine){
+rows+=row('Status','Bidding live');
+rows+=row('Our rank',s.engine.myRank!=null?esc(s.engine.myRank):'-');
+rows+=row('Last bid',s.engine.lastBidPrice!=null?'Rs '+num(s.engine.lastBidPrice):'-');
+}else if(s.requestStatus==='awaiting_price'){rows+=row('Status','Waiting for a cost');
+}else if(s.requestStatus==='armed'){rows+=row('Status','Waiting for the auction to open');
+}else if(s.requestStatus==='skipped_no_price'){rows+=row('Status','Expired - no cost was entered');
+}else if(s.requestStatus==='dismissed'){rows+=row('Status','Declined by the operator');
+}else if(s.requestStatus==='stopped'){var lapsed=!!(s.closesAt&&(Date.now()+offset)>=s.closesAt);rows+=row('Status',lapsed?'Auction ended':(s.heldReason?(s.heldReason==='platform_bidding_disabled'?'Not bidding - portal not live yet (cost saved)':s.heldReason==='tick_fault_handoff'?'Not bidding - handed to the desk to bid by hand (cost saved)':'Not bidding - paused, not by an operator (cost saved)'):'Bidding paused by an operator - resumable'));
+}else{rows+=row('Status','Auction ended');}
+stat.innerHTML=rows;
+}
+function tick(){
+if(!closesAt||done){cd.style.display='none';return;}
+var m=closesAt-(Date.now()+offset);
+if(m<=0){cd.textContent='Closing now';return;}
+var s=Math.floor(m/1000),h=Math.floor(s/3600),n=Math.floor((s%3600)/60),x=s%60;
+cd.textContent=(h?h+'h ':'')+((h||n)?n+'m ':'')+x+'s left';
+}
+function poll(){
+fetch(stateUrl).then(function(r){if(!r.ok)throw new Error('bad');return r.json();}).then(function(s){
+offset=(s.serverTime||Date.now())-Date.now();
+if(s.closesAt)closesAt=s.closesAt;
+render(s);
+}).catch(function(){}).then(function(){if(!done)setTimeout(poll,5000);});
+}
+setInterval(tick,1000);tick();poll();
+})();</script>`);
+}
+
+// dev-only: arm a few long-running sim auctions so Live Bids is populated for a demo (mock
+// mode only; SP_DEMO_SEED=1). Routed through the REAL price-request pipeline (createForLoad
+// -> capture -> armFromRequest) - not the old direct primaryEngine().arm() bypass, which
+// created loads with no backing price-request document. That bypass meant these rows could
+// never be re-priced (Live Bids only shows Re-price/Copy-link when a price-request exists
+// for the load) and, since the loadId was never registered with the sim, the mock adapter
+// could never report real rank/state for them either (getAuctionState -> sim.observe() ->
+// null -> the engine eventually raises a repeated_read_failures alert). Spawning the sim
+// auction FIRST and using its own generated id as the loadId fixes both: real rank tracking
+// AND a real price-request behind every demo row, exactly like a production armed load.
+async function seedDemoLiveAuctions() {
+  if (!sim) return;
+  // sim.spawn() computes its ceiling from cfg.lane.baseRate - a full lane object (not just
+  // origin/destination) is required, or the ceiling (and everything derived from it) is NaN.
+  const slate = [
+    { competitors: 3, closeModel: 'hard', durationMs: 28 * 60_000, shipper: 'Syngenta',
+      lane: { origin: 'Chakan, MH', destination: 'Bawal, HR', equipment: '20ft container', weight: 24, baseRate: 39000 }, units: 3 },
+    { competitors: 5, closeModel: 'hard', durationMs: 18 * 60_000, shipper: 'Syngenta',
+      lane: { origin: 'Mundra, GJ', destination: 'Bhiwandi, MH', equipment: '40ft container', weight: 26, baseRate: 71500 }, units: 2 },
+    { competitors: 2, closeModel: 'soft', durationMs: 41 * 60_000, shipper: 'Renewsys India',
+      lane: { origin: 'Hosur, TN', destination: 'Pantnagar, UK', equipment: '32ft MXL', weight: 18, baseRate: 86000 }, units: 1 },
+  ];
+  for (const cfg of slate) {
+    const a = sim.spawn(cfg);
+    const created = await requests.createForLoad({
+      id: a.id, lane: a.lane, equipment: a.equipment, units: a.units, weight: a.weight,
+      companyName: cfg.shipper, closesAt: a.closesAt, softClose: cfg.closeModel === 'soft',
+    });
+    const cost = Math.round(a.ceiling * 0.65); // comfortably below ceiling so the default band's opening bid still clears it
+    const captured = await requests.capture(created.id, { cost });
+    armFromRequest(primaryEngine(), captured, { requests });
+  }
+  log('[demo] seeded live demo auctions for Live Bids, price-request-backed (SP_DEMO_SEED=1)');
+}
+
+// dev-only: create a couple of awaiting-price requests so the worklist + the tokenized
+// /price/<token> capture page are demoable end-to-end (mock mode only; SP_DEMO_SEED=1).
+// DEMO-PR-1 stays un-captured (awaiting_price) to demo the capture form itself; DEMO-PR-2 is
+// sim-spawned + auto-captured (armed) the same way seedDemoLiveAuctions()'s rows are, so
+// there's a ready-to-test, fully re-priceable load with real rank tracking on Live Bids
+// without a manual capture step every restart.
+async function seedDemoPriceRequests() {
+  if (!sim) return;
+  const now = Date.now();
+  const r1 = await requests.createForLoad({
+    id: 'DEMO-PR-1', lane: { origin: 'Chakan, MH', destination: 'Hosur, TN' }, equipment: '32ft SXL', units: 2, weight: 15,
+    companyName: 'Renewsys India', branchName: 'REN-K', closesAt: now + 41 * 60_000, softClose: true,
+    // 30-bid soft-close customer (Renewsys shape): demoes the fine-step path. Fine ladder only
+    // arms when the boot has the shipper soft-enabled (SP_SOFT_CLOSE_ENABLED=1,
+    // SP_SOFT_CLOSE_SHIPPERS=Renewsys); rules built via deriveLoadRules, not hand-rolled.
+    closeModelKnown: true, revisionLimit: 30,
+    rules: deriveLoadRules({ branchBidCountAllowed: 30, loadBidDifference: 100 }),
+  });
+  // notes/productName/points mirror the real /sp/loads/v4 shape (post-_mapLoad: plain text +
+  // composed point addresses) so the shipper-note and full-address surfaces are demoable
+  // end-to-end. DEMO-PR-1 (above) stays points-less to exercise the lane fallback.
+  const a2 = sim.spawn({
+    competitors: 4, closeModel: 'hard', durationMs: 18 * 60_000,
+    lane: { origin: 'Bhiwandi, MH', destination: 'Bawal, HR', equipment: '20ft container', weight: 24, baseRate: 58000 },
+  });
+  const created2 = await requests.createForLoad({
+    id: a2.id, lane: a2.lane, equipment: a2.equipment, units: a2.units, weight: a2.weight,
+    companyName: 'Syngenta', closesAt: a2.closesAt, softClose: false, productName: 'Crop protection',
+    // the load poster (branchUserName/branchUserMobile post-_mapLoad) - one demo row carries a
+    // contact so the "Posted by" cell is visible in the demo. Obviously-fake number on purpose.
+    // DEMO-PR-1 above stays poster-less, which exercises the no-row path in the same demo.
+    poster: { name: 'DEMO POSTER', mobile: '9000012345', createdBy: '0' },
+    notes: 'VEHICLE REQUIRED FOR TODAYS LOADING.\nAll vehicle platforms should be in neat and good condition.\nIt is mandatory to place the vehicle in the given time frame; non-placement invites penalty.',
+    points: [
+      { kind: 'pickup', address: 'Bhiwandi, Maharashtra 421302, India' },
+      { kind: 'drop', address: 'Syngenta Depot, Sector 12, Bawal, Haryana 123501, India' },
+    ],
+  });
+  const captured2 = await requests.capture(created2.id, { cost: 65000 });
+  armFromRequest(primaryEngine(), captured2, { requests });
+  // 30-bid soft-close sim, auto-captured -> ARMED (the fine-step demo's live half). Same
+  // soft-enable env vars as above; without them it arms the plain 3-rung band, safe on any boot.
+  const a3 = sim.spawn({
+    competitors: 3, closeModel: 'soft', durationMs: 35 * 60_000, revisionLimit: 30, extendCap: 2,
+    lane: { origin: 'Chakan, MH', destination: 'Hosur, TN', equipment: '32ft SXL', weight: 15, baseRate: 21000 },
+  });
+  const created3 = await requests.createForLoad({
+    id: a3.id, lane: a3.lane, equipment: a3.equipment, units: a3.units, weight: a3.weight,
+    companyName: 'Renewsys India', branchName: 'REN-K', closesAt: a3.closesAt,
+    softClose: true, closeModelKnown: true, revisionLimit: 30,
+    rules: deriveLoadRules({ branchBidCountAllowed: 30, loadBidDifference: 100 }),
+  });
+  const captured3 = await requests.capture(created3.id, { cost: 18000 });
+  armFromRequest(primaryEngine(), captured3, { requests });
+  log(`[demo] price request open: ${config.baseUrl}/price/${publicSeg(r1)}`);
+  log(`[demo] price request armed: ${config.baseUrl}/price/${publicSeg(captured2)}`);
+}
+
+// dev-only: seed a few Team/Assignments rows so the Notifications tab is populated (mock mode
+// only; SP_DEMO_SEED=1). Skips if any person already exists, so it never clobbers real data.
+async function seedDemoPeople() {
+  if ((await personStore.list()).length) return;
+  await personStore.upsert({ name: 'Central Pricing Desk', phone: '9000000001', alertPrefs: ['price_needed', 'won', 'lost', 'error'], alertAll: true });
+  const chikhli = await personStore.upsert({ name: 'Chikhli Plant', phone: '9000000002', alertPrefs: [], alertAll: false, originScope: ['Chikhli'] });
+  await personStore.upsert({ name: 'Ops Lead', phone: '9000000003', alertPrefs: ['error'], alertAll: true });
+  const syngenta = await customerStore.upsert({ label: 'Syngenta', aliases: ['Syngenta India'] });
+  await assignmentStore.upsert({ personId: chikhli.personId, customerId: syngenta.customerId, alertKinds: ['price_needed', 'won', 'lost'] });
+  await refreshModelSnapshot();
+  log('[demo] seeded 3 Team members + 1 customer + 1 assignment (SP_DEMO_SEED=1)');
+}
+
+// Apply a saved config to the live components, shared by POST /api/config and boot() so a
+// saved margin/floor/allowlist/timing survives a restart instead of reverting to env
+// defaults. Caller owns the pollers' start/stop (their interval is a setInterval period).
+// Applies to EVERY account's engine; the global allowlist mutation is picked up by each
+// poller's config view (accounts with their own allowlist keep their override).
+function applyConfigValues(next) {
+  requests.marginsPct = next.marginsPct;
+  requests.minMarginPct = next.minMarginPct;
+  notifier.mode = next.notifyMode;
+  if (next.clericalFloor !== undefined) config.clericalFloor = next.clericalFloor;
+  // Only when the save carries the field, matching softClose/gocometDiscovery below: a margins-only
+  // save must not be able to move a portal's channel, in either direction.
+  if (next.gocometNotifyMode !== undefined) {
+    config.gocomet.notifyMode = next.gocometNotifyMode;
+    notifier.platformModes[config.gocomet.platformKey] = next.gocometNotifyMode;
+    // The target-rate channel resolves independently of the portal's, so without this line the
+    // console's GoComet control cannot silence it and an operator watching a storm has no lever
+    // short of a restart. An explicit operator choice governs every GoComet message, including
+    // this one; the independent DEFAULT is what carries a target rate onto WhatsApp at boot.
+    notifier.setTargetRateMode(next.gocometNotifyMode);
+  }
+  lastAppliedAntiDetection = next.antiDetection; // D017: read by makeEngine for any engine built AFTER this point
+  for (const e of allEngines()) e.setAntiDetection(next.antiDetection);
+  // L3 soft-close policy takes effect live: the engine re-reads it at each arm(), and the discovery
+  // config view reads config.softClose through a getter. Only applied when a save carries the block, so
+  // a partial save (e.g. margins-only) leaves the soft-close posture untouched.
+  if (next.softClose !== undefined) {
+    config.softClose = next.softClose;
+    for (const e of allEngines()) e.setSoftClose(next.softClose);
+  }
+  // Same live-apply as softClose, read at each arm() - so a save changes the NEXT load armed, never a
+  // ladder already in flight. Block-gated too, so a margins-only save cannot start or stop rounding.
+  if (next.rounding !== undefined) {
+    config.rounding = next.rounding;
+    for (const e of allEngines()) e.setRounding(next.rounding);
+  }
+  // The walk reads its settings at every decision, so a save moves the next tick. A change to what the
+  // measured step time is computed over recomputes it now rather than at the next hourly pass.
+  if (next.walk !== undefined) {
+    const prev = config.walk;
+    config.walk = next.walk;
+    for (const e of allEngines()) e.setWalk(next.walk);
+    const basis = (w) => JSON.stringify([w && w.percentile, w && w.landPercentile, w && w.measuredSince,
+      ['sp', 'gocomet'].map((p) => w && w[p] && [w[p].windowDays, w[p].minSamples])]);
+    if (prev && basis(prev) !== basis(next.walk)) refreshWalkTimingLogged();
+  }
+  if (stacks.some((s) => s.discovery)) {
+    config.allowlist = next.allowlist;
+    config.priceDeadlineLeadMs = next.priceDeadlineLeadMs;
+    config.reminderLeadMs = next.reminderLeadMs;
+    config.discoveryIntervalMs = next.discoveryIntervalMs;
+  }
+  // GoComet discovery, third of its four gates - the only one an operator can move without a
+  // restart. Wired here rather than in the POST handler for the same reason softClose is: boot
+  // calls applyConfigValues with the persisted config, so the saved posture survives a restart
+  // instead of reverting to the env default. Last, so a start picks up the interval just applied.
+  // Only when the save carries the field, so a margins-only save cannot silently arm live polling.
+  if (next.gocometDiscovery !== undefined) {
+    config.gocomet.discoveryEnabled = !!next.gocometDiscovery;
+    applyGoCometDiscovery(config.gocomet.discoveryEnabled);
+  }
+}
+
+// ---- boot -------------------------------------------------------------------
+// ---- GoComet adapter registration (Module 2, Phase 1) - OFF by default, ZERO SuperProcure impact ----
+// GoComet is the SECOND platform behind the same PlatformAdapter seam. In THIS phase it is
+// REGISTERED but deliberately NOT wired into the SuperProcure bidding stack (no discovery, no
+// engine, no scheduler, no socket) - so it cannot touch live SP money and cannot place a bid
+// (placeBid needs both writeEnabled AND GC_BID=1, and nothing here calls it). Registration means:
+// build the adapter from the env-gated config, adopt+validate the configured bare-JWT session
+// OFFLINE (no network, no OTP), and stand up the SAME proactive token-expiry alerting SuperProcure
+// uses - GoComet JWTs are ~monthly, so the clock matters more here than for SP's ~1yr token.
+// Absent GC_TOKEN -> config.gocomet.enabled is false, this whole block is skipped, and nothing is
+// instantiated. Fully best-effort: any failure logs + alerts, NEVER throws into SP boot.
+let gocometAdapter = null;
+let gocometTokenExpiryTimer = null;
+let gocometStack = null;
+let targetPriceWatch = null;
+let targetPriceTimer = null;
+async function registerGoCometAdapter() {
+  if (!config.gocomet.enabled) return;
+  try {
+    gocometAdapter = new GoCometAdapter({
+      token: config.gocomet.token,
+      userId: config.gocomet.userId,
+      baseUrl: config.gocomet.baseUrl,
+      bidEnabled: config.gocomet.bidEnabled,
+      platformKey: config.gocomet.platformKey,
+      minGetIntervalMs: config.gocomet.minGetIntervalMs,
+      rateLimitBackoffMs: config.gocomet.rateLimitBackoffMs,
+      // The rest of the read budget. Each is null unless its env var is set, so the adapter's own
+      // default applies - config.js deliberately restates none of them.
+      globalMinGetIntervalMs: config.gocomet.globalMinGetIntervalMs,
+      routineGetIntervalMs: config.gocomet.routineGetIntervalMs,
+      maxRateLimitBackoffMs: config.gocomet.maxRateLimitBackoffMs,
+      rateLimitBackoffSteps: config.gocomet.rateLimitBackoffSteps,
+      rateLimitRecoveryReads: config.gocomet.rateLimitRecoveryReads,
+      notifier,
+      log: createLogger('gocomet'),
+    });
+    const acct = await gocometAdapter.login(); // offline: validates + parses the configured JWT
+    const caps = gocometAdapter.capabilities();
+    const writeState = config.gocomet.bidEnabled ? 'WRITES ENABLED (GC_BID=1)' : 'writes OFF';
+    baseLog.info(`[gocomet] adapter registered (READ-ONLY registration, ${writeState}): user ${acct.userId || '?'} | token exp ${acct.tokenExp ? new Date(acct.tokenExp).toISOString().slice(0, 10) : 'unknown'} | closeModel ${caps.closeModel} | multiCargo ${caps.multiCargo}`);
+    // Same proactive expiry rail as SuperProcure (tokenExpiry.js), GoComet-labelled: an immediate
+    // check now, then an unref'd daily re-check. Mirrors activateRealStack's SP wiring exactly; this
+    // is the tokenExpiry pattern REUSED, not a scheduler change.
+    const expiryArgs = { notifier, accountLabel: 'gocomet', product: 'GoComet', tokenKind: 'gc-token',
+      platformKey: config.gocomet.platformKey,
+      // C078: a credential-expiry alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+      // C074: GoComet has no self-serve reconnect page - the console's "reconnect" routes are the
+      // SuperProcure OTP flow, and GoComet has no row on the Accounts page at all. The remedy is a
+      // manual token refresh: get a fresh GoComet session, update GC_TOKEN, restart Bid Command.
+      shortRemedy: 'Get a fresh GoComet token (update GC_TOKEN) and restart Bid Command',
+      longRemedy: 'get a fresh token (update GC_TOKEN) and restart Bid Command' };
+    checkTokenExpiry(Object.assign({ tokenExp: acct.tokenExp }, expiryArgs)).catch(() => {});
+    gocometTokenExpiryTimer = setInterval(() => {
+      checkTokenExpiry(Object.assign({ tokenExp: gocometAdapter.account && gocometAdapter.account.tokenExp }, expiryArgs)).catch(() => {});
+    }, 24 * 60 * 60 * 1000);
+    if (gocometTokenExpiryTimer.unref) gocometTokenExpiryTimer.unref();
+  } catch (e) {
+    // login() fails CLOSED on an absent/expired/malformed token - surface it loudly but NEVER let
+    // it break SuperProcure boot (GoComet is not on the SP money path).
+    const detail = (e && e.message) || String(e);
+    baseLog.force(`[gocomet] adapter registration failed (SuperProcure unaffected): ${detail}`, { err: e });
+    pushEvent('accounts', { level: 'warn', gocomet: 'registration_failed', detail });
+    notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+      // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+      detail: `GoComet adapter could not register: ${detail}` },
+      { dedupeKey: 'gocomet_register_failed' }).catch(() => {});
+  }
+}
+
+/**
+ * Start or stop the GoComet poller in place. The stack stays built and inspectable either way -
+ * this is the console's live stop on third-party polling, not a teardown.
+ *
+ * The timer test is the idempotence: DiscoveryPoller.start() assigns a fresh setInterval over
+ * whatever handle it already held, so starting a running poller would orphan the old interval and
+ * double the GET rate against a portal whose limiter is already the reason for the spacing gate.
+ */
+function applyGoCometDiscovery(enabled) {
+  if (!gocometStack || !gocometStack.discovery) return;
+  if (!enabled) { gocometStack.discovery.stop(); return; }
+  if (!gocometStack.discovery.timer) gocometStack.discovery.start(config.discoveryIntervalMs);
+}
+
+/**
+ * GATE 2 OF 4: build the GoComet stack and put it in `stacks`. Requires GC_ENABLE=1 AND a
+ * registered adapter (which itself requires GC_TOKEN). With GC_ENABLE unset this returns before
+ * constructing anything, so a box holding a read token behaves exactly as it did before this
+ * existed - the adapter sits on the token-expiry rail and nothing polls.
+ *
+ * Called AFTER every SuperProcure account has activated, deliberately: activateRealStack is
+ * SuperProcure's sequence (socket connect, scope refresher, SP-labelled expiry watch) and the boot
+ * loop applies it to every member of `stacks`. A stack that is not a SuperProcure account must not
+ * be in the array while that loop runs, and the total-failure guard that aborts boot must count
+ * only SuperProcure accounts.
+ *
+ * Building the stack is NOT the whole of coming online - see rehydrateGoCometStack, which the
+ * caller runs next. The two are separate calls on purpose: a failure inside construction tears the
+ * half-built stack back down, and a failure while re-arming must not, because by then live monitors
+ * may already exist.
+ *
+ * Best-effort, on the same contract as registerGoCometAdapter above: any failure logs, alerts and
+ * returns. Nothing here may throw into SuperProcure's boot - GoComet is not on the SP money path.
+ */
+/**
+ * GATE 4 OF 4 - the shipper target-rate watch. Off unless GC_TARGET_PRICE=1, and with it off
+ * nothing is constructed, so no closed load is ever re-read and the read budget is untouched.
+ *
+ * It does NOT use the durable scheduler. That store is keyed by auctionId and merges on a duplicate
+ * key, so a target-rate obligation would overwrite the load's own auction intent and a second
+ * negotiation round would overwrite the first. Its timers also live in bidEngine and are driven by
+ * the auction countdown, which reads zero on a closed enquiry - a re-armed monitor would poll
+ * against a clock saying "over" and then raise a never-bid error at the desk. So this owns its own
+ * file, its own clock and its own restart path.
+ *
+ * It never bids. Every window terminates in a question to the desk, because a target rate is a
+ * margin decision on money already booked.
+ */
+/**
+ * One watch cycle: enrol loads whose auction closed recently, then poll the enrolled set.
+ *
+ * Enrolment reads the price-request store rather than hooking discovery, because the event we are
+ * waiting for happens AFTER the engine has finalized the load and stopped reading it - both
+ * observed targets landed 46 and 18 minutes past the close. The store still holds the closed
+ * record, which is exactly the snapshot the desk needs to be shown, so it is the honest source.
+ *
+ * Enrolment is NOT restricted to loads we won. The load that actually cost money (260817Q9LG) was
+ * rank 2 at close and still received a target of Rs 1,90,000; a won-only watch set would have
+ * missed it.
+ *
+ * Re-entrant-safe and never throws: this runs on a bare interval with no supervisor above it.
+ */
+let targetPriceCycleBusy = false;
+async function runTargetPriceCycle(log) {
+  if (!targetPriceWatch || targetPriceCycleBusy) return;
+  targetPriceCycleBusy = true;
+  try {
+    const now = Date.now();
+    const mine = await requests.listFor(gocometStack.platformKey);
+    for (const r of mine) {
+      if (isTargetPriceReq(r)) continue;                       // never watch a target ask itself
+      // ONLY LOADS WE ACTUALLY QUOTED. GoComet can only reopen a load for a vendor who submitted a
+      // quote, so a declined load and one nobody priced structurally cannot produce a target rate.
+      // They would still take slots out of the hard per-cycle read cap, stretching the effective
+      // poll interval for the loads that can - directly against a 13m45s window.
+      if (r.status === 'dismissed' || r.status === 'skipped_no_price') continue;
+      const closedAt = effectiveCloseAt(r.load);
+      if (!closedAt || closedAt > now) continue;               // still live - the engine owns it
+      if (now - closedAt > config.gocomet.targetPriceWatchMs) continue;
+      targetPriceWatch.watch(Object.assign({}, r.load, { id: r.loadId }), { closedAt });
+    }
+    const out = await targetPriceWatch.tick(now);
+    if (out.found || out.expired || out.errors) {
+      log.info('target-rate cycle', out);
+    }
+  } catch (e) {
+    log.error('target-rate cycle failed', { err: e && e.message });
+  } finally {
+    targetPriceCycleBusy = false;
+  }
+}
+
+function attachTargetPriceWatch() {
+  if (!config.gocomet.targetPriceEnabled || !gocometStack || !gocometAdapter) return null;
+  try {
+    const log = createLogger('gocomet-target');
+    targetPriceWatch = new TargetPriceWatch({
+      filePath: config.targetPriceFileFor(gocometStack.account.accountId),
+      adapter: gocometAdapter,
+      log,
+      watchMs: config.gocomet.targetPriceWatchMs,
+      pollMs: config.gocomet.targetPricePollMs,
+      maxPollsPerCycle: config.gocomet.targetPriceMaxPollsPerCycle,
+      onTarget: async (rec) => {
+        // A duplicate ask costs one message; a dropped one costs the load. So a re-assert after a
+        // restart re-raises rather than assuming the original was delivered.
+        const req = await requests.createForTargetPrice(
+          Object.assign({}, rec.loadSnapshot, { id: rec.enquiryKey }),
+          {
+            targetPricePerUnit: rec.targetPricePerUnit,
+            standingPricePerUnit: rec.standingPricePerUnit,
+            targetDeadlineMs: rec.targetDeadlineMs,
+            negotiationRound: rec.round,
+            comment: rec.comment,
+            autoBiddable: rec.autoBiddable,
+            chargeLineCount: rec.chargeLineCount,
+            platformKey: gocometStack.platformKey,
+          });
+        pushEvent('price', { targetRate: rec.enquiryKey, target: rec.targetPricePerUnit });
+        const res = await notifier.requestPrice(req);
+        if (res && res.delivered) await requests.markNotified(req.id);
+      },
+      onExpired: async (rec) => {
+        pushEvent('price', { level: 'warn', targetRateExpired: rec.enquiryKey, target: rec.targetPricePerUnit });
+        await notifier.alert('error', {
+          context: 'gocomet', platformKey: gocometStack.platformKey,
+          // The ask went out on WhatsApp via the same override; without it here the MISS routes
+          // through notifyModeFor to the console, so the one message that says a load was lost is
+          // the one nobody sees. That is the exact failure this feature exists to end.
+          notifyModeOverride: config.gocomet.targetPriceNotifyMode,
+          detail: `A customer price request on load ${rec.enquiryKey} expired with no reply. They wanted Rs ${rec.targetPricePerUnit}.`,
+        }, { dedupeKey: `gc_target_expired_${rec.id}` }).catch(() => {});
+      },
+    });
+    targetPriceWatch.rehydrate().then((out) => {
+      baseLog.force(`[gocomet] target-rate watch ONLINE (GC_TARGET_PRICE=1): re-asserted ${out.reasserted},`
+        + ` missed-while-down ${out.missed}${out.corrupt ? ', STORE WAS CORRUPT' : ''}`
+        + ` | watch ${Math.round(config.gocomet.targetPriceWatchMs / 60000)}min after close`
+        + ` | poll ${Math.round(config.gocomet.targetPricePollMs / 1000)}s`);
+    }).catch((e) => log.error('target-rate rehydrate failed', { err: e && e.message }));
+    targetPriceTimer = setInterval(() => { runTargetPriceCycle(log); }, config.gocomet.targetPricePollMs);
+    if (targetPriceTimer.unref) targetPriceTimer.unref();
+    return targetPriceWatch;
+  } catch (e) {
+    const detail = (e && e.message) || String(e);
+    targetPriceWatch = null;
+    baseLog.force(`[gocomet] target-rate watch could not start (bidding unaffected): ${detail}`, { err: e });
+    return null;
+  }
+}
+
+function attachGoCometStack() {
+  if (!config.gocomet.enabled || !config.gocomet.stackEnabled || !gocometAdapter) return null;
+  try {
+    gocometStack = buildGoCometStack({
+      adapter: gocometAdapter,
+      gc: config.gocomet,
+      makeEngine,
+      makeScheduler: (accountId) => new DurableScheduler(config.intentsFileFor(accountId)),
+      discoveryConfigFor,
+      requests,
+      notifier,
+      gate: discoveryGate,
+      healthcheckUrl: config.appHealthcheckUrl, healthcheckPeers: HEALTHCHECK_PEERS, // D003
+      log: createLogger('gocomet'),
+      onExpire: (r) => pushEvent('discovery', { expired: r.loadId }),
+    });
+    stacks.push(gocometStack);
+    // INVARIANT 8 (docs/MULTI_PLATFORM_ARCHITECTURE.md): every capability the engine reads that
+    // this adapter does not declare, and every state-driven mechanism that is therefore inert,
+    // stated at construction. The failure this exists to prevent is not a crash - it is a
+    // mechanism quietly falling back to a default for three weeks with nothing in the log.
+    // baseLog.force for the same reason the auth-off and PMT postures use it: a LOG_LEVEL=error
+    // box must still show what the engine is running without.
+    for (const w of capabilityWarnings(gocometStack)) baseLog.force(w);
+    const scope = (gocometStack.account.allowlist || {}).shippers || [];
+    baseLog.force(`[gocomet] stack ONLINE (GC_ENABLE=1): account '${gocometStack.account.accountId}'`
+      + ` | portal ${gocometStack.platformKey} | intents ${config.intentsFileFor(gocometStack.account.accountId)}`
+      + ` | shippers ${scope.length ? scope.join(', ') : 'NONE (it will surface nothing)'}`
+      + ` | discovery ${config.gocomet.discoveryEnabled ? 'ON' : 'OFF (console toggle)'}`
+      + ` | writes ${config.gocomet.bidEnabled ? 'ENABLED (GC_BID=1)' : 'OFF'}`);
+    pushEvent('accounts', { gocomet: 'stack_online', accountId: gocometStack.account.accountId });
+    // GATE 3 OF 4. Read off `config` rather than the store because boot's applyConfigValues has
+    // already folded the persisted console value onto it, so a restart honours the operator's last
+    // save instead of reverting to the env default.
+    applyGoCometDiscovery(config.gocomet.discoveryEnabled);
+    attachTargetPriceWatch();
+    return gocometStack;
+  } catch (e) {
+    const detail = (e && e.message) || String(e);
+    // Half a stack is worse than none: a scheduler holding a file handle and an engine nothing can
+    // reach would sit in the process for its lifetime. Drop whatever was built and reported.
+    if (gocometStack) {
+      try { if (gocometStack.discovery) gocometStack.discovery.stop(); } catch (_) {}
+      const i = stacks.indexOf(gocometStack);
+      if (i >= 0) stacks.splice(i, 1);
+      gocometStack = null;
+    }
+    baseLog.force(`[gocomet] stack construction failed (SuperProcure unaffected): ${detail}`, { err: e });
+    pushEvent('accounts', { level: 'warn', gocomet: 'stack_failed', detail });
+    notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+      // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+      detail: `GoComet stack could not be built: ${detail}` },
+      { dedupeKey: 'gocomet_stack_failed' }).catch(() => {});
+    return null;
+  }
+}
+
+/** A dedupe suffix that identifies a CONDITION rather than an instant - see the still-open alert in
+ *  rehydrateGoCometStack for why a key must never be built from Date.now(). */
+function stableSuffix(value) {
+  return crypto.createHash('sha1').update(String(value)).digest('hex').slice(0, 12);
+}
+
+/**
+ * Re-arm the GoComet auctions that were live when this process last stopped, and retire the ones
+ * that ended while it was down. Returns how many intents the sweep touched.
+ *
+ * THIS RESUMES LIVE BIDDING, which is why it is stated here rather than buried. It used to be
+ * absent, and the note that stood in its place ("its scheduler is NOT rehydrated ... revisit when
+ * GC_BID goes on") was written while writes were off and was never revisited after they went on.
+ * The cost was not theoretical: every pm2 restart orphaned every in-flight GoComet monitor - 52 of
+ * them were sitting at status 'bidding' on the box, each one's last tick seconds before a boot
+ * banner, none of them ever re-armed and none of them ever retired. They also READ as losses, which
+ * is the half that quietly corrupted the win rate. This sweep is what retires them.
+ *
+ * SEPARATE from attachGoCometStack, and not folded into its try/catch, because that catch tears the
+ * stack down: past this point rehydrate may have armed real monitors, and tearing the stack out from
+ * under them would leave live timers bidding into a stack nothing can reach or stop.
+ *
+ * A failure here is the runtime-only bucket of the price-page gate - nothing at submit time could
+ * predict it - so it is loud and desk-visible rather than a log line. It never throws into boot:
+ * GoComet is not on the SuperProcure money path, and a GoComet re-arm failing must not stop SP
+ * coming online.
+ */
+async function rehydrateGoCometStack(stack) {
+  if (!stack || !stack.engine) return 0;
+  // THE WRITE GATE. arm() carries no biddingEnabled check - the intake path refuses the arm instead
+  // (priceRequests, PLATFORM_BIDDING_DISABLED) - and rehydrate calls arm() directly, so without this
+  // a restart with GC_BID off re-arms every persisted intent into exactly the state that refusal
+  // exists to prevent: a monitor that walks its whole ladder while every rung throws at the write
+  // gate, one desk alert per rung per load, and nothing ever bid. The old "its scheduler is NOT
+  // rehydrated" note used to provide this guarantee by doing nothing at all; resuming auctions is
+  // the point now, so it has to be stated. Gated here rather than in the engine because the engine's
+  // capability reads are a pinned seam (test-part1-part2-seam.js) and write permission is decided
+  // above it by design.
+  if (!config.gocomet.bidEnabled) {
+    // THE GATE IS ON THE RE-ARM, NOT ON THE SWEEP. Retiring an auction that ended while the process
+    // was down writes no bid - it corrects a ledger record that is otherwise read as a fought loss -
+    // so it is correct whatever the write flag says. Running only the gated half is what made this
+    // branch report a raw activeIntents() count, which applies no close-time test at all, as
+    // "auctions running before the restart": the desk was sent to hand-quote loads that closed weeks
+    // ago, nothing retired them, and the same wrong instruction returned on every restart.
+    let swept = { retired: 0, stillOpen: [], failed: [] };
+    try {
+      swept = stack.engine.retirePastClose();
+      if (swept.retired) {
+        baseLog.force(`[gocomet] retired ${swept.retired} auction(s) that ended while this process was down (GC_BID off - nothing was re-armed)`);
+        pushEvent('accounts', { level: 'warn', gocomet: 'rehydrate_retired_writes_off', count: swept.retired });
+      }
+      if (swept.failed.length) {
+        const ids = swept.failed.map((it) => String(it.auctionId)).sort();
+        baseLog.force(`[gocomet] ${ids.length} past-close auction(s) could NOT be retired - their closed-auction reporting stays wrong: ${ids.join(', ')}`);
+        pushEvent('accounts', { level: 'warn', gocomet: 'rehydrate_retire_partial', count: ids.length });
+        notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+          // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+          notifyModeOverride: 'whatsapp',
+          detail: `we could not tidy up ${ids.length} GoComet auction(s) that ended while we were down, so the closed-auction reporting for those loads may be wrong until the next restart` },
+        { dedupeKey: `gocomet_retire_partial_${stableSuffix(ids.join(','))}` }).catch(() => {});
+      }
+    } catch (e) {
+      // THE SWEEP ITSELF DIED, so `swept` still holds its zero-value and the still-open block below
+      // cannot run. That is the whole hazard: this catch used to speak only about closed-auction
+      // reporting, so the desk was told about a tidy-up problem and never told that N auctions were
+      // open and unresumed. Nothing here knows WHICH they are - the enumeration is what failed - so
+      // the instruction has to cover any of them.
+      //
+      // Keyed on the FAULT, never on Date.now(), same rule as the population key below. A poisoned
+      // intents file survives every restart, so a clock-suffixed key minted a never-before-seen key
+      // per boot and the notifier's persistent dedupe could never collapse a pm2 restart storm into
+      // one message. A different fault still hashes differently and earns its own.
+      const detail = (e && e.message) || String(e);
+      baseLog.force(`[gocomet] retire sweep FAILED with GC_BID off - stale auctions were NOT retired: ${detail}`, { err: e });
+      pushEvent('accounts', { level: 'warn', gocomet: 'rehydrate_retire_failed', detail });
+      notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+      // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+        detail: 'we could not check the GoComet auctions from before the restart, so the closed-auction reporting for that portal may be wrong and we cannot say which GoComet loads are still open - quote any open GoComet load by hand' },
+      { dedupeKey: `gocomet_retire_failed_${stableSuffix(detail)}` }).catch(() => {});
+    }
+    const stillOpen = swept.stillOpen;
+    if (stillOpen.length) {
+      // Keyed on the POPULATION, never on Date.now(): the old key made every restart a fresh message
+      // about the same stranded loads, and the notifier's dedupe (persistent, cross-restart) could
+      // never collapse them. A genuinely different set of open auctions still earns its own message.
+      const ids = stillOpen.map((it) => String(it.auctionId)).sort();
+      const population = stableSuffix(ids.join(','));
+      baseLog.force(`[gocomet] ${ids.length} auction(s) are still open but GC_BID is off - NOT resumed`);
+      pushEvent('accounts', { level: 'warn', gocomet: 'rehydrate_skipped_writes_off', count: ids.length });
+      notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+      // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+        detail: `${ids.length} GoComet auction(s) are still open after the restart, but bidding is switched off for this portal so none were resumed - quote them by hand` },
+      { dedupeKey: `gocomet_rehydrate_writes_off_${population}` }).catch(() => {});
+    }
+    return 0;
+  }
+  try {
+    return await stack.engine.rehydrate();
+  } catch (e) {
+    const detail = (e && e.message) || String(e);
+    baseLog.force(`[gocomet] rehydrate FAILED - auctions live before this restart were NOT resumed: ${detail}`, { err: e });
+    pushEvent('accounts', { level: 'warn', gocomet: 'rehydrate_failed', detail });
+    // platformKey is not decoration: Notifier.notifyModeFor resolves an UNTAGGED payload to
+    // SuperProcure, so an untagged GoComet alert goes out on SuperProcure's channel.
+    // Keyed on the FAULT for the same reason the retire catch above is: a durable intent arm() cannot
+    // rebuild describes a condition that outlives the restart, which is exactly what the notifier's
+    // persistent dedupe exists to collapse.
+    notifier.alert('error', { context: 'gocomet', platformKey: config.gocomet.platformKey,
+      // C078: an ops/health alarm, never gated by the per-load gocometNotifyMode setting.
+      notifyModeOverride: 'whatsapp',
+      detail: 'we restarted and could not resume the GoComet auctions that were running before - quote any open GoComet load by hand' },
+    { dedupeKey: `gocomet_rehydrate_failed_${stableSuffix(detail)}` }).catch(() => {});
+    return 0;
+  }
+}
+
+async function boot() {
+  // Provenance banner first, so the very top of `pm2 logs bid-command` answers "what build is
+  // live" - traceable to a tag, a release page, and a sha (or 'dev' on an unstamped checkout).
+  baseLog.info(bootBannerLine(versionInfo));
+  // fail closed: a real-money console must not start without a login gate + a stable secret.
+  if (REAL && (!config.admin.passHash || !config.admin.sessionSecret)) {
+    throw new Error('real mode requires SP_ADMIN_PASS_HASH and SP_SESSION_SECRET (operator login). Generate the hash: node scripts/hash-password.js');
+  }
+  if (!AUTH_ON) {
+    const msg = '[auth] operator login DISABLED (no SP_ADMIN_PASS_HASH) - dev/mock only; set it before exposing the console.';
+    baseLog.force(msg); // unconditional by design - a LOG_LEVEL=error deployment must not silence this
+    pushEvent('accounts', { level: 'warn', msg });
+  }
+  // Per-tonne posture, stated once at boot. The flag lives in the model layer (rulesConstants) with
+  // no config handle, and only the exact string '1' enables it - so an operator who set
+  // SP_PMT_BID=true would otherwise watch PMT loads refuse with no indication why, and nobody could
+  // answer "is per-tonne bidding on in production right now?" without SSHing in to read .env.
+  // ENABLED is logged with force, the same reasoning as the auth-off advisory above: it is the
+  // live-money posture, and a LOG_LEVEL=error box must still show it to whoever reads an incident.
+  // Disabled is the safe default and stays at info.
+  if (pmtBidEnabled()) {
+    baseLog.force('[pmt] per-tonne bidding ENABLED (SP_PMT_BID=1) - PMT loads WILL be bid; wire amount = the bare per-MT rate (SuperProcure applies the tonnage itself)');
+  } else {
+    baseLog.info('[pmt] per-tonne bidding disabled (default) - PMT loads are refused as unsupported_rule_blocked; set SP_PMT_BID=1 (exactly "1") to enable');
+  }
+
+  // accounts are data: empty/absent collection -> the one implicit 'primary' account
+  // (today's exact behaviour). Read them BEFORE wiring config, so every account's
+  // engine gets the persisted anti-detection settings.
+  // Phase 2: populate the model from legacy config/marginProfiles once (idempotent). The margin
+  // seam reads it after this runs; routing + targets still read legacy until their swaps land.
+  // No-op when the model is already populated or there is no legacy data.
+  await migrateLegacyModel({ store, log }).catch((e) => log(`[migrate] skipped: ${e && e.message}`));
+  await refreshModelSnapshot(); // prime the derived-targets snapshot before discovery starts
+
+  // fail CLOSED: a per-customer rules config that doesn't match the schema stops boot rather than
+  // silently mis-bidding (same posture as the operator-login secrets check above). No-op on today's
+  // data (no customer carries a rules block yet). Enums: src/model/rulesConstants.js; schema +
+  // validator: src/model/rulesConfig.js.
+  assertCustomerRulesValid(modelSnapshot.customers);
+
+  const accounts = (await loadAccounts(store)).filter((a) => a.enabled !== false);
+  const multi = accounts.length > 1;
+  if (multi) {
+    // LOUD advisory: overlapping shipper scopes mean shared loads; the shared request
+    // store + serialized discovery gate guarantee one price request (first account wins).
+    const warn = allowlistOverlapWarning(accounts, config.allowlist);
+    // unconditional by design (baseLog.force, not .warn) - a LOG_LEVEL=error deployment must not silence this
+    if (warn) { baseLog.force(`[accounts] WARNING: ${warn}`); pushEvent('accounts', { level: 'warn', msg: warn }); }
+    // PRECISE advisory: the shipper-name heuristic above can miss (or false-positive on) real
+    // overlap - this reads the actual branchIds SuperProcure granted each account's last login.
+    for (const w of branchOverlapWarnings(accounts)) {
+      baseLog.force(`[accounts] WARNING: ${w}`);
+      pushEvent('accounts', { level: 'warn', msg: w });
+    }
+  }
+
+  // BEFORE any stack is built, because buildRealStack reads this ledger to decide what episode its
+  // adapter inherits. An outage that was still open when the process stopped therefore survives the
+  // restart: activation sends the provisional "we are confirming, keep quoting by hand" message, and
+  // the first accepted bid closes the episode under the identity the desk's original message carried.
+  // Without it a restart forgot the outage entirely and the desk was never told to stop.
+  await loadAuthDeadMarks();
+
+  if (REAL) {
+    for (const account of accounts) {
+      stacks.push(buildRealStack(account, multi ? { accountId: account.accountId, label: account.label } : null));
+    }
+  } else if (multi) {
+    // mock mode: the primary stack exists at module level; bind it to the 'primary'
+    // record (when there is one) and add a mock stack per additional account so
+    // multi-account wiring is exercisable offline. The demo/sim routes keep driving
+    // the primary stack only.
+    let extras = accounts;
+    if (accounts[0].accountId === stacks[0].account.accountId) { stacks[0].account = accounts[0]; extras = accounts.slice(1); }
+    stacks[0].tag = { accountId: stacks[0].account.accountId, label: stacks[0].account.label };
+    for (const account of extras) {
+      const stack = { account, tag: { accountId: account.accountId, label: account.label } };
+      stack.adapter = new MockSuperProcureAdapter(sim, {});
+      stack.scheduler = new DurableScheduler(config.intentsFileFor(account.accountId));
+      stack.engine = makeEngine(stack.adapter, stack.scheduler, stack);
+      stack.discovery = null;
+      stacks.push(stack);
+    }
+  }
+
+  // hydrate live components from persisted config before wiring the loops (fresh box -> defaults)
+  applyConfigValues(await configStore.get());
+  await startWalkTiming();
+
+  // Register the GoComet adapter (Module 2, Phase 1) behind its env gate. No-op unless GC_TOKEN
+  // is set; never wired into the SP bidding stack; best-effort so it can never affect SP boot.
+  await registerGoCometAdapter();
+
+  // Daily morning heartbeat (src/notify/heartbeat.js): one WhatsApp DM to the configured
+  // recipients (default: the Suyashh person record) with a health verdict + yesterday's
+  // funnel. Started here - before the REAL/mock split - because its collectors read
+  // `stacks` lazily at fire time (08:00 IST), long after activation has settled either
+  // way; nothing about scheduling depends on which adapter is live. The unref'd timer
+  // never keeps a test process alive, and the send path no-ops (logged) when WhatsApp
+  // is unconfigured, so mock/dev boxes stay quiet without extra gating here. `sysProbe`
+  // (serverHealth) is the injected os/fs reader for the Server section - the one seam that
+  // touches the filesystem, so heartbeat.js itself stays pure.
+  startDailyHeartbeat({ stacks, store, requests, personStore, staffRoster, wa, notifier, config, sysProbe: serverHealth });
+  // Per-customer end-of-day report (src/notify/eodReport.js): at 20:00 IST each
+  // customer group gets its own day summary. Rides the same daily-IST rail and the
+  // same reasoning as the heartbeat above (lazy reads at fire time, unref'd timer,
+  // no-op send when WhatsApp is unconfigured); groups resolve dynamically from the
+  // model at each fire, so a group added mid-day is included the same evening.
+  startDailyEodReport({ store, requests, personStore, customerStore, assignmentStore, notifier, config });
+  // Director-level cross-customer EOD participation DM (src/notify/directorEod.js): at 20:10
+  // IST, just after the group EODs, ONE participation summary across all customers, plus the
+  // desk scorecard (CW-240), goes by direct message to the configured directors. Rides the same
+  // daily-IST rail and the same lazy-read/unref'd-timer reasoning as the two above; OFF unless
+  // SP_DIRECTOR_EOD_RECIPIENTS is set (config.directorEod.enabled derives from a non-empty
+  // recipient list), so a box that never configures it stays silent. personStore + assignmentStore
+  // feed the scorecard's per-group resolution (resolveGroups needs both).
+  startDailyDirectorEod({ store, requests, customerStore, personStore, assignmentStore, notifier, config });
+
+  if (REAL) {
+    let rehydrated = 0;
+    // Per-account activation (login -> identity cache -> expiry watch -> socket -> rehydrate ->
+    // discovery) is shared with the reconnect rebuild via activateRealStack, so the sequence never
+    // drifts and the token-expiry interval handle is stored on the stack for clean teardown.
+    //
+    // Isolated per account: one account's login failing must never take every OTHER account's
+    // bidding down with it. Before this, the loop had no try/catch, so a single bad token threw
+    // out of boot() into the process.exit(1) below and killed bidding for every account on the
+    // box (2026-07-11 incident: a freshly-onboarded account's token 401'd and crash-looped the
+    // whole process for ~4.5 minutes with nothing paging a human until it happened to recover).
+    // A failed account is torn down (nothing to leak - login() is always the first await inside
+    // activateRealStack, so failure this early never gets as far as a socket or armed timers) and
+    // dropped from `stacks` so it doesn't sit around as a zombie that never logs in, never watches
+    // discovery, and never appears correctly in /api/accounts. Only a TOTAL failure (every account
+    // down) still aborts boot - see the throw below, which still reaches the existing
+    // boot().catch(...) -> process.exit(1) fail-loud path for that genuinely fatal case.
+    const bootFailures = [];
+    // ONE instant for the whole boot. It is the component that makes each boot's alert keys unique -
+    // see the loop below for why that is not cosmetic - and taking it once means several accounts
+    // failing in the same boot each get their own key (the account id differs) while a single
+    // account can never get two.
+    const bootAt = Date.now();
+    for (const stack of stacks.slice()) {
+      try {
+        rehydrated += await activateRealStack(stack);
+      } catch (e) {
+        const detail = (e && e.message) || String(e);
+        baseLog.force(`[boot] account '${stack.account.accountId}' failed to come online: ${detail}`, { err: e });
+        teardownStack(stack);
+        stacks.splice(stacks.indexOf(stack), 1);
+        // authFailed is READ off the error's own code, never string-matched on the detail:
+        // 'auth_failed_401' is a message login() happens to build out of a status code and could be
+        // reworded, while the code is set on every auth path there.
+        //
+        // ...and the CAUSE alongside it, derived here rather than read off the error, because there is
+        // nothing on the error to read. The runtime latch threads `authReason` through ensureSession,
+        // and login() - the function that fails at THIS site - never calls ensureSession and never
+        // stamps one, so every boot-time auth failure rendered the generic "logged out, quote by hand"
+        // copy even when the token had simply lapsed and the fix is a fresh verification code rather
+        // than a Reconnect. jwtExp is arithmetic on our own credential (a static method, no instance
+        // needed) and is exactly the same test _tokenPhase makes at runtime, so the two paths reach
+        // the same conclusion about the same token. Captured INSIDE the loop, where `stack.account`
+        // still exists - the stack is spliced out above and the alert loop below has only `f`.
+        bootFailures.push({ accountId: stack.account.accountId, label: stack.account.label, detail,
+          authFailed: !!(e && e.code === 'AUTH'),
+          tokenExpired: bootTokenExpired(stack.account, bootAt) });
+      }
+    }
+    if (!stacks.length) {
+      throw new Error(`real mode: every enabled account failed to come online (${bootFailures.map((f) => f.accountId).join(', ')})`);
+    }
+    retagStacks(); // a boot failure can drop a multi-account box back to one live account
+    for (const f of bootFailures) {
+      pushEvent('accounts', { level: 'warn', bootFailed: f.accountId, detail: f.detail });
+      // THE KEY CARRIES THE BOOT INSTANT, and that is a bug fix, not tidying. The notifier's sent-mark
+      // is a PERMANENT store document with no TTL, so the old `${accountId}_boot_failed` fired ONCE
+      // EVER per account: after the 2026-08-04 13:42 restart wrote three of those marks, those three
+      // accounts could never alert on a boot failure again. Every boot now gets its own key, so a
+      // repeat failure on a later boot is a new message rather than silence.
+      if (f.authFailed) {
+        // A dead SuperProcure session at boot is the SAME condition the runtime latch detects, so it
+        // renders the same template with the same wording through the same raiser. A non-auth boot
+        // failure (network, config) keeps the generic alarm below, because "the login is logged out"
+        // would be a lie for it.
+        // Marked as well as raised: this stack has already been torn down and spliced out of
+        // `stacks`, so there is no adapter left that could ever announce the recovery. The mark is
+        // what makes a later reconnect on this account send the all-clear.
+        //
+        // KEYED TO THE EPISODE THE LEDGER ALREADY HOLDS, not to this boot. The ledger is hydrated
+        // before any stack is built, so a restart DURING a still-open outage arrives here already
+        // knowing that outage's identity - and noteAuthDeadMark correctly refuses to rewind it. Keying
+        // the alert off a fresh `bootAt` anyway minted a second, deliverable dedupe key for the same
+        // ongoing episode: a duplicate "logged out" on every restart, while the eventual all-clear
+        // still carries the original identity and never closes this duplicate's thread. `bootAt` is
+        // the fallback for what it was always right for - a boot failure with no prior mark, i.e. a
+        // genuinely new outage that starts at boot - and it keeps that case's per-boot key, which is
+        // what stops the notifier's permanent, TTL-less sent-mark silencing every later boot failure.
+        const priorEpisode = openAuthEpisodeFor(f.accountId);
+        const down = { accountId: f.accountId, accountLabel: f.label || f.accountId,
+          since: Number.isFinite(priorEpisode) ? priorEpisode : bootAt,
+          reason: f.tokenExpired ? 'token_expired' : null };
+        noteAuthDeadMark(down);
+        await raiseAuthDeadOnce(down, () => computeAffectedCustomers(f.accountId));
+      } else {
+        // reuses the existing 'error' WhatsApp template (context/detail) - the same one engine
+        // alerts already send - so this doesn't need a new template just to reach a human.
+        notifier.alert('error', { context: f.label || f.accountId, detail: `account failed to come online: ${f.detail}` },
+          { dedupeKey: `${f.accountId}_boot_failed_${bootAt}` }).catch(() => {});
+      }
+    }
+    // AFTER the SuperProcure activation loop, the total-failure abort and retagStacks - see
+    // attachGoCometStack for why all three must be past. No-op unless GC_ENABLE=1.
+    // The rehydrate is folded into the same `rehydrated` count the banner reports, because the
+    // operator reading that line wants "how many auctions came back", not "how many SP ones did".
+    rehydrated += await rehydrateGoCometStack(attachGoCometStack());
+    // A row parked while its portal had no live stack wrote no intent, so rehydrate cannot restore it.
+    await rearmParkedRequests();
+    return app.listen(config.port, config.host, () => {
+      baseLog.info(`[bid-command] mode=REAL (LIVE - placing real bids) listening http://localhost:${config.port}`);
+      if (multi) baseLog.info(`[bid-command] accounts: ${stacks.length} (${stacks.map((s) => s.account.accountId).join(', ')})`);
+      if (bootFailures.length) baseLog.force(`[bid-command] WARNING: ${bootFailures.length} account(s) failed to come online: ${bootFailures.map((f) => f.accountId).join(', ')}`);
+      if (rehydrated) baseLog.info(`[bid-command] rehydrated ${rehydrated} auction(s) after restart`);
+      baseLog.info(`[bid-command] discovery polling every ${Math.round(config.discoveryIntervalMs / 1000)}s; price requests at /api/price-requests`);
+      baseLog.info(costFloorBootLine());
+    });
+  }
+  for (const stack of stacks) await stack.adapter.login();
+  sim.startAutoStep(config.sim.autoStepMs);
+  if (process.env.SP_DEMO_SEED === '1') { seedDemoLiveAuctions(); await seedDemoPriceRequests(); await seedDemoPeople(); }
+  let rehydrated = 0;
+  for (const stack of stacks) rehydrated += await stack.engine.rehydrate();
+  // same gate, same no-op; after the SP rehydrate so it never re-arms SP intents. Mirrors the REAL
+  // path above deliberately even though the box only ever takes that one - a mock/dev boot that
+  // silently skipped the re-arm is exactly how the REAL path's omission went unnoticed for so long.
+  rehydrated += await rehydrateGoCometStack(attachGoCometStack());
+  return app.listen(config.port, config.host, () => {
+    baseLog.info(`[bid-command] mode=${config.mode} listening http://localhost:${config.port}`);
+    if (multi) baseLog.info(`[bid-command] accounts: ${stacks.length} (${stacks.map((s) => s.account.accountId).join(', ')})`);
+    if (rehydrated) baseLog.info(`[bid-command] rehydrated ${rehydrated} live auction(s) from disk after restart`);
+    baseLog.info(`[bid-command] open the dashboard, click "Run demo" to watch it bid.`);
+  });
+}
+
+// ---- process-level safety nets -----------------------------------------------
+// An uncaught exception is a crash we didn't handle anywhere closer to the source.
+// Node's own default behavior for one is to log and exit; PM2's autorestart plus
+// DurableScheduler's boot-time re-arm of every still-open intent are specifically built
+// to recover cleanly through a restart, so exiting here is not a new risk - it's the
+// same behavior Node already has, just logged in the same structured JSON shape as
+// everything else instead of a raw stack dump to stderr.
+const processLog = createLogger('process');
+process.on('uncaughtException', (err) => {
+  processLog.error('uncaught exception', { err });
+  process.exit(1);
+});
+
+// A rejected promise nobody attached a .catch to. Logged for visibility but NOT fatal -
+// unlike an uncaught exception this is usually a missed .catch on a best-effort side
+// path (a notification send, an audit-log write) rather than a sign the process itself
+// is in a broken state, so crashing over it would trade one log line for real downtime.
+process.on('unhandledRejection', (reason) => {
+  processLog.error('unhandled rejection', { err: reason instanceof Error ? reason : new Error(String(reason)) });
+});
+
+if (require.main === module) {
+  boot().catch((e) => { baseLog.error('boot failed', { err: e }); process.exit(1); });
+}
+
+module.exports = {
+  app, requests, notifier, store, bidLogger, configStore, customerStore, renderPriceForm, renderCaptured, boot, stacks,
+  // exported so the three per-tonne commitment states can be pinned as a decision rather than as a
+  // regex over rendered HTML - it states a money commitment and the unit it is stated in.
+  pmtCommitmentText,
+  // Exported so the episode-handover tests can drive the REAL ledger rather than a hand-copied model
+  // of it. This is the layer that lost its authority to declare recovery, and the composed property -
+  // "a reconnect inherits the open episode and announces only that it is confirming" - has no HTTP
+  // surface and cannot be reached from the adapter alone. Every previous round's worst defects were
+  // composed properties that each layer got locally right, so this one gets a real test.
+  // loadAuthDeadMarks is exported for the same reason: "an outage survives a process restart" is a
+  // property of the LEDGER's durability and has no HTTP surface at all - the only way to drive it is
+  // to write a mark, drop the in-memory copy the way a restart does, and hydrate again.
+  noteAuthDeadMark, openAuthEpisodeFor, clearAuthDeadMark, announceAuthReconnecting, loadAuthDeadMarks,
+  AUTH_DEAD_MARKS_COLLECTION,
+  // Exported so "which host does this account's OTP go to" can be pinned directly. It decides
+  // whether a live customer credential is requested from - and later sent to - SuperProcure main
+  // or the customer's own white-label host, and the REAL-mode route that calls it cannot be
+  // reached offline, so a module-level test is the only place that decision can be checked.
+  tenantAuthFor, tenantConfigError,
+  // Exported alongside it because a null here silently reverts the whole short-lived-token path to
+  // the day ladder and the 24h cadence, and that regression is invisible in the logs.
+  tokenLifetimeOf,
+  // exported so the ceiling test can sweep it directly: the suggested cost must NEVER produce an
+  // opening bid above the cap, and that is an arithmetic property (floor vs round), not an HTTP one.
+  ceilingCostTarget,
+  // exported purely so the page-JS test can pin its behaviour against hostile values -
+  // it is the seam that keeps script-embedded data from killing the guard a second time.
+  jsonForScript, pricingClosed,
+  // exported purely so the page-JS test can pin the /price countdown banner against the
+  // engine's REAL live thresholds, not a hand-copied number that could silently drift.
+  PRICE_ALERT_AMBER_MS, PRICE_ALERT_RED_MS,
+  // exported so the desk-cost-floor test can pin the effective floor and the boot line an operator
+  // reads off pm2-out.log, neither of which is reachable from an HTTP surface.
+  hardCostFloorFor, costFloorBootLine,
+  // The four GoComet gates have no HTTP surface between them, and the one that matters most is a
+  // NEGATIVE: with GC_ENABLE unset nothing may be constructed. Proving that needs to see that the
+  // adapter registered and the stack did not - two different variables, one of which is meant to
+  // stay null. stackForRequest and applyConfigValues are exported alongside because the two
+  // remaining properties are compositions no route exposes: that a GoComet-owned price request
+  // resolves to the GoComet ENGINE rather than falling back to stacks[0] (the SuperProcure one),
+  // and that the console toggle stops and starts the poller without rebuilding the stack around it.
+  stackForRequest, applyConfigValues, rehydrateOwnedStack,
+  // Exported so a rebuilt engine's anti-detection posture (D017: does a FRESH engine pick up the
+  // live Settings, or only BidEngine's own construction defaults) can be pinned directly - the
+  // defect only shows at the moment a NEW engine is built, which normal boot's stacks/rebuild
+  // sequencing makes otherwise unreachable from an HTTP surface without a real reconnect.
+  makeEngine,
+  // Exported for the same reason: what the price page PROMISES and what an arm actually does are
+  // resolved through the same lookup by design, and a record whose portal is not running is the
+  // case where the two would otherwise drift - the page inheriting an empty capabilities object's
+  // permissive defaults while the submit refuses. There is no HTTP surface that states the two
+  // side by side.
+  portalFactsFor, loadWillNotBid,
+  get gocometAdapter() { return gocometAdapter; },
+  get gocometStack() { return gocometStack; },
+  // primary-stack views, kept for compatibility (tests + the mock demo import these);
+  // getters because real-mode stacks are only built inside boot().
+  get engine() { return stacks[0] ? stacks[0].engine : null; },
+  get discovery() { return stacks[0] ? stacks[0].discovery : null; },
+};

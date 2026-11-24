@@ -1,0 +1,49 @@
+node_modules/
+.build/
+# Internal Claude context — never ships in the deliverable repo handed to BRL.
+CLAUDE.local.md
+data/*.json
+data/*.tmp
+data/*.corrupt.*
+.env
+*.log
+npm-debug.log*
+data/*.png
+data/recon/
+data/logs/
+# React console build output - built on deploy, never committed
+dashboard/dist/
+# Release-provenance stamp - written by scripts/deploy.sh at package time, shipped in the
+# tarball, read by the server at boot. A build artifact, never committed (would also trip the
+# deploy clean-tree guard on the next run).
+version.json
+# Generated screenshots from scripts/ui-state-flow-screenshots.mjs - regenerate, don't commit
+scripts/ui-audit-screenshots/
+
+# Generated screenshots from scripts/ui-cohesion-screenshots.mjs - regenerate, don't commit
+scripts/ui-cohesion-screenshots/
+
+# Generated screenshots from scripts/ui-load-tables-screenshots.js - regenerate, don't commit
+scripts/ui-load-tables-screenshots/
+
+# Generated screenshots from scripts/ui-price-flow-screenshots.mjs / ui-settings-screenshots.mjs - regenerate, don't commit
+scripts/ui-price-flow-shots/
+scripts/ui-settings-shots/
+
+# local visual-review artifacts (regenerable via scripts/preview-price-pages.mjs)
+docs/reviews/**/screenshots/
+
+# Internal review + diagnosis artifacts (local /review + /diagnose outputs; never shipped).
+# Makes the docs/reviews/**/screenshots/ rule above redundant - kept for clarity, harmless.
+docs/reviews/
+docs/diagnoses/
+# Internal Claude guidance (paired with CLAUDE.local.md; keep local, never in the tarball).
+# NOTE: scripts/deploy.sh tars the working tree and only --excludes CLAUDE.local.md, so
+# ignoring this keeps it out of git but NOT out of the tarball - deploy.sh needs a matching
+# --exclude='CLAUDE.md' to stop it shipping to the box.
+CLAUDE.md
+# One-off puppeteer debug/verify throwaways (regenerate or archive; not committed).
+debug-menu.js
+debug-menu-v2.js
+verify-bidder-checks.js
+verify-bidder-final.js

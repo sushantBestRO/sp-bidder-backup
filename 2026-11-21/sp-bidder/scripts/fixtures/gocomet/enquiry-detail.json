@@ -1,0 +1,122 @@
+{
+  "id": "eec5631d-913a-405f-bca5-b45593064668",
+  "name": "3262511465-5601270693 (E.com)",
+  "number_of_power_negotiations": 0,
+  "created_by": {
+    "_redacted": "REDACTED - see README.md in this directory"
+  },
+  "enquiry_type": "Spot",
+  "mode": "FTL",
+  "shipment_type": "DOMESTIC",
+  "creation_type": "direct",
+  "key": "2608115VVB",
+  "l1_quote_total_cost_display": null,
+  "cargo_type": {
+    "hazardous": false,
+    "envirotainer": false,
+    "refrigerated": false
+  },
+  "cargo_quantity": 1.0,
+  "cargo_unit": "TRUCK",
+  "hazardous": false,
+  "refrigerated": false,
+  "envirotainer": false,
+  "valid_for_fi": false,
+  "temperature": null,
+  "quantity": [
+    "1 x 32FTSXL (LxWXH  32'x8'x8'8\") 7 Ton Truck"
+  ],
+  "packaging_details": [],
+  "stackable": true,
+  "created_at": "11/08/2026 10:21",
+  "origin": "Survey No. 1934, NH-48, Near Darshan Hotel, Village # Degam, Taluka # Chikhli, Degam-396530, Gujarat",
+  "destination": "M/S AVNI SOLAR 10/532G, St Marys Building, Kanakkari, Kottayam-686632 Kerala",
+  "origin_zip_code": "396530",
+  "destination_zip_code": "686632",
+  "other_origins": [],
+  "other_origin_zip_codes": [],
+  "other_destinations": [],
+  "other_destination_zip_codes": [],
+  "bid_close_time": "11/08/2026 11:30",
+  "bid_open_time": null,
+  "quote_valid_from": null,
+  "min_quote_valid_till": null,
+  "bid_close_timestamp": "2026-08-11T11:30:00.000+05:30",
+  "current_server_time": "2026-08-11T10:40:19.506+05:30",
+  "enquiry_label": "New",
+  "bidding_closed": false,
+  "bidding_closed_at": null,
+  "archived": false,
+  "gross_weight": [
+    "1 x 32FTSXL (LxWXH  32'x8'x8'8\") 7 Ton Truck 7000.0 KG"
+  ],
+  "volumetric_weight": "N/A",
+  "chargeable_weight": "N/A",
+  "net_weight": "N/A",
+  "volume": "N/A",
+  "products": [],
+  "cargo_invoice_data": {
+    "cargo_value_currency": "INR"
+  },
+  "stuffing_date": "11/08/2026",
+  "charges_required": "",
+  "rejection_remarks": "",
+  "rejection_reason_type": null,
+  "bid_closing_in": 2980,
+  "bid_opening_in": null,
+  "confirmed_at": null,
+  "comments": null,
+  "ceiling_rate": null,
+  "ceiling_rate_currency": "INR",
+  "slab_rate": 300.0,
+  "formatted_ceiling_rate": null,
+  "formatted_preferred_carrier_lines": [],
+  "quote_defaults": [],
+  "quote_validation": [],
+  "pallet_count": null,
+  "dispatch_custom_fields": [],
+  "custom_columns": [
+    {
+      "key": "expected_transit_time",
+      "label": "Expected Transit Time",
+      "value": 6,
+      "priority": 0
+    },
+    {
+      "key": "distance_in_km_from_the_loading_location_pol_to_the_delivery_location_pod",
+      "label": "Distance in KM from the Loading Location (POL) to the Delivery Location (POD)",
+      "value": "1672",
+      "priority": 1
+    },
+    {
+      "key": "business_type",
+      "label": "Business Type",
+      "value": "KAM",
+      "priority": 4
+    },
+    {
+      "key": "total_gross_weight_mt",
+      "label": "Total Gross Weight (MT)",
+      "value": 7,
+      "priority": 5
+    }
+  ],
+  "show_consignment_details": false,
+  "auction_type": "British Auction",
+  "quote_approved_by": null,
+  "cargo_value": null,
+  "client_company_name": "Waaree Energies Ltd.",
+  "client_group": {
+    "_redacted": "REDACTED - see README.md in this directory"
+  },
+  "status": "Open",
+  "workflow_creation_status": "pending",
+  "quotes_sent": 0,
+  "vendor_rank": null,
+  "shipper": null,
+  "consignee": null,
+  "is_negotiating": false,
+  "editing_enabled": false,
+  "total_revisions": 0,
+  "revisions_left": 3
+}

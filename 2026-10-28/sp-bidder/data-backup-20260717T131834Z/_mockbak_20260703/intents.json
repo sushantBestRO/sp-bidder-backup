@@ -1,0 +1,103 @@
+{
+  "savedAt": 1783053932227,
+  "intents": [
+    {
+      "createdAt": 1782558479610,
+      "auctionId": "SPA-0001",
+      "lane": {
+        "origin": "Chakan, MH",
+        "destination": "Bawal, HR"
+      },
+      "equipment": "20ft container",
+      "units": 3,
+      "closesAt": 1783055612029,
+      "marketRate": 41120,
+      "costFloor": 33864,
+      "ladder": [
+        45232,
+        44777,
+        43413,
+        41140,
+        37956,
+        33864
+      ],
+      "status": "armed",
+      "firedRungs": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783053932030
+    },
+    {
+      "createdAt": 1782558479615,
+      "auctionId": "SPA-0002",
+      "lane": {
+        "origin": "Mundra, GJ",
+        "destination": "Bhiwandi, MH"
+      },
+      "equipment": "40ft container",
+      "units": 3,
+      "closesAt": 1783055012033,
+      "marketRate": 75374,
+      "costFloor": 62072,
+      "ladder": [
+        82911,
+        82077,
+        79577,
+        75409,
+        69574,
+        62072
+      ],
+      "status": "bidding",
+      "firedRungs": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783053932227,
+      "revisionsLeft": 5
+    },
+    {
+      "createdAt": 1782558479617,
+      "auctionId": "SPA-0003",
+      "lane": {
+        "origin": "Hosur, TN",
+        "destination": "Pantnagar, UK"
+      },
+      "equipment": "32ft MXL",
+      "units": 1,
+      "closesAt": 1783056392034,
+      "marketRate": 91436,
+      "costFloor": 75300,
+      "ladder": [
+        100580,
+        99569,
+        96535,
+        91479,
+        84401,
+        75300
+      ],
+      "status": "armed",
+      "firedRungs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783053932034
+    }
+  ]
+}

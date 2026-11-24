@@ -1,0 +1,151 @@
+{
+  "current": {
+    "marginsPct": [
+      12.6,
+      7.2,
+      5
+    ],
+    "minMarginPct": 5,
+    "allowlist": {
+      "shippers": [
+        "Syngenta"
+      ],
+      "lanes": [],
+      "hardCloseOnly": true
+    },
+    "recipients": [
+      {
+        "name": "Suyashh Gupta",
+        "phone": "+919594937777",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      },
+      {
+        "name": "Siddharth Rodrigues",
+        "phone": "+919356252711",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      },
+      {
+        "name": "sushant govinde",
+        "phone": "+919594963468",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      }
+    ],
+    "discoveryIntervalMs": 50000,
+    "priceDeadlineLeadMs": 90000,
+    "reminderLeadMs": 300000,
+    "notifyMode": "whatsapp",
+    "gocometNotifyMode": "whatsapp",
+    "antiDetection": {
+      "enabled": true,
+      "cadenceJitterMs": 250,
+      "openJitterMs": 4000,
+      "maxBidsPerMin": 20,
+      "minInterFireMs": 150
+    },
+    "softClose": {
+      "enabled": true,
+      "shippers": [
+        "Havells",
+        "Dynamic Cables",
+        "Cords Cable",
+        "Payal Polyplast",
+        "Epack",
+        "Renewsys",
+        "Shriji",
+        "KEI",
+        "Transrail",
+        "Vishal",
+        "Premier",
+        "Goodluck",
+        "Safex Chemicals",
+        "Rallis",
+        "Syngenta",
+        "Durian",
+        "Tata Consumer",
+        "BG",
+        "Borosil",
+        "Automat",
+        "Hindalco",
+        "SIKA",
+        "ADAMA",
+        "ION Exchange"
+      ],
+      "mode": "live",
+      "reserve": 1
+    },
+    "rounding": {
+      "enabled": true,
+      "shippers": [
+        "Durian"
+      ],
+      "step": 100
+    },
+    "gocometDiscovery": true,
+    "clericalFloor": {
+      "absRs": null,
+      "perKmRs": null
+    },
+    "walk": {
+      "percentile": 85,
+      "landPercentile": 95,
+      "measuredSince": 1790512156417,
+      "sp": {
+        "enabled": true,
+        "stepTimeMs": 1000,
+        "landMs": 1500,
+        "safetyMarginMs": 100,
+        "maxWalkWindowMs": 6000,
+        "stepTimeSource": "measured",
+        "windowDays": 5,
+        "minSamples": 50,
+        "probeLeadMs": 4000
+      },
+      "gocomet": {
+        "enabled": true,
+        "stepTimeMs": 2500,
+        "landMs": 4500,
+        "safetyMarginMs": 100,
+        "maxWalkWindowMs": 10000,
+        "clockErrorMs": 1000,
+        "stepTimeSource": "measured",
+        "windowDays": 5,
+        "minSamples": 50,
+        "probeLeadMs": 9000,
+        "finalShotWithoutRead": true
+      }
+    }
+  }
+}

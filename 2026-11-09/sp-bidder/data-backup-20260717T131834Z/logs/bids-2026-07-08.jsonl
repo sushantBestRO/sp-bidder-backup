@@ -1,0 +1,4 @@
+{"ts":1783508375193,"kind":"bid_placed","auctionId":"22954131","price":50670,"rungIndex":0,"rank":null,"latencyMs":137}
+{"ts":1783508376373,"kind":"bid_placed","auctionId":"22954131","price":48240,"rungIndex":1,"rank":null,"latencyMs":84}
+{"ts":1783508400140,"kind":"auction_result","auctionId":"22954131","won":false,"finalRank":6}
+{"ts":1783511100089,"kind":"auction_result","auctionId":"22956349","won":false,"finalRank":6}

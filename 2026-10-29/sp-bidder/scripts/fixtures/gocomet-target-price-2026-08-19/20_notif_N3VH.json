@@ -1,0 +1,232 @@
+{
+  "notifications": {
+    "notifications": [
+      {
+        "id": "33cbd2c5-999f-4087-be6a-487deecb5b81",
+        "subject": "Desk User One(BEST ROADWAYS LTD-Kutchh) has updated Freight Quote TBV602 against the Target Price",
+        "message": "<table border='1'><tr> <td></td><td><b>Previous Rate Per Unit</b></td> <td><b>Target Rate Per Unit</b></td> <td><b>Updated Rate Per Unit</b></td></tr><tr> <td><b>Total Charge</b></td> <td>1,02,695.0 INR</td> <td>98000.0 INR</td> <td>99,000.0 INR</td> </tr></table>",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_updated_during_negotiation",
+        "created_at": "17/08/2026 20:54 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 20:54:57 UTC +05:30",
+        "created_by": {
+          "id": "87ecaca1-79d6-4001-84c6-d433cc77e232",
+          "name": "Desk User One",
+          "email": "desk.one@example.com",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "logistics"
+          ],
+          "company_name": "BEST ROADWAYS LTD-Kutchh"
+        },
+        "web_data": {
+          "message": "<table border='1'><tr> <td></td><td><b>Previous Rate Per Unit</b></td> <td><b>Target Rate Per Unit</b></td> <td><b>Updated Rate Per Unit</b></td></tr><tr> <td><b>Total Charge</b></td> <td>1,02,695.0 INR</td> <td>98000.0 INR</td> <td>99,000.0 INR</td> </tr></table>",
+          "subject": "Desk User One(BEST ROADWAYS LTD-Kutchh) has updated Freight Quote TBV602 against the Target Price",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "6a026d5f-a101-456d-a737-a39ed7a17fc0",
+        "subject": "Desk User One(BEST ROADWAYS LTD-Kutchh) has updated Freight Quote (TBV602)",
+        "message": "<b>Charges</b> changed from 1,02,695.0 INR to 99,000.0 INR <br>",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_updated",
+        "created_at": "17/08/2026 20:54 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 20:54:56 UTC +05:30",
+        "created_by": {
+          "id": "87ecaca1-79d6-4001-84c6-d433cc77e232",
+          "name": "Desk User One",
+          "email": "desk.one@example.com",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "logistics"
+          ],
+          "company_name": "BEST ROADWAYS LTD-Kutchh"
+        },
+        "web_data": {
+          "message": "<b>Charges</b> changed from 1,02,695.0 INR to 99,000.0 INR <br>",
+          "subject": "Desk User One(BEST ROADWAYS LTD-Kutchh) has updated Freight Quote (TBV602)",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "28f76a9c-9d4d-42fc-b867-24b4b123c465",
+        "subject": "Shipper User One(Waaree Energies Ltd.) has added Target Rate for Quote TBV602",
+        "message": "<table border='1'><tr> <td></td> <td><b> Current Rate Per Unit </b></td> <td><b> Target Rate Per Unit </b></td> </tr><tr> <td><b>Total Charge</b></td> <td>1,02,695.0 INR</td> <td>98000.0 INR</td> </tr></table><br><b>Deadline: </b> 17/08/2026 21:00 IST",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_indicative",
+        "created_at": "17/08/2026 20:46 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 20:46:15 UTC +05:30",
+        "created_by": {
+          "id": "716835fc-63d9-47ca-8a1f-d5098882c7b7",
+          "name": "Shipper User One",
+          "email": "shipper.one@example.com",
+          "role": "client_super_admin",
+          "workflow_role_tag": [
+            "logistics"
+          ],
+          "company_name": "Waaree Energies Ltd."
+        },
+        "web_data": {
+          "message": "<table border='1'><tr> <td></td> <td><b> Current Rate Per Unit </b></td> <td><b> Target Rate Per Unit </b></td> </tr><tr> <td><b>Total Charge</b></td> <td>1,02,695.0 INR</td> <td>98000.0 INR</td> </tr></table><br><b>Deadline: </b> 17/08/2026 21:00 IST",
+          "subject": "Shipper User One(Waaree Energies Ltd.) has added Target Rate for Quote TBV602",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "9100d562-8d8a-4637-8522-58b97f085999",
+        "subject": "Desk User Two(Best Roadway Limited) has updated Freight Quote (TBV602)",
+        "message": "<b>Charges</b> changed from 1,05,260.0 INR to 1,02,695.0 INR <br>",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_updated",
+        "created_at": "17/08/2026 19:50 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 19:50:12 UTC +05:30",
+        "created_by": {
+          "id": "aa58bc67-b689-48f9-bc28-c3e81d8bb020",
+          "name": "Desk User Two",
+          "email": "desk.two@example.com",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "admin"
+          ],
+          "company_name": "Best Roadway Limited"
+        },
+        "web_data": {
+          "message": "<b>Charges</b> changed from 1,05,260.0 INR to 1,02,695.0 INR <br>",
+          "subject": "Desk User Two(Best Roadway Limited) has updated Freight Quote (TBV602)",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "23d164a8-28b8-4bec-baf4-34ab90dbb973",
+        "subject": "Desk User Two(Best Roadway Limited) has updated Freight Quote (TBV602)",
+        "message": "<b>Charges</b> changed from 1,08,680.0 INR to 1,05,260.0 INR <br>",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_updated",
+        "created_at": "17/08/2026 19:49 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 19:49:38 UTC +05:30",
+        "created_by": {
+          "id": "aa58bc67-b689-48f9-bc28-c3e81d8bb020",
+          "name": "Desk User Two",
+          "email": "desk.two@example.com",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "admin"
+          ],
+          "company_name": "Best Roadway Limited"
+        },
+        "web_data": {
+          "message": "<b>Charges</b> changed from 1,08,680.0 INR to 1,05,260.0 INR <br>",
+          "subject": "Desk User Two(Best Roadway Limited) has updated Freight Quote (TBV602)",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "8cb5ae95-8f2f-44a5-a0f9-3b7c377b5ef2",
+        "subject": "Your new <b>rank is 2</b> in the shipment. Rank changed at 17/08/2026 19:49 IST. <br>Reduce your quote to improve your chances of getting the business<br><a href=https://app.gocomet.com/quotes/260817N3VH?>Link to reduce quote</a>",
+        "message": "",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "rank_changed",
+        "created_at": "17/08/2026 19:49 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 19:49:34 UTC +05:30",
+        "created_by": {
+          "id": "00000000-0000-0000-0000-000000000000",
+          "name": "rival @example.invalid",
+          "email": "rival@example.invalid",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "logistics"
+          ],
+          "company_name": "REDACTED RIVAL CARRIER"
+        },
+        "web_data": {
+          "message": "",
+          "subject": "Your new <b>rank is 2</b> in the shipment. Rank changed at 17/08/2026 19:49 IST. <br>Reduce your quote to improve your chances of getting the business<br><a href=https://app.gocomet.com/quotes/260817N3VH?>Link to reduce quote</a>",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "f2606dec-c383-4c10-9217-0a579fb16f23",
+        "subject": "Desk User Two(Best Roadway Limited) has submitted new freight Quote <b>TBV602</b>",
+        "message": "",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_submitted",
+        "created_at": "17/08/2026 17:50 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 17:50:17 UTC +05:30",
+        "created_by": {
+          "id": "aa58bc67-b689-48f9-bc28-c3e81d8bb020",
+          "name": "Desk User Two",
+          "email": "desk.two@example.com",
+          "role": "vendor_admin",
+          "workflow_role_tag": [
+            "admin"
+          ],
+          "company_name": "Best Roadway Limited"
+        },
+        "web_data": {
+          "message": "",
+          "subject": "Desk User Two(Best Roadway Limited) has submitted new freight Quote <b>TBV602</b>",
+          "item_details": "260817N3VH"
+        }
+      },
+      {
+        "id": "baea6996-d30e-4ccf-ba5a-07fd5bb42fb5",
+        "subject": "New Enquiry Request by Shipper User One(Waaree Energies Ltd.)",
+        "message": "",
+        "attachments": [],
+        "redirect_url": "https://app.gocomet.com/quotes/260817N3VH?",
+        "channel_intent": "quote_request",
+        "created_at": "17/08/2026 17:47 UTC +05:30",
+        "created_at_with_seconds": "17/08/2026 17:47:05 UTC +05:30",
+        "created_by": {
+          "id": "716835fc-63d9-47ca-8a1f-d5098882c7b7",
+          "name": "Shipper User One",
+          "email": "shipper.one@example.com",
+          "role": "client_super_admin",
+          "workflow_role_tag": [
+            "logistics"
+          ],
+          "company_name": "Waaree Energies Ltd."
+        },
+        "web_data": {
+          "message": "",
+          "subject": "New Enquiry Request by Shipper User One(Waaree Energies Ltd.)",
+          "item_details": "260817N3VH"
+        }
+      }
+    ],
+    "total_page": 1,
+    "current_page": 1,
+    "has_more": null
+  },
+  "cc_emails": [
+    "shipper.cc1@example.com",
+    "shipper.two@example.com",
+    "shipper.cc2@example.com",
+    "shipper.one@example.com",
+    "shipper.cc3@example.com",
+    "shipper.cc4@example.com",
+    "shipper.cc5@example.com",
+    "shipper.cc6@example.com",
+    "shipper.cc7@example.com",
+    "shipper.cc8@example.com",
+    "shipper.cc9@example.com",
+    "shipper.cc10@example.com",
+    "shipper.cc11@example.com",
+    "shipper.cc12@example.com",
+    "shipper.cc13@example.com",
+    "shipper.cc14@example.com",
+    "shipper.cc15@example.com",
+    "shipper.cc16@example.com",
+    "shipper.cc17@example.com",
+    "shipper.cc18@example.com"
+  ],
+  "custom_groups": {}
+}

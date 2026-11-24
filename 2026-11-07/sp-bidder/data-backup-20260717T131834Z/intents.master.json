@@ -1,0 +1,413 @@
+{
+  "savedAt": 1784281440089,
+  "intents": [
+    {
+      "createdAt": 1783838492412,
+      "auctionId": "23075092",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Coimbatore"
+      },
+      "equipment": "Dala Body LPT - 22Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Coimbatore, TAMIL NADU, India"
+        }
+      ],
+      "closesAt": 1783838820000,
+      "cost": 70000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        78820,
+        75040,
+        74410
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783838820037
+    },
+    {
+      "createdAt": 1783919156823,
+      "auctionId": "23088465",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Chadi"
+      },
+      "equipment": "Trailer 40'",
+      "units": 1,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "RENEWLIFE 342312, Chadi, Rajasthan,India"
+        }
+      ],
+      "startsAt": 1783921800000,
+      "closesAt": 1783923600000,
+      "cost": 100000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        112600,
+        107200,
+        103600
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783923600011
+    },
+    {
+      "createdAt": 1783919188365,
+      "auctionId": "23088404",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Dudu"
+      },
+      "equipment": "Trailer 40'",
+      "units": 1,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "SHASHIARUN 303008, Dudu, Rajasthan, India"
+        }
+      ],
+      "startsAt": 1783921500000,
+      "closesAt": 1783923300000,
+      "cost": 95000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        4.5
+      ],
+      "minMarginPct": 4.5,
+      "ladder": [
+        106970,
+        101840,
+        99275
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783923300125
+    },
+    {
+      "createdAt": 1783919212445,
+      "auctionId": "23088369",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Keeranur"
+      },
+      "equipment": "Trailer 40'",
+      "units": 20,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "M/s KRR Air Pvt Ltd  Taluk,Pudukottai,Tamilnadu - 622502, Keeranur, Tamil Nadu, India"
+        }
+      ],
+      "startsAt": 1783921500000,
+      "closesAt": 1783923300000,
+      "cost": 110000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        123860,
+        117920,
+        113960
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783922100034
+    },
+    {
+      "createdAt": 1783935665131,
+      "auctionId": "23097094",
+      "lane": {
+        "origin": "GHILOT",
+        "destination": "Sonipat"
+      },
+      "equipment": "PICK UP",
+      "units": 1,
+      "companyName": "Havells India Ltd.",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Havells India Ltd., Ghilot, Rajasthan 301705, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Sonipat, Haryana, India"
+        }
+      ],
+      "closesAt": 1783936500000,
+      "cost": 7000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        7882,
+        7504,
+        7441
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783936500045
+    },
+    {
+      "createdAt": 1783938239023,
+      "auctionId": "23094081",
+      "lane": {
+        "origin": "JHAGADIA",
+        "destination": "ASSUNDI"
+      },
+      "equipment": "AP: Truck flat 25 ton-Open Body",
+      "units": 1,
+      "companyName": "SIKA INDIA PRIVATE LIMITED",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "SIKA INDIA PRIVATE LIMITED, JHAGADIA, Padvaniya, Gujarat 393110, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Quality Trading Company, ASSUNDI, MAHARASHTRA ,India, 442704"
+        }
+      ],
+      "closesAt": 1783940400000,
+      "cost": 85000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        95710,
+        91120,
+        90355
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783940400040
+    },
+    {
+      "createdAt": 1784179963091,
+      "auctionId": "23188358",
+      "lane": {
+        "origin": "Thane",
+        "destination": "Indore"
+      },
+      "equipment": "6.5 MT Closed Body",
+      "units": 1,
+      "companyName": "Tata Consumer Product Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Tata Consumer Product Ltd, Thane, Maharashtra,India, 421302"
+        },
+        {
+          "kind": "drop",
+          "address": "Tata Consumer Product Ltd, Indore, Madhya Pradesh, India, 453771"
+        }
+      ],
+      "closesAt": 1784181420000,
+      "cost": 30000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        33780,
+        32160,
+        31890
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784181420233,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784183989959,
+      "auctionId": "23191127",
+      "lane": {
+        "origin": "302013",
+        "destination": "HISSAR"
+      },
+      "equipment": "14 Feet upto 03 MT",
+      "units": 1,
+      "companyName": "ADAMA India Private Limited",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Adama India Pvt Limited, 302013, Jaipur, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "ADAMA India Private Limited, HISSAR, Haryana, India, 125001"
+        }
+      ],
+      "closesAt": 1784184300000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784184300087,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784274576370,
+      "auctionId": "23228406",
+      "lane": {
+        "origin": "Thane",
+        "destination": "Pune"
+      },
+      "equipment": "6.5 MT Closed Body",
+      "units": 1,
+      "companyName": "Tata Consumer Product Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Tata Consumer Product Ltd, Thane, Maharashtra,India, 421302"
+        },
+        {
+          "kind": "drop",
+          "address": "Tata Consumer Product Ltd, Pune, Maharashtra, India"
+        }
+      ],
+      "closesAt": 1784281440000,
+      "cost": 12000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        13512,
+        12864,
+        12756
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784281440089,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784277689669,
+      "auctionId": "23229173",
+      "lane": {
+        "origin": "Nagpur",
+        "destination": "Dahej"
+      },
+      "equipment": "NA",
+      "units": 1,
+      "companyName": "ADAMA India Private Limited",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "ADAMA India Private Limited, Nagpur, Maharashtra, India, 440023"
+        },
+        {
+          "kind": "drop",
+          "address": "ADAMA India Private Limited, Dahej, Gujarat,India, 392130"
+        }
+      ],
+      "closesAt": 1784277900000,
+      "cost": 20000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.3
+      ],
+      "minMarginPct": 3.3,
+      "ladder": [
+        22520,
+        21440,
+        20660
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784277900106,
+      "revisionsLeft": 2
+    }
+  ]
+}

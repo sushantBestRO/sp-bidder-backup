@@ -1,0 +1,2788 @@
+{
+  "savedAt": 1784280060029,
+  "intents": [
+    {
+      "createdAt": 1783506045962,
+      "auctionId": "22954131",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "JAIPUR M CORP"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN FURINTURE JAIPUR, JAIPUR M CORP, Rajasthan 302021, in"
+        }
+      ],
+      "closesAt": 1783508400000,
+      "cost": 45000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        50670,
+        48240,
+        47835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 6,
+      "won": false,
+      "updatedAt": 1783508400131,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783508036557,
+      "auctionId": "22956349",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Naval Park, Hindustan Shipyard Colony"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "EASTERN NAVAL COMMAND, Naval Park, Hindustan Shipyard Colony, Visakhapatnam, Andhra Pradesh, India, 530014"
+        }
+      ],
+      "closesAt": 1783511100000,
+      "cost": 98800,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        111249,
+        105914,
+        105024
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": 6,
+      "won": false,
+      "updatedAt": 1783511100083
+    },
+    {
+      "createdAt": 1783596232696,
+      "auctionId": "22991048",
+      "lane": {
+        "origin": "Wada",
+        "destination": "New Delhi"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "MAPLE MOLDING WADA, Maharashtra, India, 421303"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "startsAt": 1783596300000,
+      "closesAt": 1783599900000,
+      "cost": 46000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        51796,
+        49312,
+        48898
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1783599900067,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783597783870,
+      "auctionId": "22992353",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "New Delhi"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "startsAt": 1783597920000,
+      "closesAt": 1783601520000,
+      "cost": 65000,
+      "marginsPct": [
+        2,
+        1,
+        0.05
+      ],
+      "minMarginPct": 0.5,
+      "ladder": [
+        66300,
+        65650,
+        65325
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783601520084,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783605082733,
+      "auctionId": "22997477",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Sahibabad"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Bajaj Finance Limited Off, Pitampura, New Delhi, Delhi, India, 110034"
+        },
+        {
+          "kind": "drop",
+          "address": "Bajaj Finance Limited Unit No, Sahibabad, Uttar Pradesh,India, 201010"
+        }
+      ],
+      "closesAt": 1783606680000,
+      "cost": 44000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        49544,
+        47168,
+        46772
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783606680141,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783746207792,
+      "auctionId": "23043509",
+      "lane": {
+        "origin": "Wada",
+        "destination": "Sector 62"
+      },
+      "equipment": "32 SXL( 7 - 8 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India"
+        },
+        {
+          "kind": "drop",
+          "address": "DLF PROJECT OFFICE, Sector 62, Gurugram, Haryana, India, 122011"
+        }
+      ],
+      "startsAt": 1783746300000,
+      "closesAt": 1783748100000,
+      "cost": 62000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        69812,
+        66464,
+        65906
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783748100133,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783746730848,
+      "auctionId": "23043635",
+      "lane": {
+        "origin": "Jodhpur",
+        "destination": "Palghar"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "SHASHWAT FURNISHING SOLUTIONS LIMITED, Jodhpur, Rajasthan,India"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED, Palghar, Maharashtra,India, 401404"
+        }
+      ],
+      "closesAt": 1783748280000,
+      "cost": 32000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        36032,
+        34304,
+        34016
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783748280190,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783746751401,
+      "auctionId": "23043364",
+      "lane": {
+        "origin": "Vasai East",
+        "destination": "Palghar"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "RADHE INDUSTRIES, Vasai East, Maharashtra,India, 401208"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED, Palghar, Maharashtra,India, 401404"
+        }
+      ],
+      "closesAt": 1783747560000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783747560189
+    },
+    {
+      "createdAt": 1783760164781,
+      "auctionId": "23049542",
+      "lane": {
+        "origin": "Bhiwandi",
+        "destination": "Palghar"
+      },
+      "equipment": "LPT 14( 2.5 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED UNIT 3,, Palghar ,India, 401404"
+        }
+      ],
+      "closesAt": 1783761900000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783761900150,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783765218630,
+      "auctionId": "23052898",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Jammu"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Jammu, Jammu And Kashmir 180010, IN"
+        }
+      ],
+      "startsAt": 1783765800000,
+      "closesAt": 1783769400000,
+      "cost": 62000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        69812,
+        66464,
+        65906
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783769400185,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783768063283,
+      "auctionId": "23055358",
+      "lane": {
+        "origin": "Bhiwandi",
+        "destination": "New Delhi"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "NEXUS, Bhiwandi, Amane, Maharashtra 421302, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "startsAt": 1783768500000,
+      "closesAt": 1783771500000,
+      "cost": 45000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        50670,
+        48240,
+        47835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783771500111,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783771089525,
+      "auctionId": "23057531",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Naval Park, Hindustan Shipyard Colony"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "EASTERN NAVAL COMMAND VISAKHAPATNAM, Naval Park, Hindustan Shipyard Colony, Visakhapatnam, Andhra Pradesh, India, 530014"
+        }
+      ],
+      "startsAt": 1783775400000,
+      "closesAt": 1783778400000,
+      "cost": 86000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        96836,
+        92192,
+        91418
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 6,
+      "won": false,
+      "updatedAt": 1783778400012,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783771158091,
+      "auctionId": "23057405",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Kolkata"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Kolkata, West Bengal 712310, INDIA"
+        }
+      ],
+      "startsAt": 1783775160000,
+      "closesAt": 1783778160000,
+      "cost": 72000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        81072,
+        77184,
+        76536
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783790089222,
+      "closedWhileDown": true
+    },
+    {
+      "createdAt": 1783771275011,
+      "auctionId": "23057528",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Sabbavaram"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "INDIAN MARITIME UNIVERSITY, Sabbavaram, Andhra Pradesh, India, 531035"
+        }
+      ],
+      "startsAt": 1783775280000,
+      "closesAt": 1783778280000,
+      "cost": 56000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        63056,
+        60032,
+        59528
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783778280081,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783771328951,
+      "auctionId": "23057767",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JH)"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "National Commission for, NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JH), NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JHARKHAND ,India, 834005"
+        }
+      ],
+      "startsAt": 1783772040000,
+      "closesAt": 1783775040000,
+      "cost": 95000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        106970,
+        101840,
+        100985
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1783775040067,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783771705015,
+      "auctionId": "23058113",
+      "lane": {
+        "origin": "Bhiwandi",
+        "destination": "Palghar"
+      },
+      "equipment": "LPT 14( 2.5 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED UNIT 3,, Palghar ,India, 401404"
+        }
+      ],
+      "startsAt": 1783771980000,
+      "closesAt": 1783773780000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1783773780138,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783771760352,
+      "auctionId": "23057358",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "New Delhi"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "startsAt": 1783775040000,
+      "closesAt": 1783778040000,
+      "cost": 62000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        69812,
+        66464,
+        65906
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783778040068,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783771775787,
+      "auctionId": "23057351",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Noida"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Noida, Uttar Pradesh, India, 201301"
+        }
+      ],
+      "startsAt": 1783774920000,
+      "closesAt": 1783777920000,
+      "cost": 44000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        49544,
+        47168,
+        46772
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783777920137,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783771833910,
+      "auctionId": "23057334",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "RANCHI"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Ranchi, Jharkhand 834004, India"
+        }
+      ],
+      "startsAt": 1783774800000,
+      "closesAt": 1783777800000,
+      "cost": 70000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        78820,
+        75040,
+        74410
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783777800154,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783772118737,
+      "auctionId": "23058366",
+      "lane": {
+        "origin": "Bhiwandi",
+        "destination": "Kolkata"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Kolkata, West Bengal 712310, INDIA"
+        }
+      ],
+      "startsAt": 1783772340000,
+      "closesAt": 1783774140000,
+      "cost": 95000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        106970,
+        101840,
+        100985
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783774140110,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783778514503,
+      "auctionId": "23062770",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "New Delhi"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "startsAt": 1783778700000,
+      "closesAt": 1783781100000,
+      "cost": 45000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        50670,
+        48240,
+        47835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783781100186,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783780478763,
+      "auctionId": "23063649",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Wada"
+      },
+      "equipment": "LPT 22( 10 - 11 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+        }
+      ],
+      "startsAt": 1783780800000,
+      "closesAt": 1783782600000,
+      "cost": 6000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        6756,
+        6432,
+        6378
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783782600089,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783831327460,
+      "auctionId": "23073266",
+      "lane": {
+        "origin": "Pune",
+        "destination": "Wada"
+      },
+      "equipment": "LPT 22( 9 - 10 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Amazon wood Pvt Ltd, Nimgaon Bhogi,Pune,Maharashtra,India"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+        }
+      ],
+      "closesAt": 1783831500000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783831500185,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783845070085,
+      "auctionId": "23076538",
+      "lane": {
+        "origin": "Ankleshwar+Vadodara",
+        "destination": "Todapur"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Shankar Patel Estate, Ankleshwar+Vadodara, Gujarat,India, 390006"
+        },
+        {
+          "kind": "drop",
+          "address": "IARI CAMPUS, Todapur, New Delhi, Delhi, India, 110012"
+        }
+      ],
+      "closesAt": 1783846800000,
+      "cost": 45000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        50670,
+        48240,
+        47835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783846800210,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783850758483,
+      "auctionId": "23076979",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "PATNA"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+        }
+      ],
+      "closesAt": 1783852320000,
+      "cost": 74000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        83324,
+        79328,
+        78662
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1783852320128,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784123079750,
+      "auctionId": "23175083",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "PATNA"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+        }
+      ],
+      "closesAt": 1784124000000,
+      "cost": 74000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        4.5
+      ],
+      "minMarginPct": 4.5,
+      "ladder": [
+        83324,
+        79328,
+        77330
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784124000190,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784180472605,
+      "auctionId": "23189215",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Hyderabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784181180000,
+      "cost": 68000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        76568,
+        72896,
+        72284
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784181180013,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784180815068,
+      "auctionId": "23189088",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Vadodra"
+      },
+      "equipment": "Dala Body LPT - 14Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Vadodra, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784181300000,
+      "cost": 22000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        24772,
+        23584,
+        23386
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784181300201,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784180868587,
+      "auctionId": "23189295",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Coimbatore"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Coimbatore, TAMIL NADU, India"
+        }
+      ],
+      "closesAt": 1784181420000,
+      "cost": 118000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        132868,
+        126496,
+        125434
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 5,
+      "won": false,
+      "updatedAt": 1784181420191,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784181210105,
+      "auctionId": "23189355",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Ahmedabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Ahmedabad, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784181660000,
+      "cost": 18000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        20268,
+        19296,
+        19134
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784181660020,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784181407894,
+      "auctionId": "23189365",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Kollam"
+      },
+      "equipment": "Dala Body LPT - 19Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "A&S MARKETING, Kollam, Kerala, India, 691334"
+        }
+      ],
+      "closesAt": 1784181780000,
+      "cost": 85000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        95710,
+        91120,
+        90355
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784181780051,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784181617551,
+      "auctionId": "23189370",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Ranchi"
+      },
+      "equipment": "Dala Body LPT - 19Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "NARAYAN & ASSOCIATES, Ranchi, JHARKHAND, India, 834001"
+        }
+      ],
+      "closesAt": 1784181900000,
+      "cost": 55000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        61930,
+        58960,
+        58465
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784181900125,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784181908797,
+      "auctionId": "23189385",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Dehradun"
+      },
+      "equipment": "Dala Body LPT - 14Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Dehradun, Uttarakhand,India"
+        }
+      ],
+      "closesAt": 1784182020000,
+      "cost": 19000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        21394,
+        20368,
+        20197
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784182020209,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784181961751,
+      "auctionId": "23189487",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Hyderabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784182140000,
+      "cost": 68000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        76568,
+        72896,
+        72284
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784182140120,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784182060318,
+      "auctionId": "23189599",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Bhiwandi"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Bhiwandi, Maharashtra,India"
+        }
+      ],
+      "closesAt": 1784182260000,
+      "cost": 40000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        45040,
+        42880,
+        42520
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784182260116,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784182169032,
+      "auctionId": "23189102",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Vadodra"
+      },
+      "equipment": "Container 20/22 Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Vadodra, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784182500000,
+      "cost": 22000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        24772,
+        23584,
+        23386
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784182500031,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784182772479,
+      "auctionId": "23190901",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "DELHI,"
+      },
+      "equipment": " Tempo",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Delhi, India"
+        }
+      ],
+      "closesAt": 1784183100000,
+      "cost": 8000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        9008,
+        8576,
+        8504
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784183100091,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784182841910,
+      "auctionId": "23191543",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "MUMBAI"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "MUMBAI, Maharashtra ,India"
+        }
+      ],
+      "closesAt": 1784183460000,
+      "cost": 50000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        2.7
+      ],
+      "minMarginPct": 2.7,
+      "ladder": [
+        56300,
+        53600,
+        51350
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784183460064,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784182858475,
+      "auctionId": "23191527",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Kollam"
+      },
+      "equipment": "Dala Body LPT - 19Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "A&S MARKETING, Kollam, Kerala, India, 691334"
+        }
+      ],
+      "closesAt": 1784183340000,
+      "cost": 80000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        90080,
+        85760,
+        85040
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784183340013,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784183265646,
+      "auctionId": "23191838",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Vadodra"
+      },
+      "equipment": "Dala Body LPT - 17Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Vadodra, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784183820000,
+      "cost": 19000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        21394,
+        20368,
+        20197
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784183820172,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784189084709,
+      "auctionId": "23194713",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Bhiwandi"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Bhiwandi, Maharashtra,India"
+        }
+      ],
+      "closesAt": 1784189460000,
+      "cost": 39000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        43914,
+        41808,
+        41457
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784189460020,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784189239444,
+      "auctionId": "23194344",
+      "lane": {
+        "origin": "Karegaon",
+        "destination": "Palghar"
+      },
+      "equipment": "LPT 19( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "AMAZON WOOD PVT LTD, Karegaon, Maharashtra, India, 412220"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LTD UNIT-4, Palghar ,India, 401404"
+        }
+      ],
+      "closesAt": 1784191320000,
+      "cost": 15000,
+      "marginsPct": [
+        30.6,
+        20.7,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        19590,
+        18105,
+        15945
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784191320060,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784196144438,
+      "auctionId": "23198748",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "HYDERABAD"
+      },
+      "equipment": "32 SXL( 7 - 8 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, Hyderabad, Telangana 500081, India"
+        }
+      ],
+      "closesAt": 1784199600000,
+      "cost": 60000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3
+      ],
+      "minMarginPct": 3,
+      "ladder": [
+        67560,
+        64320,
+        61800
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784199600104,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784196468286,
+      "auctionId": "23198768",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "New Delhi"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "closesAt": 1784199840000,
+      "cost": 47000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        52922,
+        50384,
+        48692
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784199840046,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784196525897,
+      "auctionId": "23198760",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "BHUBANESHWAR"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, BHUBANESHWAR, Odisha 751002, IN"
+        }
+      ],
+      "closesAt": 1784199720000,
+      "cost": 75000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        84450,
+        80400,
+        79725
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 6,
+      "won": false,
+      "updatedAt": 1784199720034,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784203508818,
+      "auctionId": "23203974",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Jodhpur"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Arun Agenices,, Jodhpur, Rajasthan,India, 342003"
+        }
+      ],
+      "closesAt": 1784205000000,
+      "cost": 50000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        56300,
+        53600,
+        53150
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784205000125,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784203535535,
+      "auctionId": "23204428",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "Nagour Choraha"
+      },
+      "equipment": "20( 6 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Airforce Mess O MESS, Nagour Choraha, Phalodi, Rajasthan, 342301"
+        }
+      ],
+      "closesAt": 1784205600000,
+      "cost": 40000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        45040,
+        42880,
+        42520
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784205600158,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784205544317,
+      "auctionId": "23206204",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "PATNA"
+      },
+      "equipment": "32 SXL( 7 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+        }
+      ],
+      "closesAt": 1784207400000,
+      "cost": 100000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        112600,
+        107200,
+        103600
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 4,
+      "won": false,
+      "updatedAt": 1784207400112,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784208407421,
+      "auctionId": "23208755",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Ahmedabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Ahmedabad, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784208600000,
+      "cost": 26000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        29276,
+        27872,
+        27638
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784208600160,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784215458367,
+      "auctionId": "23212996",
+      "lane": {
+        "origin": "Palghar",
+        "destination": "New Delhi"
+      },
+      "equipment": "32 SXL( 8 - 9 MT)",
+      "units": 1,
+      "companyName": "Durian Industries Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+        },
+        {
+          "kind": "drop",
+          "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+        }
+      ],
+      "closesAt": 1784217000000,
+      "cost": 70000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        0.2
+      ],
+      "minMarginPct": 0.2,
+      "ladder": [
+        78820,
+        75040,
+        70140
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784217000078,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784266606778,
+      "auctionId": "23223203",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "MUMBAI"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "MUMBAI, Maharashtra ,India"
+        }
+      ],
+      "closesAt": 1784267220000,
+      "cost": 50000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        56300,
+        53600,
+        53150
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784267220206,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784266622410,
+      "auctionId": "23223430",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Gurgaon Rural"
+      },
+      "equipment": "Dala Body LPT - 14Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Gurgaon Rural, Haryana, India"
+        }
+      ],
+      "closesAt": 1784267340000,
+      "cost": 9000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        10134,
+        9648,
+        9567
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784267340023,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784266640893,
+      "auctionId": "23223194",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Coimbatore"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Coimbatore, TAMIL NADU, India"
+        }
+      ],
+      "closesAt": 1784267100000,
+      "cost": 115000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        129490,
+        123280,
+        122245
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 5,
+      "won": false,
+      "updatedAt": 1784267100098,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267040500,
+      "auctionId": "23224609",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "AGARTALA"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "S.S.ENTERPRISE, AGARTALA, Tripura,India, 799001"
+        }
+      ],
+      "closesAt": 1784267580000,
+      "cost": 106000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        119356,
+        113632,
+        112678
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784267580163,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784267082897,
+      "auctionId": "23224706",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Barasat"
+      },
+      "equipment": "Dala Body LPT - 19Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "SHRI RAM APPLIANCES, Barasat, WEST BENGAL, India, 700127"
+        }
+      ],
+      "closesAt": 1784267820000,
+      "cost": 64000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        72064,
+        68608,
+        68032
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784267820063,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267356015,
+      "auctionId": "23224855",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Nagpur"
+      },
+      "equipment": "Dala Body LPT - 19Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Nagpur, Maharashtra, India"
+        }
+      ],
+      "closesAt": 1784268060000,
+      "cost": 40000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        45040,
+        42880,
+        42520
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784268060024,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267401974,
+      "auctionId": "23224867",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Bhopal"
+      },
+      "equipment": "Dala Body LPT - 14Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Bhopal, Madhya Pradesh, India"
+        }
+      ],
+      "closesAt": 1784268180000,
+      "cost": 22000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        24772,
+        23584,
+        23386
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784268180123,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267765840,
+      "auctionId": "23224971",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Hyderabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784268540000,
+      "cost": 63000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        4.5
+      ],
+      "minMarginPct": 4.5,
+      "ladder": [
+        70938,
+        67536,
+        65835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784268540203,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267794528,
+      "auctionId": "23224959",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Ahmedabad"
+      },
+      "equipment": "Container 7MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Ahmedabad, Gujarat, India"
+        }
+      ],
+      "closesAt": 1784268420000,
+      "cost": 21000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        23646,
+        22512,
+        22323
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784268420159,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267848506,
+      "auctionId": "23224954",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Bangalore"
+      },
+      "equipment": "Container 20/22 Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Bangalore, Karnataka, India"
+        }
+      ],
+      "closesAt": 1784268300000,
+      "cost": 58499,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        65870,
+        62711,
+        62184
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784268300098,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784267967059,
+      "auctionId": "23225475",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "Gurgaon Rural"
+      },
+      "equipment": "Dala Body LPT - 14Ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Gurgaon Rural, Haryana, India"
+        }
+      ],
+      "closesAt": 1784268780000,
+      "cost": 6000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        6756,
+        6432,
+        6378
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784268780095,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784268490380,
+      "auctionId": "23225649",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "SREERAMPORE"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "SREERAMPORE, West Bengal 712203, India"
+        }
+      ],
+      "closesAt": 1784269260000,
+      "cost": 79999,
+      "marginsPct": [
+        12.6,
+        7.2,
+        2.7
+      ],
+      "minMarginPct": 2.7,
+      "ladder": [
+        90079,
+        85759,
+        82159
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784269260202,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784279110616,
+      "auctionId": "23230501",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "SREERAMPORE"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "SREERAMPORE, West Bengal 712203, India"
+        }
+      ],
+      "closesAt": 1784279940000,
+      "cost": 94000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3
+      ],
+      "minMarginPct": 3,
+      "ladder": [
+        105844,
+        100768,
+        96820
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784279940152,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784279291628,
+      "auctionId": "23230541",
+      "lane": {
+        "origin": "Govindgarh",
+        "destination": "MUMBAI"
+      },
+      "equipment": "Container 14 MT 32ft",
+      "units": 1,
+      "companyName": "BG",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "BG, Govindgarh, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "MUMBAI, Maharashtra ,India"
+        }
+      ],
+      "closesAt": 1784280060000,
+      "cost": 60000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        67560,
+        64320,
+        63780
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784280060029,
+      "revisionsLeft": 0
+    }
+  ]
+}

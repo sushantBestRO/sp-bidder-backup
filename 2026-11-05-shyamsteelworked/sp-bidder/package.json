@@ -1,0 +1,22 @@
+{
+  "name": "bid-command",
+  "version": "1.0.0",
+  "description": "Live freight-auction auto-bidder for Best Roadways across procurement portals (SuperProcure, GoComet), with an operator console for human-in-the-loop pricing and bid oversight.",
+  "main": "src/web/server.js",
+  "scripts": {
+    "start": "node src/web/server.js",
+    "demo": "node scripts/demo.js",
+    "test": "node scripts/run-tests.js",
+    "build:console": "cd dashboard && npm install && npm run build"
+  },
+  "author": "Built for Suyashh / Best Roadways",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "puppeteer-core": "^25.1.0",
+    "socket.io-client": "^4.8.3"
+  }
+}

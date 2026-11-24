@@ -1,0 +1,337 @@
+{
+  "savedAt": 1784268974290,
+  "intents": [
+    {
+      "createdAt": 1783777512570,
+      "auctionId": "22724361",
+      "lane": {
+        "origin": "Ahmedabad",
+        "destination": "Surat"
+      },
+      "equipment": "19FT-SA-8MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Ahmedabad, Bareja, Gujarat 382425, India"
+        },
+        {
+          "kind": "drop",
+          "address": "SUNRISE ENTERPRISE - SURAT, Gujarat, India, 395006"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783919035892
+    },
+    {
+      "createdAt": 1783778052910,
+      "auctionId": "23061063",
+      "lane": {
+        "origin": "Ahmedabad",
+        "destination": "Sarkhej"
+      },
+      "equipment": "Bolero Pickup",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Ahmedabad, Bareja, Gujarat 382425, India"
+        },
+        {
+          "kind": "drop",
+          "address": "TRANSPORT BOOKING - AHMEDABAD DC 1125, Sarkhej, Ahmedabad, Gujarat, India"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 4000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        4504,
+        4288,
+        4252
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1784268974290
+    },
+    {
+      "createdAt": 1783778772977,
+      "auctionId": "23051184",
+      "lane": {
+        "origin": "BANGALORE",
+        "destination": "Washim"
+      },
+      "equipment": "22FT-SA-6MT (Container)",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, BANGALORE, Karnataka 562107, INDIA"
+        },
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Jigani, Karnataka, India, 560105"
+        },
+        {
+          "kind": "drop",
+          "address": "VYANKATESH ENTERPRISES-WASHIM, Maharashtra, India, 444505"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 43000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        48418,
+        46096,
+        45709
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783918423665
+    },
+    {
+      "createdAt": 1783778816082,
+      "auctionId": "23049480",
+      "lane": {
+        "origin": "BANGALORE",
+        "destination": "Haveri"
+      },
+      "equipment": "22FT-TB-10MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, BANGALORE, Karnataka 562107, INDIA"
+        },
+        {
+          "kind": "drop",
+          "address": "SRI RENUKA ELECTRICAL - HAVERI, Karnataka,India, 581110"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 24000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        27024,
+        25728,
+        25512
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783919035837
+    },
+    {
+      "createdAt": 1783778820642,
+      "auctionId": "23049811",
+      "lane": {
+        "origin": "Bagru",
+        "destination": "sojat city"
+      },
+      "equipment": "22FT-TB-10MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Bagru, Rajasthan, India, 303007"
+        },
+        {
+          "kind": "drop",
+          "address": "KAVERI SANITATION / 306104 SOJAT CITY, Rajasthan,India"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 18500,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        20831,
+        19832,
+        19666
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783918423699
+    },
+    {
+      "createdAt": 1783778896666,
+      "auctionId": "23049812",
+      "lane": {
+        "origin": "Bagru",
+        "destination": "BIKANER"
+      },
+      "equipment": "22FT-TB-10MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Bagru, Rajasthan, India, 303007"
+        },
+        {
+          "kind": "drop",
+          "address": "ARORA ENTERPRISES, Bikaner, Rajasthan 334004, India"
+        },
+        {
+          "kind": "drop",
+          "address": "BABA RAMDEV TRADING COMPANY, BIKANER, Rajasthan 334003, India"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 23000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        25898,
+        24656,
+        24449
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783918423732
+    },
+    {
+      "createdAt": 1783779820364,
+      "auctionId": "23062129",
+      "lane": {
+        "origin": "Jigani",
+        "destination": "MYSORE"
+      },
+      "equipment": "14FT-LCV-4 MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Jigani, Karnataka, India, 560105"
+        },
+        {
+          "kind": "drop",
+          "address": "NEMINATH PIPE CENTRE - MYSORE, MYSORE, Karnataka 570015, INDIA"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 9500,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        10697,
+        10184,
+        10099
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783918423769
+    },
+    {
+      "createdAt": 1783780882126,
+      "auctionId": "23049667",
+      "lane": {
+        "origin": "Dera Bassi",
+        "destination": "Jind"
+      },
+      "equipment": "22FT-TB-10MT",
+      "units": 1,
+      "companyName": "Ashirvad Pipes Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ashirvad Pipes Pvt Ltd, Dera Bassi, Punjab, India, 140507"
+        },
+        {
+          "kind": "drop",
+          "address": "MAHALAXMI SANITARY STORE, Jind, Haryana, India, 126102"
+        },
+        {
+          "kind": "drop",
+          "address": "BHAGWATI SANITARY & HARDWARE STORE, Jind, Haryana, India, 126102"
+        }
+      ],
+      "startsAt": 4114870705000,
+      "closesAt": 4114871605000,
+      "cost": 12000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        13512,
+        12864,
+        12756
+      ],
+      "status": "stopped",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": null,
+      "updatedAt": 1783918423797
+    }
+  ]
+}

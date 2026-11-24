@@ -1,0 +1,87 @@
+{
+  "current": {
+    "marginsPct": [
+      12.6,
+      7.2,
+      0
+    ],
+    "minMarginPct": 0,
+    "allowlist": {
+      "shippers": [
+        "Syngenta",
+        "Durian"
+      ],
+      "lanes": [],
+      "hardCloseOnly": true
+    },
+    "recipients": [
+      {
+        "name": "Suyashh Gupta",
+        "phone": "+919594937777",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      },
+      {
+        "name": "Siddharth Rodrigues",
+        "phone": "+919356252711",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      },
+      {
+        "name": "sushant govinde",
+        "phone": "+919594963468",
+        "alerts": [
+          "price_needed",
+          "bid_live",
+          "outbid",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      }
+    ],
+    "discoveryIntervalMs": 50000,
+    "priceDeadlineLeadMs": 90000,
+    "reminderLeadMs": 60000,
+    "notifyMode": "whatsapp",
+    "antiDetection": {
+      "enabled": true,
+      "cadenceJitterMs": 250,
+      "openJitterMs": 4000,
+      "maxBidsPerMin": 20,
+      "minInterFireMs": 150
+    },
+    "softClose": {
+      "enabled": true,
+      "shippers": [
+        "Havells"
+      ],
+      "mode": "live",
+      "reserve": 1
+    }
+  }
+}

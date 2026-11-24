@@ -1,0 +1,473 @@
+{
+  "p919594963468::durian": {
+    "assignmentId": "p919594963468::durian",
+    "personId": "p919594963468",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783682340503
+  },
+  "p919594963428::syngenta": {
+    "assignmentId": "p919594963428::syngenta",
+    "personId": "p919594963428",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783743373488
+  },
+  "p919594963428::durian": {
+    "assignmentId": "p919594963428::durian",
+    "personId": "p919594963428",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783743373508
+  },
+  "p919090707777::durian": {
+    "assignmentId": "p919090707777::durian",
+    "personId": "p919090707777",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783760750333
+  },
+  "p919090707777::syngenta": {
+    "assignmentId": "p919090707777::syngenta",
+    "personId": "p919090707777",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783760750351
+  },
+  "p919594963468::syngenta": {
+    "assignmentId": "p919594963468::syngenta",
+    "personId": "p919594963468",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783772581125
+  },
+  "p919887877477::ashirvad-pipes-pvt-ltd": {
+    "assignmentId": "p919887877477::ashirvad-pipes-pvt-ltd",
+    "personId": "p919887877477",
+    "customerId": "ashirvad-pipes-pvt-ltd",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783779980032
+  },
+  "p919594937777::ashirvad-pipes-pvt-ltd": {
+    "assignmentId": "p919594937777::ashirvad-pipes-pvt-ltd",
+    "personId": "p919594937777",
+    "customerId": "ashirvad-pipes-pvt-ltd",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925728973
+  },
+  "p919594937777::durian": {
+    "assignmentId": "p919594937777::durian",
+    "personId": "p919594937777",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925728998
+  },
+  "p919594937777::epack-prefab": {
+    "assignmentId": "p919594937777::epack-prefab",
+    "personId": "p919594937777",
+    "customerId": "epack-prefab",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729035
+  },
+  "p919594937777::havells": {
+    "assignmentId": "p919594937777::havells",
+    "personId": "p919594937777",
+    "customerId": "havells",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729059
+  },
+  "p919594937777::kei-industries": {
+    "assignmentId": "p919594937777::kei-industries",
+    "personId": "p919594937777",
+    "customerId": "kei-industries",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729081
+  },
+  "p919594937777::payal-polyplast": {
+    "assignmentId": "p919594937777::payal-polyplast",
+    "personId": "p919594937777",
+    "customerId": "payal-polyplast",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729103
+  },
+  "p919594937777::renewsys": {
+    "assignmentId": "p919594937777::renewsys",
+    "personId": "p919594937777",
+    "customerId": "renewsys",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729124
+  },
+  "p919594937777::shriji-polymers": {
+    "assignmentId": "p919594937777::shriji-polymers",
+    "personId": "p919594937777",
+    "customerId": "shriji-polymers",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729149
+  },
+  "p919594937777::syngenta": {
+    "assignmentId": "p919594937777::syngenta",
+    "personId": "p919594937777",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729172
+  },
+  "p919594937777::tata-consumer": {
+    "assignmentId": "p919594937777::tata-consumer",
+    "personId": "p919594937777",
+    "customerId": "tata-consumer",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783925729194
+  },
+  "g120363428871199271::syngenta": {
+    "assignmentId": "g120363428871199271::syngenta",
+    "personId": "g120363428871199271",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452363
+  },
+  "g120363411426913433::durian": {
+    "assignmentId": "g120363411426913433::durian",
+    "personId": "g120363411426913433",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452382
+  },
+  "g120363411347757347::tata-consumer": {
+    "assignmentId": "g120363411347757347::tata-consumer",
+    "personId": "g120363411347757347",
+    "customerId": "tata-consumer",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452389
+  },
+  "g120363428671543048::shriji-polymers": {
+    "assignmentId": "g120363428671543048::shriji-polymers",
+    "personId": "g120363428671543048",
+    "customerId": "shriji-polymers",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452392
+  },
+  "g120363429355684261::payal-polyplast": {
+    "assignmentId": "g120363429355684261::payal-polyplast",
+    "personId": "g120363429355684261",
+    "customerId": "payal-polyplast",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452397
+  },
+  "g120363413198812050::renewsys": {
+    "assignmentId": "g120363413198812050::renewsys",
+    "personId": "g120363413198812050",
+    "customerId": "renewsys",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784107299953
+  },
+  "g120363428348263917::adama": {
+    "assignmentId": "g120363428348263917::adama",
+    "personId": "g120363428348263917",
+    "customerId": "adama",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784267495324
+  },
+  "p919594937777::borosil": {
+    "assignmentId": "p919594937777::borosil",
+    "personId": "p919594937777",
+    "customerId": "borosil",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783682248751
+  },
+  "p919594963428::borosil": {
+    "assignmentId": "p919594963428::borosil",
+    "personId": "p919594963428",
+    "customerId": "borosil",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783743373526
+  },
+  "p919090707777::borosil": {
+    "assignmentId": "p919090707777::borosil",
+    "personId": "p919090707777",
+    "customerId": "borosil",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1783760750314
+  },
+  "g120363410658010519::borosil": {
+    "assignmentId": "g120363410658010519::borosil",
+    "personId": "g120363410658010519",
+    "customerId": "borosil",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784095452385
+  },
+  "g120363431523383103::havells": {
+    "assignmentId": "g120363431523383103::havells",
+    "personId": "g120363431523383103",
+    "customerId": "havells",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784619627022
+  },
+  "g120363412499828108::kei-industries": {
+    "assignmentId": "g120363412499828108::kei-industries",
+    "personId": "g120363412499828108",
+    "customerId": "kei-industries",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784619627028
+  },
+  "p919594963615::syngenta": {
+    "assignmentId": "p919594963615::syngenta",
+    "personId": "p919594963615",
+    "customerId": "syngenta",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328687
+  },
+  "p919594963615::durian": {
+    "assignmentId": "p919594963615::durian",
+    "personId": "p919594963615",
+    "customerId": "durian",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328689
+  },
+  "p919594963615::payal-polyplast": {
+    "assignmentId": "p919594963615::payal-polyplast",
+    "personId": "p919594963615",
+    "customerId": "payal-polyplast",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328691
+  },
+  "p919594963615::kei-industries": {
+    "assignmentId": "p919594963615::kei-industries",
+    "personId": "p919594963615",
+    "customerId": "kei-industries",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328693
+  },
+  "p919594963615::havells": {
+    "assignmentId": "p919594963615::havells",
+    "personId": "p919594963615",
+    "customerId": "havells",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328695
+  },
+  "p919594963615::epack-prefab": {
+    "assignmentId": "p919594963615::epack-prefab",
+    "personId": "p919594963615",
+    "customerId": "epack-prefab",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328697
+  },
+  "p919594963615::ashirvad-pipes-pvt-ltd": {
+    "assignmentId": "p919594963615::ashirvad-pipes-pvt-ltd",
+    "personId": "p919594963615",
+    "customerId": "ashirvad-pipes-pvt-ltd",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328703
+  },
+  "p919594963615::borosil": {
+    "assignmentId": "p919594963615::borosil",
+    "personId": "p919594963615",
+    "customerId": "borosil",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784796328705
+  },
+  "p919624094477::adama": {
+    "assignmentId": "p919624094477::adama",
+    "personId": "p919624094477",
+    "customerId": "adama",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785138808473
+  },
+  "g120363412728296902::havells": {
+    "assignmentId": "g120363412728296902::havells",
+    "personId": "g120363412728296902",
+    "customerId": "havells",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1784967725708
+  },
+  "p919594963410::ion-exchange": {
+    "assignmentId": "p919594963410::ion-exchange",
+    "personId": "p919594963410",
+    "customerId": "ion-exchange",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": false,
+    "updatedAt": 1785138808479
+  },
+  "g120363427449331536::ion-exchange": {
+    "assignmentId": "g120363427449331536::ion-exchange",
+    "personId": "g120363427449331536",
+    "customerId": "ion-exchange",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785139219337
+  },
+  "g120363428368443116::sika-india": {
+    "assignmentId": "g120363428368443116::sika-india",
+    "personId": "g120363428368443116",
+    "customerId": "sika-india",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785139219341
+  },
+  "g120363409451350927::dynamic-cables": {
+    "assignmentId": "g120363409451350927::dynamic-cables",
+    "personId": "g120363409451350927",
+    "customerId": "dynamic-cables",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785139219345
+  },
+  "g120363428359034400::cords-cable": {
+    "assignmentId": "g120363428359034400::cords-cable",
+    "personId": "g120363428359034400",
+    "customerId": "cords-cable",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785139219351
+  },
+  "g120363432108035056::epack-prefab": {
+    "assignmentId": "g120363432108035056::epack-prefab",
+    "personId": "g120363432108035056",
+    "customerId": "epack-prefab",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "updatedAt": 1785139219355
+  },
+  "g120363428283207652::safex-chemicals": {
+    "assignmentId": "g120363428283207652::safex-chemicals",
+    "personId": "g120363428283207652",
+    "customerId": "safex-chemicals",
+    "lanes": null,
+    "marginOverride": null,
+    "alertKinds": null,
+    "enabled": true,
+    "owner": false,
+    "updatedAt": 1785591950714
+  }
+}

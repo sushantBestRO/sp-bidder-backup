@@ -1,0 +1,46 @@
+# Automated test gate for the SuperProcure bidder (live-money code). Runs the same checks the
+# manual pre-deploy gate runs, on every push to main and every PR, so nothing merges red.
+# Deploy stays a deliberate manual step (`sh scripts/deploy.sh`) - this gates code, it does not ship.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same ref cancels the older in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 18 (matches the production VPS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+
+      # --- backend: the money-path suite (scripts/run-tests.js, the pre-deploy gate) ---
+      - name: Install backend deps
+        run: npm ci
+
+      - name: Backend tests (npm test)
+        run: npm test
+
+      # --- dashboard: vite build does NOT typecheck, so tsc --noEmit runs separately ---
+      - name: Dashboard build + typecheck
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+          npx tsc --noEmit

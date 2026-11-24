@@ -1,0 +1,300 @@
+{
+  "p919594937777": {
+    "personId": "p919594937777",
+    "name": "Suyashh Gupta",
+    "phone": "+919594937777",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783925728947
+  },
+  "p919594963468": {
+    "personId": "p919594963468",
+    "name": "sushant govinde",
+    "phone": "+919594963468",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783612034216
+  },
+  "p919594963428": {
+    "personId": "p919594963428",
+    "name": "Sameer AmbadaskaR",
+    "phone": "+919594963428",
+    "email": "sameer.ambdaskar@bestroadways.com",
+    "accountId": "sameer-ambdaskar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783743373467
+  },
+  "p919090707777": {
+    "personId": "p919090707777",
+    "name": "Pavan Konda",
+    "phone": "+919090707777",
+    "email": "pavan.konda@bestroadways.com",
+    "accountId": "sameer-ambdaskar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783760750291
+  },
+  "p919982893777": {
+    "personId": "p919982893777",
+    "name": "Balkishan Sharma",
+    "phone": "+919982893777",
+    "email": null,
+    "accountId": "alwar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482246
+  },
+  "p917838323242": {
+    "personId": "p917838323242",
+    "name": "Gurdeep Singh",
+    "phone": "+917838323242",
+    "email": null,
+    "accountId": "ludhiana",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482268
+  },
+  "p919887877477": {
+    "personId": "p919887877477",
+    "name": "Key Account Neemrana",
+    "phone": "+919887877477",
+    "email": null,
+    "accountId": "neemrana",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482270
+  },
+  "p919999444060": {
+    "personId": "p919999444060",
+    "name": "Rakesh Kapoor",
+    "phone": "+919999444060",
+    "email": null,
+    "accountId": "noida-rakesh-kapoor",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482272
+  },
+  "g120363428871199271": {
+    "personId": "g120363428871199271",
+    "name": "BRL Bids · Syngenta",
+    "phone": "120363428871199271@g.us",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452359
+  },
+  "g120363411426913433": {
+    "personId": "g120363411426913433",
+    "name": "BRL Bids · Durian",
+    "phone": "120363411426913433@g.us",
+    "email": null,
+    "accountId": "sameer-ambdaskar",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452380
+  },
+  "g120363410658010519": {
+    "personId": "g120363410658010519",
+    "name": "BRL Bids · Borosil",
+    "phone": "120363410658010519@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452384
+  },
+  "g120363411347757347": {
+    "personId": "g120363411347757347",
+    "name": "BRL Bids · Tata Consumer",
+    "phone": "120363411347757347@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452387
+  },
+  "g120363428671543048": {
+    "personId": "g120363428671543048",
+    "name": "BRL Bids · Shriji Polymers",
+    "phone": "120363428671543048@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452390
+  },
+  "g120363429355684261": {
+    "personId": "g120363429355684261",
+    "name": "BRL Bids · Payal Polyplast",
+    "phone": "120363429355684261@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784095452394
+  },
+  "g120363413198812050": {
+    "personId": "g120363413198812050",
+    "name": "BRL Bids · Renewsys",
+    "phone": "120363413198812050@g.us",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784107299948
+  },
+  "g120363428348263917": {
+    "personId": "g120363428348263917",
+    "name": "BRL Bids · ADAMA",
+    "phone": "120363428348263917@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784267495316
+  },
+  "g120363431523383103": {
+    "personId": "g120363431523383103",
+    "name": "BRL Bids · Havells",
+    "phone": "120363431523383103@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784619627016
+  },
+  "g120363412499828108": {
+    "personId": "g120363412499828108",
+    "name": "BRL Bids · KEI",
+    "phone": "120363412499828108@g.us",
+    "email": null,
+    "accountId": "master",
+    "alertPrefs": "all",
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784619627026
+  },
+  "p919594963615": {
+    "personId": "p919594963615",
+    "name": "Siddharth Rodrigues (BRL)",
+    "phone": "+919594963615",
+    "email": "siddharth.rodrigues@bestroadways.com",
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error",
+      "price_submitted"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1784796328666
+  }
+}

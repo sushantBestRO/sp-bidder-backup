@@ -1,0 +1,66 @@
+{
+  "current": {
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "allowlist": {
+      "shippers": [],
+      "lanes": [],
+      "hardCloseOnly": false
+    },
+    "recipients": [
+      {
+        "name": "Central Pricing Desk",
+        "phone": "+919000000001",
+        "alerts": [
+          "price_needed",
+          "won",
+          "lost",
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      },
+      {
+        "name": "Chikhli Plant",
+        "phone": "+919000000002",
+        "alerts": [
+          "price_needed",
+          "won",
+          "lost"
+        ],
+        "scope": {
+          "origins": [
+            "Chikhli"
+          ],
+          "shippers": []
+        }
+      },
+      {
+        "name": "Ops Lead",
+        "phone": "+919000000003",
+        "alerts": [
+          "error"
+        ],
+        "scope": {
+          "origins": [],
+          "shippers": []
+        }
+      }
+    ],
+    "discoveryIntervalMs": 30000,
+    "priceDeadlineLeadMs": 90000,
+    "notifyMode": "whatsapp",
+    "antiDetection": {
+      "enabled": true,
+      "cadenceJitterMs": 250,
+      "maxBidsPerMin": 20,
+      "minInterFireMs": 150
+    }
+  }
+}

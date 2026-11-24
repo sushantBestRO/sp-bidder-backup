@@ -1,0 +1,56 @@
+{
+  "3de6db04bf9b2558b9": {
+    "id": "3de6db04bf9b2558b9",
+    "loadId": "DEMO-PR-1",
+    "account": null,
+    "load": {
+      "lane": {
+        "origin": "Chakan, MH",
+        "destination": "Hosur, TN"
+      },
+      "equipment": "32ft SXL",
+      "units": 2,
+      "companyName": "Renewsys India",
+      "closesAt": 1783056392036,
+      "softClose": true
+    },
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "status": "awaiting_price",
+    "createdAt": 1783053932038,
+    "deadlineAt": 1783056302036,
+    "price": null,
+    "capturedAt": null
+  },
+  "0696ca52739e1f0ca5": {
+    "id": "0696ca52739e1f0ca5",
+    "loadId": "DEMO-PR-2",
+    "account": null,
+    "load": {
+      "lane": {
+        "origin": "Bhiwandi, MH",
+        "destination": "Bawal, HR"
+      },
+      "equipment": "20ft container",
+      "units": 1,
+      "companyName": "Syngenta",
+      "closesAt": 1783055012036,
+      "softClose": false
+    },
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "status": "awaiting_price",
+    "createdAt": 1783053932039,
+    "deadlineAt": 1783054922036,
+    "price": null,
+    "capturedAt": null
+  }
+}

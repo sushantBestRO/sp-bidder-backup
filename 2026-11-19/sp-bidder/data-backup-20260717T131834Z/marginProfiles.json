@@ -1,0 +1,30 @@
+{
+  "sp:syngenta": {
+    "platformKey": "sp",
+    "customerKey": "syngenta",
+    "customerLabel": "Syngenta",
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "enabled": true,
+    "updatedAt": 1783586702340,
+    "updatedBy": "admin"
+  },
+  "sp:durian": {
+    "platformKey": "sp",
+    "customerKey": "durian",
+    "customerLabel": "Durian",
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "enabled": true,
+    "updatedAt": 1783586721510,
+    "updatedBy": "admin"
+  }
+}

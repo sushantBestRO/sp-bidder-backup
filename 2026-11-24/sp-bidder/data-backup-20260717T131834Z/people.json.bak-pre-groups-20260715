@@ -1,0 +1,180 @@
+{
+  "p919594937777": {
+    "personId": "p919594937777",
+    "name": "Suyashh Gupta",
+    "phone": "+919594937777",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783925728947
+  },
+  "p919356252711": {
+    "personId": "p919356252711",
+    "name": "Siddharth Rodrigues",
+    "phone": "+919356252711",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error",
+      "price_submitted"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783925715946
+  },
+  "p919594963468": {
+    "personId": "p919594963468",
+    "name": "sushant govinde",
+    "phone": "+919594963468",
+    "email": null,
+    "accountId": "primary",
+    "alertPrefs": [
+      "price_needed",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783612034216
+  },
+  "p919594963428": {
+    "personId": "p919594963428",
+    "name": "Sameer AmbadaskaR",
+    "phone": "+919594963428",
+    "email": "sameer.ambdaskar@bestroadways.com",
+    "accountId": "sameer-ambdaskar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783743373467
+  },
+  "p919090707777": {
+    "personId": "p919090707777",
+    "name": "Pavan Konda",
+    "phone": "+919090707777",
+    "email": "pavan.konda@bestroadways.com",
+    "accountId": "sameer-ambdaskar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": false,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783760750291
+  },
+  "p919982893777": {
+    "personId": "p919982893777",
+    "name": "Balkishan Sharma",
+    "phone": "+919982893777",
+    "email": null,
+    "accountId": "alwar",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482246
+  },
+  "p917838323242": {
+    "personId": "p917838323242",
+    "name": "Gurdeep Singh",
+    "phone": "+917838323242",
+    "email": null,
+    "accountId": "ludhiana",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482268
+  },
+  "p919887877477": {
+    "personId": "p919887877477",
+    "name": "Key Account Neemrana",
+    "phone": "+919887877477",
+    "email": null,
+    "accountId": "neemrana",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482270
+  },
+  "p919999444060": {
+    "personId": "p919999444060",
+    "name": "Rakesh Kapoor",
+    "phone": "+919999444060",
+    "email": null,
+    "accountId": "noida-rakesh-kapoor",
+    "alertPrefs": [
+      "price_needed",
+      "price_submitted",
+      "bid_live",
+      "outbid",
+      "won",
+      "lost",
+      "error"
+    ],
+    "alertAll": true,
+    "originScope": [],
+    "enabled": true,
+    "updatedAt": 1783776482272
+  }
+}

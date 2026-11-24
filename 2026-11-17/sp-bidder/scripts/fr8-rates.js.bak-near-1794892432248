@@ -1,0 +1,203 @@
+'use strict';
+
+/**
+ * FR8 rate guide refresher. Writes data/fr8Rates.json, which src/notify/rateHints.js reads at send time.
+ * It NEVER places, changes or reads a bid or price request; it only reads your inquiry history to decide which
+ * FR8 pages are worth fetching, and writes one new data file.
+ *
+ *   node scripts/fr8-rates.js coverage [--days 120] [--max 250]   fetch + print how many of your inquiries get a line
+ *   node scripts/fr8-rates.js refresh  [--days 120] [--max 200]   fetch + save (this is the nightly job)
+ *   node scripts/fr8-rates.js report   [--days 120]               coverage from the saved file, no fetching
+ *   node scripts/fr8-rates.js page <from> <to>                    fetch ONE page and print what was parsed
+ *                                                                 (e.g. page delhi jaipur) - use it to check the parser
+ *
+ * Options: --force (refetch routes fetched in the last 12 h)   --delay 1500 (ms between requests)
+ * Env:     FR8_BASE (default https://www.fr8.in)   FR8_CONTACT (an email/phone put in the User-Agent)
+ *
+ * Be a polite client: one request at a time, a pause between them, a timeout, a cap on pages per run, and a stop
+ * after repeated failures. Please also confirm fr8.in's terms (https://www.fr8.in/terms) allow this use.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const {
+  hubSlug, fr8ClassOf, routeKey, routeUrl, parseFr8Page,
+} = require('../src/notify/rateHints');
+
+const ROOT = path.join(__dirname, '..');
+const DATA_DIR = process.env.SP_DATA_DIR ? path.resolve(process.env.SP_DATA_DIR) : path.join(ROOT, 'data');
+const LOG_DIR = path.join(DATA_DIR, 'logs');
+const RATES_FILE = process.env.FR8_RATES_FILE ? path.resolve(process.env.FR8_RATES_FILE) : path.join(DATA_DIR, 'fr8Rates.json');
+const BASE = process.env.FR8_BASE || 'https://www.fr8.in';
+const MISSING_RECHECK_MS = 14 * 24 * 3600 * 1000;
+const FRESH_MS = 12 * 3600 * 1000;
+
+function args(argv) {
+  const out = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+      const k = a.slice(2);
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith('--')) { out[k] = next; i++; } else out[k] = true;
+    } else out._.push(a);
+  }
+  return out;
+}
+
+function readJson(file, dflt) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return dflt; }
+}
+
+/** Every distinct SP/GoComet inquiry in the window: { from, to, cls } per inquiry (hub ends only are routable). */
+function collectDemand(days) {
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  const seen = new Map();
+  const add = (r) => {
+    if (!r || !r.lane || typeof r.lane !== 'object') return;
+    const id = r.id || `${r.platformKey || 'sp'}:${r.loadId}`;
+    const ts = Number(r.createdAt || r.capturedAt || 0);
+    if (ts && ts < cutoff) return;
+    seen.set(id, r);
+  };
+  try {
+    for (const f of fs.readdirSync(LOG_DIR).filter((n) => /^priceRequestArchive-.*\.jsonl$/.test(n)).sort()) {
+      for (const line of fs.readFileSync(path.join(LOG_DIR, f), 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try { add(JSON.parse(line)); } catch (e) { /* skip */ }
+      }
+    }
+  } catch (e) { /* no archive */ }
+  const cur = readJson(path.join(DATA_DIR, 'priceRequests.json'), {});
+  for (const r of (Array.isArray(cur) ? cur : Object.values(cur))) add(r.load ? { ...r, lane: r.load.lane, equipment: r.load.equipment } : r);
+  const items = [];
+  for (const r of seen.values()) {
+    const from = hubSlug(r.lane.origin);
+    const to = hubSlug(r.lane.destination);
+    items.push({ from, to, routable: !!(from && to && from !== to), cls: fr8ClassOf(r.equipment) });
+  }
+  return items;
+}
+
+function pairsByDemand(items) {
+  const m = new Map();
+  for (const it of items) if (it.routable) m.set(routeKey(it.from, it.to), (m.get(routeKey(it.from, it.to)) || 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([key, n]) => ({ key, n, from: key.split('>')[0], to: key.split('>')[1] }));
+}
+
+async function fetchPage(url, { timeoutMs = 15000 } = {}) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const contact = process.env.FR8_CONTACT ? ` (${process.env.FR8_CONTACT})` : '';
+    const res = await fetch(url, {
+      signal: ctl.signal,
+      redirect: 'follow',
+      headers: { 'user-agent': `BestRoadways-RateGuide/1.0${contact}`, accept: 'text/html' },
+    });
+    const body = res.status === 200 ? await res.text() : '';
+    return { status: res.status, body };
+  } finally { clearTimeout(timer); }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function saveAtomic(file, doc) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(doc, null, 1));
+  fs.renameSync(tmp, file);
+}
+
+async function refresh({ days = 120, max = 200, delay = 1500, force = false, log = console.log, only = null } = {}) {
+  const items = collectDemand(days);
+  const doc = readJson(RATES_FILE, null) || { version: 1, source: 'fr8.in', routes: {}, missing: {} };
+  doc.routes = doc.routes || {}; doc.missing = doc.missing || {};
+  const now = Date.now();
+  const queue = (only ? [only] : pairsByDemand(items)).filter((p) => {
+    const r = doc.routes[p.key];
+    if (!force && r && now - r.fetchedAt < FRESH_MS) return false;
+    const miss = doc.missing[p.key];
+    if (!force && miss && now - miss.checkedAt < MISSING_RECHECK_MS) return false;
+    return true;
+  }).slice(0, max);
+  log(`[fr8] ${items.length} inquiries in the last ${days}d, ${items.filter((i) => i.routable).length} hub-to-hub; fetching ${queue.length} route page(s)`);
+  let ok = 0; let none = 0; let fail = 0; let consecutiveFail = 0;
+  for (const p of queue) {
+    const url = routeUrl(p.from, p.to, BASE);
+    try {
+      const { status, body } = await fetchPage(url);
+      if (status === 200) {
+        const parsed = parseFr8Page(body);
+        if (parsed.rows.length) {
+          doc.routes[p.key] = { url, km: parsed.km, fetchedAt: Date.now(), rows: parsed.rows };
+          delete doc.missing[p.key]; ok++; consecutiveFail = 0;
+        } else { doc.missing[p.key] = { checkedAt: Date.now(), reason: 'no-rate-table' }; none++; consecutiveFail = 0; }
+      } else if (status === 404 || status === 410) {
+        doc.missing[p.key] = { checkedAt: Date.now(), reason: `http-${status}` }; none++; consecutiveFail = 0;
+      } else { fail++; consecutiveFail++; log(`[fr8] ${p.key}: HTTP ${status} (kept previous data, if any)`); }
+    } catch (e) { fail++; consecutiveFail++; log(`[fr8] ${p.key}: ${e && e.message} (kept previous data, if any)`); }
+    if (consecutiveFail >= 5) { log('[fr8] 5 failures in a row - stopping this run'); break; }
+    await sleep(delay);
+  }
+  doc.updatedAt = Date.now();
+  saveAtomic(RATES_FILE, doc);
+  log(`[fr8] done: ${ok} with rates, ${none} without a page/table, ${fail} failed. Saved ${RATES_FILE}`);
+  return doc;
+}
+
+function report(days, log = console.log) {
+  const items = collectDemand(days);
+  const doc = readJson(RATES_FILE, { routes: {}, missing: {} });
+  const total = items.length;
+  const routable = items.filter((i) => i.routable);
+  let pageHit = 0; let vehicleOk = 0; let shown = 0;
+  const lost = new Map();
+  for (const it of routable) {
+    const route = doc.routes && doc.routes[routeKey(it.from, it.to)];
+    if (!route) { lost.set(routeKey(it.from, it.to), (lost.get(routeKey(it.from, it.to)) || 0) + 1); continue; }
+    pageHit++;
+    if (!it.cls) continue;
+    vehicleOk++;
+    if (route.rows.some((r) => r.key === it.cls)) shown++;
+  }
+  const pct = (n) => (total ? `${(100 * n / total).toFixed(1)}%` : '-');
+  log(`\nFR8 guide coverage over the last ${days} days (${total} inquiries)`);
+  log(`  both ends are FR8 hub cities ........ ${routable.length}  (${pct(routable.length)})`);
+  log(`  ...and FR8 has a rate page .......... ${pageHit}  (${pct(pageHit)})`);
+  log(`  ...and the truck type is mappable ... ${vehicleOk}  (${pct(vehicleOk)})`);
+  log(`  ...and the page prices that type .... ${shown}  (${pct(shown)})   <- messages that would carry the FR8 line`);
+  const top = [...lost.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (top.length) log(`  most-asked hub lanes with no FR8 page: ${top.map(([k, n]) => `${k.replace('>', '→')} (${n})`).join(', ')}`);
+  return { total, routable: routable.length, pageHit, vehicleOk, shown };
+}
+
+async function main() {
+  const a = args(process.argv.slice(2));
+  const cmd = a._[0] || 'refresh';
+  const days = Number(a.days) || 120;
+  if (cmd === 'page') {
+    const [from, to] = [a._[1], a._[2]];
+    if (!from || !to) { console.log('usage: node scripts/fr8-rates.js page <from> <to>   e.g. page delhi jaipur'); process.exit(1); }
+    const url = routeUrl(from, to, BASE);
+    console.log('GET', url);
+    const { status, body } = await fetchPage(url);
+    console.log('HTTP', status, `(${body.length} bytes)`);
+    const parsed = parseFr8Page(body);
+    console.log('km:', parsed.km);
+    console.table(parsed.rows);
+    if (!parsed.rows.length) console.log('No rate rows parsed. If the page does show a rate table in your browser, send me this output and the page source.');
+    return;
+  }
+  if (cmd === 'report') { report(days); return; }
+  if (cmd === 'refresh' || cmd === 'coverage') {
+    await refresh({ days, max: Number(a.max) || (cmd === 'coverage' ? 250 : 200), delay: Number(a.delay) || 1500, force: !!a.force });
+    if (cmd === 'coverage') report(days);
+    return;
+  }
+  console.log('commands: coverage | refresh | report | page <from> <to>');
+  process.exit(1);
+}
+
+module.exports = { collectDemand, pairsByDemand, refresh, report, fetchPage, args };
+if (require.main === module) main().catch((e) => { console.error('[fr8] fatal:', e && e.message); process.exit(1); });

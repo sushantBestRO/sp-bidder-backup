@@ -1,0 +1,3 @@
+{"ts":1783158126353,"action":"go_live","actor":"admin","ip":"127.0.0.1","armed":0}
+{"ts":1783158169605,"action":"kill","actor":"admin","ip":"127.0.0.1","reason":"manual (console)"}
+{"ts":1783158216781,"action":"resume","actor":"admin","ip":"127.0.0.1"}

@@ -1,0 +1,5 @@
+{"ts":1784017474954,"kind":"bid_placed","auctionId":"23127093","price":45040,"rungIndex":0,"rank":null,"latencyMs":128}
+{"ts":1784017498229,"kind":"bid_placed","auctionId":"23127093","price":42520,"rungIndex":2,"rank":null,"latencyMs":162}
+{"ts":1784017500042,"kind":"auction_result","auctionId":"23127093","won":false,"finalRank":2}
+{"ts":1784034872876,"kind":"bid_placed","auctionId":"23138946","price":16890,"rungIndex":0,"rank":null,"latencyMs":106}
+{"ts":1784034900212,"kind":"auction_result","auctionId":"23138946","won":true,"finalRank":1}

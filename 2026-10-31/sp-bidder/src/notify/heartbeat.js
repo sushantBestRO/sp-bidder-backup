@@ -1,0 +1,1041 @@
+'use strict';
+
+const { createLogger } = require('../logging/logger');
+const { loadAccounts } = require('../auth/accounts');
+const { isGroupJid } = require('../model/normalizePhone');
+const { COLLECTION: BIDLOG_COLLECTION } = require('../logging/bidLogger');
+const { closedOutcome } = require('../util/closedOutcome');
+// The daily-at-HH:MM-IST clockwork (time math + schedule + missed-fire catch-up) lives in
+// dailyTask.js, shared with the per-customer EOD report - the helpers are re-exported below
+// so this module's public surface (and its tests) are unchanged by the extraction.
+const { DAY_MS, CATCHUP_WINDOW_MS, istMidnight, istDayStamp, istDisplayDate, parseTimeIST, nextRunAt, startDailyISTTask } = require('./dailyTask');
+
+/**
+ * Daily morning heartbeat - one WhatsApp DM, every morning, that says "the bot is
+ * alive, here is what it did yesterday, here is anything that needs a human".
+ *
+ * The design premise (borrowed from a prior system's daily health check, which was
+ * built after a quoting bug silently killed its worker cron for FOUR DAYS with
+ * nothing paging anyone): the message's ABSENCE is itself the alarm. A reader who
+ * gets this every morning notices the morning it doesn't arrive - which is exactly
+ * the class of failure (dead process, dead sender session, dead box) that no
+ * in-process alert can report, because the thing that would send the alert is the
+ * thing that died. So this message must be maximally hard to silence:
+ *
+ *   - every data section is gathered independently and try/caught individually; a
+ *     section that can't be read renders as "could not read X" instead of taking
+ *     the whole message down (fail quiet-loud - a prior system's triage found that
+ *     errors printed to stdout but not folded into the health verdict made its
+ *     "0 issues" line technically a lie; here every gather failure IS a verdict issue);
+ *   - if even the gather step explodes, a minimal degraded message still goes out;
+ *   - the send deliberately does NOT sit behind the sender-health circuit breaker
+ *     (see Notifier.sendDirect) - one queued heartbeat delivered late on reconnect
+ *     is bounded noise, whereas skipping it recreates the silent morning;
+ *   - a boot-time catch-up re-fires a send that a restart/deploy swallowed (the
+ *     PM2 process being down at exactly 08:00 must not cost the day's message).
+ *
+ * The audience is the DIRECTOR, not the operator: short, plain language, verdict in
+ * the first line (WhatsApp shows the first line in the chat-list preview), no ids,
+ * no jargon, no console paths. The operator-grade detail (which account, which
+ * error) stays in `pm2 logs` via the structured logger.
+ *
+ * Scheduling follows the house pattern (plain timers, no cron dependency - the
+ * token-expiry check in server.js is the precedent): a self-rescheduling setTimeout
+ * chain aimed at the next HH:MM IST. IST is computed with a fixed +05:30 offset
+ * (IST has no DST, so the offset is exact) rather than the box's own timezone -
+ * the reader lives in IST; the VPS may not.
+ *
+ * All reads go through the store seam / injected components; this module touches
+ * no filesystem and no network of its own (the send rides the Notifier/WhatsApp
+ * client like every other message).
+ */
+
+const log = createLogger('heartbeat');
+
+// One state doc through the store seam: last run time, per-account branch counts
+// (tomorrow's comparison base - SuperProcure adds branches server-side and that
+// matters to the business, so a day-over-day change is called out), and the IST
+// date of the last SUCCESSFUL send (the boot catch-up's dedupe).
+const COLLECTION = 'heartbeat';
+const STATE_KEY = 'state';
+
+const TOKEN_WARN_DAYS = 30;   // surface an SP token expiring within this many days
+
+// ---- Server-section thresholds ----------------------------------------------
+// The point at which each machine-health fact stops being a standing-line number and becomes a
+// verdict-flipping issue the reader must act on. Storage is the one that can silently lose
+// live-money state: a full disk means the durable scheduler cannot persist an armed intent, so it
+// warns early. MEM_RESTART_MB MUST match ecosystem.config.cjs max_memory_restart - PM2 restarts the
+// process at that RSS - and MEM_WARN_MB (85% of it) is the "about to bounce" line.
+const STORAGE_WARN_PCT = 85;                            // filesystem holding data/ this full -> clear before writes fail
+const LOG_WARN_BYTES = 1024 * 1024 * 1024;              // 1 GB of app logs -> rotate/clear
+const MEM_RESTART_MB = 500;                             // MUST match ecosystem.config.cjs max_memory_restart
+const MEM_WARN_MB = Math.round(MEM_RESTART_MB * 0.85);  // 85% of the PM2 cap -> a self-restart is near
+const SYS_FREE_WARN_PCT = 10;                           // whole box this low on free RAM -> co-tenant apps at risk
+
+// ---- section collectors ------------------------------------------------------
+// Each returns { ok: true, ...facts }. Each is called through a try/catch wrapper
+// (collectHeartbeat) that turns a throw into { ok: false }, so one unreadable
+// source degrades one section, never the message.
+
+/**
+ * Accounts: how many SP accounts SHOULD be online (enabled records in the accounts
+ * collection - the implicit primary when none) vs how many stacks actually hold a
+ * logged-in adapter. `expected > live` catches the boot path that drops a
+ * failed-login account from `stacks` entirely (2026-07-11 incident class) - counting
+ * stacks alone would happily report "1 of 1" on a box that was meant to run two.
+ * Also sums branch counts (and diffs them against the state doc from the last run -
+ * SuperProcure adds branches server-side, silently) and finds the soonest token
+ * expiry so a lapse-in-30-days gets a line in front of the director, not just the
+ * operator's per-threshold alerts (tokenExpiry.js remains the precise mechanism).
+ *
+ * `platformKey` scopes the LIVE side to one portal, and the scoping is load-bearing rather than
+ * tidy: `expected` comes from loadAccounts, which only ever holds SuperProcure accounts, so a
+ * second portal's stack in the same array would inflate liveCount against an expected that can
+ * never move, contribute its branch count to an SP total, and - worst - offer its ~30-day token
+ * as the soonest expiry, putting another portal's date in front of the Director as an SP account
+ * about to lapse. Omitted (tests) preserves the unfiltered behaviour.
+ *
+ * This is the ONE section that stays scoped, and it is not an oversight left behind when the funnel
+ * and today sections went all-portal on 2026-08-12. Those count loads and bids, which add across
+ * portals; this one compares live stacks against an SP-only roster and renders the words
+ * "SuperProcure account" and "SuperProcure login". server.js hands the heartbeat the whole `stacks`
+ * array - the GoComet stack is pushed into it (attachGoCometStack) - so this filter is the only
+ * thing keeping a second portal out of an SP count.
+ */
+async function collectAccounts({ stacks, store, state, platformKey = null }) {
+  const expected = (await loadAccounts(store)).filter((a) => a.enabled !== false);
+  const onPortal = (s) => !platformKey || (s.platformKey || platformKey) === platformKey;
+  const live = (stacks || []).filter((s) => s && s.adapter && s.adapter.account && onPortal(s));
+  let totalBranches = 0;
+  const branchCounts = {};
+  const changes = [];
+  let tokenSoonest = null;
+  for (const s of live) {
+    const acct = s.adapter.account;
+    const id = (s.account && s.account.accountId) || 'primary';
+    const count = Array.isArray(acct.branchIds) ? acct.branchIds.length : 0;
+    totalBranches += count;
+    branchCounts[id] = count;
+    const prev = state && state.branchCounts ? state.branchCounts[id] : undefined;
+    if (prev != null && prev !== count) {
+      changes.push({ accountId: id, label: (s.account && s.account.label) || id, from: prev, to: count });
+    }
+    if (acct.tokenExp != null && (!tokenSoonest || acct.tokenExp < tokenSoonest.exp)) {
+      tokenSoonest = { exp: acct.tokenExp, label: (s.account && s.account.label) || id };
+    }
+  }
+  return {
+    ok: true,
+    expectedCount: expected.length,
+    liveCount: live.length,
+    totalBranches,
+    branchCounts,
+    changes,
+    tokenSoonest,
+  };
+}
+
+/**
+ * C073/C101: the heartbeat's accounts section is deliberately SuperProcure-only (its `expected`
+ * side, loadAccounts(), has no GoComet analogue) - GoComet had NO section here at all, and its
+ * token-expiry rail (tokenExpiry.js) is a separate alert channel the heartbeat never surfaced
+ * alongside SP's own account status. `ok:true, enabled:false` (not ok:false) when GC_ENABLE is
+ * off - that is the common, deliberate posture on most boxes, not a read failure.
+ *
+ * `live` answers C101's declared-and-unread capability: past capabilities().livenessExpectedMs
+ * with no successful listAuctions(), the adapter is SILENT, not idle - stamped on
+ * adapter.lastListSucceededAt. null (not false) when there has not been a first successful poll
+ * yet (fresh boot) or the adapter declares no livenessExpectedMs at all - never invented.
+ */
+async function collectGoComet({ stacks, config }) {
+  const enabled = !!(config && config.gocomet && config.gocomet.enabled);
+  if (!enabled) return { ok: true, enabled: false };
+  const platformKey = config.gocomet.platformKey;
+  const stack = (stacks || []).find((s) => s && s.platformKey === platformKey);
+  if (!stack || !stack.adapter) return { ok: true, enabled: true, registered: false };
+  const acct = stack.adapter.account || {};
+  const caps = typeof stack.adapter.capabilities === 'function' ? stack.adapter.capabilities() : {};
+  const lastSuccess = stack.adapter.lastListSucceededAt;
+  const livenessExpectedMs = caps.livenessExpectedMs != null ? caps.livenessExpectedMs : null;
+  const silentForMs = lastSuccess != null ? Date.now() - lastSuccess : null;
+  const live = (silentForMs == null || livenessExpectedMs == null) ? null : silentForMs <= livenessExpectedMs;
+  return {
+    ok: true,
+    enabled: true,
+    registered: true,
+    tokenExp: acct.tokenExp != null ? acct.tokenExp : null,
+    pollerRunning: !!(stack.discovery && stack.discovery.timer),
+    // Review correction (26 Sep): the console's own live toggle (applyGoCometDiscovery), so a
+    // deliberate stop can be told apart from a poller that died. Mirrors config.gocomet.
+    // discoveryEnabled exactly, including its default (GC_DISCOVERY unset -> false -> "paused" is
+    // the honest reading of a poller that was never asked to run at all).
+    discoveryEnabled: !!(config.gocomet && config.gocomet.discoveryEnabled),
+    live,
+    silentForMs,
+    livenessExpectedMs,
+  };
+}
+
+/**
+ * WhatsApp sender: is the Maytapi session actually LIVE (sessionHealthy - the same
+ * probe the alert circuit breaker uses, fail-open on an unreadable response)?
+ * `configured:false` (no creds / disabled) is not an issue - a dashboard-only
+ * deploy is a deliberate choice - but a configured sender that is logged out IS:
+ * that's the 2026-07-15 failure (sends accepted, nothing delivered) and the reader
+ * should hear about it from the one channel that still queues through it.
+ */
+async function collectSender({ wa, config }) {
+  const modes = channelModes(config);
+  if (!wa || !wa.enabled()) return { ok: true, configured: false, healthy: null, mode: config.notifyMode, modes };
+  let healthy = true;
+  try { healthy = await wa.sessionHealthy(); } catch (_) { healthy = true; } // fail-open, like the breaker
+  return { ok: true, configured: true, healthy, mode: config.notifyMode, modes };
+}
+
+/**
+ * The channel per PORTAL, since it stopped being one global (Notifier.notifyModeFor). Reported as
+ * an ADDITIONAL `modes` map beside the existing scalar `mode`, which keeps its exact meaning - the
+ * SuperProcure channel - so nothing reading the old shape changes. renderHeartbeat reads neither
+ * today; both are carried for whoever consumes the section next.
+ */
+function channelModes(config) {
+  const out = { [config.platformKey]: config.notifyMode };
+  if (config.gocomet && config.gocomet.platformKey) out[config.gocomet.platformKey] = config.gocomet.notifyMode;
+  return out;
+}
+
+/**
+ * Yesterday's funnel, over the IST calendar day that just ended. Two sources:
+ *
+ *   priceRequests - the COHORT created yesterday (one request per discovered
+ *   in-scope load, so createdAt-in-window IS "new loads found"). Within the cohort:
+ *   priced = a cost was captured (capturedAt survives every later status change);
+ *   missed = deadline passed unpriced (skipped_no_price is terminal, never
+ *   overwritten by finalizeClosed); declined = operator dismissed it. The store
+ *   prunes 7 days after close, so yesterday is always still on disk.
+ *
+ *   closedBids - bids we actually placed (ourBids[].ts) and rejections
+ *   (rejectedBids[].ts) stamped inside the window, plus won/lost outcomes for
+ *   auctions that CLOSED yesterday. Outcomes are keyed off closedAt, not the
+ *   request cohort - a load discovered Monday can close Tuesday, and it belongs
+ *   to Tuesday's message.
+ *
+ * EVERY PORTAL COUNTS. Until 2026-08-12 both sides were filtered to a single platformKey and
+ * collectHeartbeat passed config.platformKey, which is 'sp' and is set nowhere - so GoComet was
+ * invisible here by construction. Not one line this section renders names a portal: "New loads
+ * found", "Priced in time", "Missed the pricing cutoff" are claims about the whole desk's day, and
+ * a GoComet load nobody priced is a load nobody priced. The scoping argument that stood here - an
+ * internal aggregate has no row to hang a label on, so mixing portals corrupts it invisibly - is
+ * true of a number that MIXES incompatible things. These are counts of loads and bids, and the two
+ * portals' loads and bids add.
+ *
+ * There is no loadId join to protect, which is what distinguishes this from the EOD collectors'
+ * fix (eodReport.loadKey): the cohort and the closedBids scan are independent passes, and every
+ * closedBids figure comes from iterating the records themselves. Nothing here looks a record up by
+ * id, so nothing here can join one portal's row to another's.
+ */
+async function collectFunnel({ requests, store, now }) {
+  const dayEnd = istMidnight(now);      // today 00:00 IST
+  const dayStart = dayEnd - DAY_MS;     // yesterday 00:00 IST
+  const inWindow = (ts) => ts != null && ts >= dayStart && ts < dayEnd;
+
+  const all = (await requests.listAll()) || [];
+  const cohort = all.filter((r) => r && inWindow(r.createdAt));
+  const priced = cohort.filter((r) => r.capturedAt != null).length;
+  const missedCutoff = cohort.filter((r) => r.status === 'skipped_no_price').length;
+  const declined = cohort.filter((r) => r.status === 'dismissed').length;
+
+  const docs = await store.listDocs(BIDLOG_COLLECTION);
+  let bidsPlaced = 0;
+  let loadsBid = 0;
+  let rejected = 0;
+  let won = 0;
+  let lost = 0;
+  // Bid, end never seen. Its own class rather than a bucket it does not belong in: a record retired
+  // by the restart sweep or by _retireUnreadable carries landed bids and no final rank, which is
+  // byte-identical to a fought loss, so the binary rule below charged every one of them to `lost`.
+  // Nothing produced that shape before this branch, which is why this file was not on the list of
+  // consumers to widen - and this message goes to the client's Director every morning.
+  let closedUnknown = 0;
+  for (const rec of docs || []) {
+    if (!rec) continue;
+    const mine = (rec.ourBids || []).filter((b) => b && inWindow(b.ts));
+    bidsPlaced += mine.length;
+    if (mine.length) loadsBid += 1;
+    rejected += (rec.rejectedBids || []).filter((b) => b && inWindow(b.ts)).length;
+    // ZERO BIDS FIRST, then won, then the unknown class. That order is the canonical rule
+    // (exportModel.deriveStatus, mirrored by directorEod and by eodReport skipping bid-less docs),
+    // and only two of its three predicates were implemented here: a load retired before its first
+    // rung carries the flag and no rank, so it landed in the unknown tally while every other surface
+    // called it No-bid. no_bid is not one of the three buckets this message reports - a load nothing
+    // of ours was ever on cannot be won, lost, or a close we failed to see.
+    if (rec.status === 'closed' && inWindow(rec.closedAt) && ((rec.ourBids || []).length || (rec.gcUnconfirmedSubmissions || []).length)) {
+      const outcome = closedOutcome(rec);
+      if (outcome === 'won') won += 1;
+      else if (outcome === 'closed_unknown') closedUnknown += 1;
+      else lost += 1;
+    }
+  }
+  return { ok: true, discovered: cohort.length, priced, missedCutoff, declined, bidsPlaced, loadsBid, rejected, won, lost, closedUnknown };
+}
+
+/**
+ * Today, at send time: how many auctions are already armed (a cost is in, the bot
+ * will bid without anyone doing anything) - split into closing today vs later -
+ * and how many discovered loads are still waiting on a price. The "waiting" count
+ * is the one line the reader can act on over morning tea: it means someone on the
+ * pricing desk has an open link.
+ *
+ * All-portal, for the same reason as collectFunnel above, and the "waiting" count is where it bites
+ * hardest: a scoped read tells the desk its worklist is empty while a GoComet price link sits open.
+ */
+async function collectToday({ requests, now }) {
+  const dayEnd = istMidnight(now) + DAY_MS; // tomorrow 00:00 IST
+  const all = (await requests.listAll()) || [];
+  const armed = all.filter((r) => r && r.status === 'armed');
+  const armedToday = armed.filter((r) => r.load && r.load.closesAt != null && r.load.closesAt >= now && r.load.closesAt < dayEnd).length;
+  const armedLater = armed.filter((r) => r.load && r.load.closesAt != null && r.load.closesAt >= dayEnd).length;
+  const awaiting = all.filter((r) => r && r.status === 'awaiting_price').length;
+  return { ok: true, armedToday, armedLater, awaiting };
+}
+
+// ---- membership audit helpers ---------------------------------------------------
+// Compare on the 10-digit Indian mobile core so the three shapes that reach this audit all line
+// up: the roster's '+91XXXXXXXXXX', the sender's listPhones '91XXXXXXXXXX', and a group
+// participant's '91XXXXXXXXXX@c.us'. Recognise-and-remove the country code (mirrors
+// normalizePhone.js), never blind-slice - a wrong core would let a stranger read as staff. A shape
+// we can't reduce keeps its own digits (still compares equal to itself), '' when there are none.
+function canonicalNumber(raw) {
+  let d = String(raw == null ? '' : raw).replace(/\D/g, '');
+  if (d.length === 14 && d.startsWith('0091')) d = d.slice(4);
+  else if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return d;
+}
+
+// WhatsApp namespaces that are NOT an individual phone number. `@lid` is the one that matters here:
+// after WhatsApp's "linked identifier" (LID) migration an admin/participant can be returned as
+// '<opaque-digits>@lid' instead of '<msisdn>@c.us', and its digits are not a dialable number.
+// (@newsletter / @broadcast / @g.us are likewise not a person's mobile.)
+const NON_PHONE_JID = /@(?:lid|newsletter|broadcast|g\.us)$/i;
+
+// The 10-digit phone core for an admin/participant id we can RECONCILE against a number, or null
+// when the id is OPAQUE (an @lid linked identifier, or any id that doesn't reduce to a plausible
+// MSISDN). canonicalNumber alone would strip an '<opaque>@lid' down to a long non-matching digit
+// string and then read a present admin as "missing" - a false "core admin demoted" line to the
+// director. The admin-superset check uses null to mean "present but unverifiable by number" and
+// degrades that group to could-not-check (settingsUnreadable) instead of a false accusation.
+function canonicalPhoneKey(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s || NON_PHONE_JID.test(s)) return null;
+  const key = canonicalNumber(s);
+  // A reconciled MSISDN core is a plausible mobile length (Indian mobiles reduce to 10; keep a small
+  // band for a country-coded or lightly-formatted number). A bare-digit @lid that arrived without
+  // its suffix is far longer - reject anything outside the band as non-phone.
+  return key.length >= 10 && key.length <= 13 ? key : null;
+}
+
+// How an unknown number is shown to the director: the participant's digits with a leading '+'
+// (the group is staff-only by definition, so the full number is fine to print - it is the one
+// actionable fact). Never the raw '...@c.us' JID.
+function displayNumber(raw) {
+  const d = String(raw == null ? '' : raw).replace(/\D/g, '');
+  return d ? `+${d}` : String(raw == null ? '' : raw);
+}
+
+// The BRL-staff numbers that MUST hold admin on every "BRL Bids" customer group. Admin-only-add
+// (config.membersCanAddMembers:false) only protects a group while an admin the business trusts is
+// there to police it, and no one of them can be locked out of reversing a bad change - so the
+// settings tripwire asserts all three stay admins. The bot is added to this set at check time from
+// selfNumber() (it admins every group it created), exactly as the membership allowlist auto-includes
+// self. A hardcoded constant, deliberately: unlike the staff allowlist (operator-editable, many
+// people, changes often), the set of people who administer the bidding groups is tiny and stable,
+// and a store-editable "who must be admin" list would itself be a place drift could hide - moving it
+// via a code change is the more tamper-evident path. `label` is how a missing admin is named to the
+// reader; numbers are matched on the 10-digit core (canonicalNumber), same as the membership diff.
+const CORE_ADMINS = [
+  // BRL-issued line, second repoint. It replaced the personal +919356252711 on 2026-07-24, then
+  // moved here on 2026-08-06 when the +919594963615 handset was lost - that line can no longer
+  // receive anything, so it is being retired from every channel that names it rather than left to
+  // fail silently. The two .env alert lists (MONITOR_ALERT_TO, SP_DIRECTOR_EOD_RECIPIENTS) were
+  // repointed on the box the same day; the person record p919594963615 was already disabled.
+  { label: 'Sid', number: '+919594964626' },
+  { label: 'Suyashh', number: '+919594937777' },
+  { label: 'Sushant', number: '+919594963468' },
+  // Added on the box 2026-09-19 when Rishab's handset became the sender, and carried into git here
+  // because deploy.sh ships the working tree - the next deploy would otherwise have silently
+  // reverted it and nobody would have found out until a heartbeat stopped naming him.
+  //
+  // It was a dedupe against `self` while the sender WAS this number. That stopped being true on
+  // 2026-09-22, when the sender moved to 918882034647: this entry is now the only thing checking
+  // Rishab is still admin.
+  { label: 'Rishab', number: '+919594964196' },
+];
+
+/**
+ * Daily group tripwire. Every "BRL Bids" customer group is registered alertPrefs:'all', so it
+ * receives BRL's cost/bid/margin per load - it is BRL-staff-only, forever. Once a day (this section
+ * rides the heartbeat's own schedule - no second scheduler), fetch each registered group live via
+ * Maytapi (ONE getGroups call, which returns participants + admins + config together) and assert
+ * three things, all SURFACE-ONLY - it names the group and the drift for a human to act on; it never
+ * removes, kicks, promotes, demotes, messages, or reconfigures anything:
+ *   1. MEMBERSHIP (#48): no participant outside the staff allowlist (staffRoster) plus the bot. An
+ *      unknown participant is margin economics leaking to an outsider.
+ *   2. ADD-SETTING: config.membersCanAddMembers === false (adds are admin-only). A group that
+ *      drifted back to "anyone can add" is the exact hole admin-only-add was set to close.
+ *   3. CORE ADMINS: admins[] is a superset of {bot, Sid, Suyashh, Sushant} (CORE_ADMINS + self). A
+ *      demoted core admin (or a demoted bot) means the lock can no longer be enforced or reversed.
+ *
+ * Fail-closed at every seam, because a check that silently renders "all clear" is worse than none:
+ *   - not wired into this deployment (no staffRoster dep) -> { wired:false }, renders nothing;
+ *   - WhatsApp sender off -> nothing to fetch and the heartbeat can't send anyway -> silent;
+ *   - roster empty/unconfigured -> reported as UNCONFIGURED ('not being verified'), never all-clear
+ *     and never "everyone is an intruder" (an empty allowlist is a setup gap, not a group of spies);
+ *   - the fetch OR the bot's own-number lookup failing -> reported as UNAVAILABLE ('could not run');
+ *   - a group returned WITHOUT a readable config/admins block -> that group's settings are reported
+ *     UNVERIFIED for the day (settingsUnreadable), never assumed compliant.
+ * Only the clean, fully-read case renders the reassuring standing lines.
+ *
+ * @param {Object} params - Injected dependencies.
+ * @param {Object} params.wa - WhatsApp client (enabled()/getGroups()/selfNumber()) used to fetch
+ *   live group state; a disabled/absent client short-circuits to the senderOff result.
+ * @param {Object} params.personStore - Person/group registry store (list()).
+ * @param {Object} params.staffRoster - Staff allowlist store (list()); falsy means this tripwire is
+ *   not wired into this deployment.
+ * @returns {Promise<Object>} The membership report - one of the fail-closed shapes (wired:false,
+ *   senderOff, configured:false, fetchOk:false) or, on a clean read, { ok, wired, configured,
+ *   fetchOk, rosterCount, groupsRegistered, groupsChecked, findings, unverifiable,
+ *   settingsAudited, openAdd, adminGaps, settingsUnreadable }.
+ */
+async function collectMembership({ wa, personStore, staffRoster }) {
+  if (!staffRoster) return { ok: true, wired: false };                 // feature not deployed here
+  if (!wa || !wa.enabled()) return { ok: true, wired: true, senderOff: true };
+
+  const roster = (await staffRoster.list()) || [];
+  const groups = ((await personStore.list()) || [])
+    .filter((p) => p && p.enabled !== false && isGroupJid(p.phone));
+  const groupsRegistered = groups.length;
+
+  if (!roster.length) return { ok: true, wired: true, configured: false, groupsRegistered };
+
+  let fetched;
+  let self;
+  try {
+    fetched = await wa.getGroups();
+    self = await wa.selfNumber();
+  } catch (e) {
+    log.error('membership audit: could not fetch WhatsApp group members - reporting audit unavailable', { err: e });
+    return { ok: true, wired: true, configured: true, fetchOk: false, groupsRegistered };
+  }
+  if (!Array.isArray(fetched) || self == null) {
+    log.error('membership audit: group list or the bot own number was unreadable - reporting audit unavailable');
+    return { ok: true, wired: true, configured: true, fetchOk: false, groupsRegistered };
+  }
+
+  const allowed = new Set([...roster.map(canonicalNumber), canonicalNumber(self)].filter(Boolean));
+  const byId = new Map(fetched.filter((g) => g && g.id).map((g) => [String(g.id).toLowerCase(), g]));
+
+  // Desired-admin set for the settings tripwire: the bot (from self, counted exactly as the
+  // membership allowlist counts it) plus the three human core admins. Canonicalized to the 10-digit
+  // core so an admin JID / country-coded number / bare mobile all reconcile, and deduped so self can
+  // never double-count a core number. `self` is non-null here (an unresolvable self already failed
+  // the audit closed above), so the bot key is always present.
+  const requiredAdmins = [{ key: canonicalNumber(self), label: 'Bid Command' }];
+  for (const c of CORE_ADMINS) {
+    const key = canonicalNumber(c.number);
+    if (key && !requiredAdmins.some((r) => r.key === key)) requiredAdmins.push({ key, label: c.label });
+  }
+
+  const findings = [];            // registered groups that contain >=1 unknown participant (#48)
+  const unverifiable = [];        // registered groups the fetch didn't return (bot removed / group gone)
+  const openAdd = [];             // groups whose "who can add members" drifted OFF admin-only
+  const adminGaps = [];           // groups missing >=1 required admin: { name, jid, missing: [labels] }
+  const settingsUnreadable = [];  // groups returned but whose config/admins could not be read (fail-closed)
+  let groupsChecked = 0;
+  for (const g of groups) {
+    const jid = String(g.phone).toLowerCase();
+    const label = g.name || jid;
+    const remote = byId.get(jid);
+    if (!remote) { unverifiable.push({ name: label, jid }); continue; }
+    groupsChecked += 1;
+
+    // (1) membership: any participant not on the staff allowlist (the #48 check, unchanged).
+    const unknowns = [];
+    for (const p of remote.participants || []) {
+      const key = canonicalNumber(p);
+      if (!key) continue;                        // an unreadable participant row, not an intruder
+      if (!allowed.has(key)) unknowns.push(displayNumber(p));
+    }
+    if (unknowns.length) findings.push({ name: label, jid, unknowns });
+
+    // (2) settings: the two group-config assertions this tripwire adds, over the config + admins the
+    // getGroups wrapper now surfaces. The add-setting and the admin-superset are read INDEPENDENTLY
+    // so a real drift is never masked by the other field being unreadable; either field being
+    // unreadable also records the group as settings-unverified (fail-closed - never a silent pass).
+    const cfg = remote.config;
+    const addReadable = cfg != null && typeof cfg.membersCanAddMembers === 'boolean';
+    // Admin ids are matched on the phone core, but an id can be OPAQUE - a WhatsApp @lid linked
+    // identifier (post-LID-migration) or anything that doesn't reduce to a dialable number. Reconcile
+    // only the ids that ARE a phone (canonicalPhoneKey), and separately note whether any opaque id is
+    // present. A demotion can be asserted ONLY when every admin id was a readable phone; if any id is
+    // opaque, a "missing" core admin might actually be present under that opaque id, so flagging it
+    // would be a false accusation - the admin check degrades to UNVERIFIED (settingsUnreadable), a
+    // benign could-not-check, exactly like a missing block. Every WhatsApp group has >=1 admin, so an
+    // admins list that reduced to no readable phone AND held no opaque id is an empty/absent read
+    // glitch (not "zero admins") - also unreadable, never "everyone was demoted".
+    const rawAdmins = Array.isArray(remote.admins) ? remote.admins : [];
+    const adminKeys = rawAdmins.map(canonicalPhoneKey).filter(Boolean);
+    const hasOpaqueAdmin = rawAdmins.some((a) => a != null && String(a).trim() !== '' && canonicalPhoneKey(a) == null);
+    const adminsReadable = adminKeys.length > 0 && !hasOpaqueAdmin;
+
+    // The add-setting and the admin-superset are read INDEPENDENTLY: an unreadable admin set must
+    // never mask a real open-add drift, and an open/closed add setting must never mask a real admin
+    // gap. Each field being unreadable independently records the group as settings-unverified.
+    if (addReadable && cfg.membersCanAddMembers !== false) openAdd.push({ name: label, jid });
+    if (adminsReadable) {
+      const adminSet = new Set(adminKeys);
+      // A missing core admin has two very different causes: the group was PROVISIONED without them,
+      // or they were genuinely DEMOTED. A once-a-day snapshot cannot tell those apart, and - this
+      // is the part that killed the richer version - it cannot even tell them apart by reading the
+      // PARTICIPANT list, because demoting a WhatsApp admin does not remove them from the group. A
+      // real demotion and a provisioning gap both present as a plain member.
+      //
+      // So nothing is inferred here beyond what the admin list literally says. The renderer states
+      // the state and names the action; neither claims a cause. Doing it any other way has now been
+      // wrong twice in production - see the note at the render site.
+      //
+      // (Reading `participants` to split "member" from "absent" was tried and removed: it bought a
+      // distinction that did not fire on the incident that motivated it, and it fails OPEN on an
+      // empty read - whatsapp.js coerces an unreadable participant list to [], which would have
+      // rendered every missing admin as "not in the group at all". getGroups() only returns groups
+      // the sender is IN, so for the bot that sentence could never have been true.)
+      const missing = requiredAdmins.filter((r) => !adminSet.has(r.key)).map((r) => r.label);
+      if (missing.length) adminGaps.push({ name: label, jid, missing });
+    }
+    if (!addReadable || !adminsReadable) settingsUnreadable.push({ name: label, jid });
+  }
+  return {
+    ok: true, wired: true, configured: true, fetchOk: true,
+    rosterCount: roster.length, groupsRegistered, groupsChecked, findings, unverifiable,
+    settingsAudited: true, openAdd, adminGaps, settingsUnreadable,
+  };
+}
+
+/**
+ * Server health: the box the bot runs on, read through the injected `sysProbe` (the one seam that
+ * touches os/fs, so this module stays filesystem-free per its header). Reports storage use of the
+ * filesystem holding the app's data, the app's own log footprint, process memory against the PM2
+ * restart cap, whole-box free RAM, and process uptime. Every fact is OPTIONAL: a probe that could
+ * not read one (an older Node without fs.statfs, a missing log dir) leaves it null and the renderer
+ * skips it, rather than failing the whole section. Not wired (no sysProbe dep) -> { wired:false },
+ * which renders nothing - a deployment that never injected the probe shows no Server line at all.
+ * The threshold policy lives in the renderer; this collector only carries the raw facts + the PM2
+ * memory cap (so the renderer can phrase "N of CAP MB" without re-hardcoding it).
+ */
+async function collectServer({ sysProbe, config }) {
+  if (!sysProbe) return { ok: true, wired: false };
+  const r = await sysProbe.read({ dataDir: config && config.dataDir });
+  return {
+    ok: true,
+    wired: true,
+    storagePct: r.storage ? r.storage.usedPct : null,
+    logsBytes: r.logsBytes != null ? r.logsBytes : null,
+    rssMb: r.rssBytes != null ? Math.round(r.rssBytes / (1024 * 1024)) : null,
+    sysFreePct: r.sysFreePct != null ? r.sysFreePct : null,
+    uptimeSec: r.uptimeSec != null ? r.uptimeSec : null,
+    memCapMb: MEM_RESTART_MB,
+  };
+}
+
+/**
+ * Gather every section, each behind its own try/catch. A section that throws is
+ * logged for the operator (structured, with the error) and reported to the reader
+ * as { ok: false } - which the renderer turns into a "could not read X" line AND
+ * an attention verdict. Never throws.
+ */
+async function collectHeartbeat(deps) {
+  const state = await deps.store.getDoc(COLLECTION, STATE_KEY).catch(() => null);
+  const sections = {};
+  const grab = async (name, fn) => {
+    try { sections[name] = await fn(); } catch (e) {
+      log.error(`heartbeat could not read ${name}`, { err: e });
+      sections[name] = { ok: false };
+    }
+  };
+  // Only the ACCOUNTS section is portal-scoped, and only because its `expected` side cannot be
+  // anything else (see collectAccounts). The funnel and today sections count loads and bids across
+  // every portal the desk works.
+  const platformKey = deps.config && deps.config.platformKey;
+  await grab('accounts', () => collectAccounts({ stacks: deps.stacks, store: deps.store, state, platformKey }));
+  await grab('sender', () => collectSender({ wa: deps.wa, config: deps.config }));
+  await grab('funnel', () => collectFunnel({ requests: deps.requests, store: deps.store, now: deps.now }));
+  await grab('today', () => collectToday({ requests: deps.requests, now: deps.now }));
+  await grab('membership', () => collectMembership({ wa: deps.wa, personStore: deps.personStore, staffRoster: deps.staffRoster }));
+  await grab('server', () => collectServer({ sysProbe: deps.sysProbe, config: deps.config }));
+  await grab('gocomet', () => collectGoComet({ stacks: deps.stacks, config: deps.config }));
+  return sections;
+}
+
+// ---- renderer ------------------------------------------------------------------
+
+// Reader-facing names for a section the heartbeat couldn't read - plain words, no
+// module paths ("funnel" would mean nothing to the director).
+const SECTION_LABELS = {
+  accounts: 'its SuperProcure account status',
+  sender: 'its WhatsApp sender status',
+  funnel: "yesterday's bidding records",
+  today: "today's auction list",
+  membership: 'the daily group membership check',
+  server: 'its server health',
+  gocomet: 'its GoComet status',
+};
+
+/**
+ * Turn the membership section into { issues, status } for the renderer. Attention-worthy findings
+ * (unknown numbers, groups the bot can no longer see, an unavailable or unconfigured audit) go into
+ * `issues` so they sit under the verdict and flip it to "attention needed" - the same fail-closed
+ * stance the rest of the heartbeat takes (a lying "all normal" is worse than noise). Only a clean,
+ * fully-read audit gets the reassuring standing `status` line. Absent/not-wired/sender-off/threw
+ * (ok:false, already handled by the generic could-not-read line) render nothing here.
+ */
+function membershipReport(m) {
+  if (!m || m.wired === false || m.senderOff || m.ok === false) return { issues: [], status: null, settingsStatus: null };
+  if (m.fetchOk === false) {
+    return { issues: ['the daily group membership check could not run - the customer group members could not be read, so who is in the groups was NOT verified today'], status: null, settingsStatus: null };
+  }
+  if (!m.configured) {
+    return { issues: ['the group membership check is not set up yet (no staff numbers on the allowlist) - customer group members are NOT being verified'], status: null, settingsStatus: null };
+  }
+  const issues = [];
+  for (const g of m.unverifiable || []) {
+    issues.push(`could not check who is in the "${g.name}" group - Bid Command may have been removed from it; please check`);
+  }
+  for (const g of m.findings || []) {
+    for (const num of g.unknowns) {
+      issues.push(`unknown number in the "${g.name}" group: ${num} - these groups are staff-only, please check who this is`);
+    }
+  }
+  // Group-settings tripwire lines. Gated on settingsAudited so a section built before this feature
+  // (or one that never reached the fetch) carries no settings verdict and renders exactly as it did
+  // - existing callers are undisturbed. Each line is fail-closed: an unreadable settings block is an
+  // attention line, never a silent pass.
+  if (m.settingsAudited) {
+    for (const g of m.settingsUnreadable || []) {
+      issues.push(`could not check the security settings for the "${g.name}" group - who can add members and who is admin were NOT verified today; please check`);
+    }
+    for (const g of m.openAdd || []) {
+      issues.push(`the "${g.name}" group is set to let anyone add members - it should be admins-only; please check who changed this`);
+    }
+    for (const g of m.adminGaps || []) {
+      for (const who of g.missing) {
+        // ONE line, and it states a STATE rather than a cause.
+        //
+        // This audit is a once-a-day snapshot of the admin list. It can see who IS an admin; it
+        // can never see who WAS one. Every causal wording is therefore a guess, and both guesses
+        // have now been wrong in production:
+        //
+        //   "is no longer an admin ... who changed this"  fired ten times on 2026-07-31 against
+        //       five groups that had simply been provisioned without the dual admins. No demotion
+        //       had happened at all.
+        //   "was never made an admin"                     is the inverse guess and is wrong in
+        //       exactly the case this tripwire exists to catch: demoting a WhatsApp admin does NOT
+        //       remove them from the group, so a real demotion presents as a plain member - the
+        //       same shape as the provisioning gap. The two causes are indistinguishable from a
+        //       single snapshot, which is the whole point.
+        //
+        // So: report the state, name the action, and keep the investigate cue that the sibling
+        // open-add line above never gave up. True under a demotion AND under a provisioning gap,
+        // which is the only claim this data supports.
+        //
+        // Telling the two apart honestly needs yesterday's admin set persisted - the state doc at
+        // the bottom of this module already round-trips branchCounts day over day, so the
+        // mechanism exists and is six functions away. That is a real feature, not a wording fix.
+        const label = typeof who === 'string' ? who : (who && who.label) || String(who);
+        issues.push(`${label} is not an admin of the "${g.name}" group - please check and promote ${label === 'Bid Command' ? 'it' : 'them'}`);
+      }
+    }
+  }
+  if (issues.length) return { issues, status: null, settingsStatus: null };
+  const n = m.groupsChecked || 0;
+  const status = n
+    ? `*Group membership* - all ${n} customer group${n === 1 ? '' : 's'} staff-only`
+    : '*Group membership* - no customer groups to check';
+  // Standing settings line, only on a clean, fully-audited settings pass (its problem states already
+  // spoke under the verdict). Emoji-free like the other status lines.
+  const settingsStatus = (m.settingsAudited && n)
+    ? `*Group settings* - all ${n} locked to admin-only adds, core admins in place`
+    : null;
+  return { issues: [], status, settingsStatus };
+}
+
+// Sparse emoji polish for WhatsApp (3-5 per message, one per SECTION anchor, never one
+// per data line - the same anchor-not-decoration role emoji play in waTemplates.js).
+// Written as unicode ESCAPES so the source file stays ASCII-only per repo convention;
+// only the rendered message carries the glyphs. Log lines never use these. The verdict
+// pair is deliberately mood-matched (check vs warning) so an attention/degraded morning
+// can never look cheerful in the chat-list preview; the closing italic line stays
+// emoji-free so it reads as the serious footer it is.
+const EMOJI_OK = '\u{2705}';            // green check - the all-normal verdict line
+const EMOJI_WARN = '\u{26A0}\u{FE0F}';  // warning sign - attention AND degraded verdicts
+const EMOJI_YDAY = '\u{1F4CA}';         // bar chart - the Yesterday funnel header
+const EMOJI_TODAY = '\u{1F4C5}';        // calendar - the Today line
+const EMOJI_UP = '\u{1F4C8}';           // chart up - branches-added note
+const EMOJI_DOWN = '\u{1F4C9}';         // chart down - branches-removed note
+
+// Human-readable machine sizes/durations for the Server line. ASCII only (the rendered message
+// stays ASCII outside the deliberate emoji set). Sizes read in MB up to ~1 GB, then GB with one
+// decimal; uptime in its largest sensible WHOLE unit (minutes under an hour, hours under two days,
+// else days). A null fact (unreadable on this box) formats to null so the renderer drops it.
+function fmtSize(bytes) {
+  if (bytes == null) return null;
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1024) return `${Math.round(mb)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+function fmtUptime(sec) {
+  if (sec == null) return null;
+  const unit = (n, u) => `${n} ${u}${n === 1 ? '' : 's'}`;
+  if (sec < 3600) return unit(Math.max(1, Math.round(sec / 60)), 'minute');
+  if (sec < 2 * 86400) return unit(Math.round(sec / 3600), 'hour');
+  return unit(Math.round(sec / 86400), 'day');
+}
+
+/**
+ * Render the WhatsApp message. Contract with the reader:
+ *   - line 1 is the verdict, alone ("all systems normal" / "attention needed") -
+ *     WhatsApp's chat-list preview shows it before the chat is even opened;
+ *   - issues (anything a human should act on) are bulleted right under it;
+ *   - notes (worth knowing, no action needed - e.g. a branch-count change) follow;
+ *   - then the standing sections: accounts, alerts, yesterday, today.
+ * WhatsApp *bold* markers only; hyphens, never em dashes; ASCII source (the sparse
+ * emoji above are escape sequences - the template literal itself stays ASCII).
+ * Multi-account detail (per-account labels) appears only when >1 account runs -
+ * the same no-label-noise rule the notifier follows.
+ */
+function renderHeartbeat(sections, now) {
+  const a = sections.accounts;
+  const s = sections.sender;
+  const f = sections.funnel;
+  const t = sections.today;
+  const mem = membershipReport(sections.membership);
+  const sv = sections.server;
+
+  const issues = [];
+  const notes = [];
+
+  // Ordered by how fast a human must move: a dead sender first (every alert is
+  // dark), then a missing account (that branch cannot bid at all), then a token
+  // running out (days of runway, but manual-recovery-only once it lapses).
+  if (s && s.ok && s.configured && s.healthy === false) {
+    issues.push('WhatsApp alerts are not being delivered - the sender number is logged out and needs to be re-linked');
+  }
+  if (a && a.ok && a.liveCount < a.expectedCount) {
+    const down = a.expectedCount - a.liveCount;
+    issues.push(`${down} of ${a.expectedCount} SuperProcure account${a.expectedCount === 1 ? '' : 's'} could not log in - those branches are not being bid on`);
+  }
+  if (a && a.ok && a.tokenSoonest) {
+    const daysLeft = Math.floor((a.tokenSoonest.exp - now) / DAY_MS);
+    if (daysLeft <= TOKEN_WARN_DAYS) {
+      const label = a.expectedCount > 1 ? ` (${a.tokenSoonest.label})` : '';
+      issues.push(daysLeft <= 0
+        ? `the SuperProcure login${label} has expired - bidding is blocked until it is reconnected`
+        : `the SuperProcure login${label} expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'} - please have it reconnected before then`);
+    }
+  }
+  // Server health: the box itself. Placed after the SP-account issues (a dead account is more urgent
+  // to the business) but before the could-not-read sweep. Storage first - a full disk is the failure
+  // that silently loses live-money state (the durable scheduler cannot persist an armed intent). Each
+  // check fires only when its fact was actually read; a null field (unreadable on this box) never
+  // invents an issue.
+  if (sv && sv.ok && sv.wired) {
+    if (sv.storagePct != null && sv.storagePct >= STORAGE_WARN_PCT) {
+      issues.push(`the server storage is ${sv.storagePct}% full - it needs clearing soon (bids and logs are saved here, and bidding stops if the storage fills)`);
+    }
+    if (sv.logsBytes != null && sv.logsBytes >= LOG_WARN_BYTES) {
+      issues.push(`Bid Command's log files have grown to ${fmtSize(sv.logsBytes)} - they should be cleared or rotated to free up space`);
+    }
+    if (sv.rssMb != null && sv.rssMb >= MEM_WARN_MB) {
+      issues.push(`Bid Command is using ${sv.rssMb} MB of its ${sv.memCapMb} MB memory limit - it may restart itself soon (this is automatic and safe, but if it keeps happening please check)`);
+    }
+    if (sv.sysFreePct != null && sv.sysFreePct <= SYS_FREE_WARN_PCT) {
+      issues.push(`the server is low on free memory (${sv.sysFreePct}% left) - other apps sharing the server may be affected; worth a look`);
+    }
+  }
+  // C073/C101: GoComet status, parallel to the SP accounts block above. Silent when GC is disabled
+  // (the common posture) or still building its first successful read - never invents an issue from
+  // an absent fact. Token expiry is intentionally NOT re-alarmed here (tokenExpiry.js already pages
+  // ops for it, C078); this only reports the poller and the adapter's own liveness.
+  const gc = sections.gocomet;
+  if (gc && gc.ok && gc.enabled) {
+    if (gc.registered === false) {
+      issues.push('GoComet is enabled but its adapter never registered - check GC_TOKEN and the boot log');
+    } else if (gc.registered) {
+      // Review correction (26 Sep): a deliberate console pause (applyGoCometDiscovery(false)) stops
+      // the poller BY DESIGN, and the adapter's last-success clock naturally goes stale right along
+      // with it - both of which are indistinguishable, on the raw facts alone, from a genuine crash.
+      // One honest "paused" line replaces both alarms rather than reporting a stopped-on-purpose
+      // poller as if it had died.
+      if (gc.discoveryEnabled === false) {
+        issues.push('GoComet polling is paused (console toggle) - no GoComet loads are being surfaced');
+      } else {
+        if (!gc.pollerRunning) {
+          issues.push('the GoComet discovery poller is not running - no GoComet loads are being surfaced');
+        }
+        if (gc.live === false) {
+          const mins = Math.round(gc.silentForMs / 60000);
+          issues.push(`the GoComet adapter has not completed a successful read in ${mins} minute${mins === 1 ? '' : 's'} - it may be stuck, not just quiet`);
+        }
+      }
+    }
+  }
+  for (const [name, sec] of Object.entries(sections)) {
+    if (!sec || sec.ok === false) issues.push(`Bid Command could not read ${SECTION_LABELS[name] || name} this morning`);
+  }
+  // Membership tripwire: unknown numbers / an unavailable-or-unconfigured audit are attention items,
+  // spelled out under the verdict alongside the other issues (membershipReport owns the wording so a
+  // "could not run" never masquerades as all-clear).
+  for (const i of mem.issues) issues.push(i);
+
+  // Branch-count change: information, not an alarm - SuperProcure adding branches
+  // server-side is business-relevant (new lanes appear with no config change) but
+  // needs no fix.
+  if (a && a.ok) {
+    for (const c of a.changes) {
+      const who = a.expectedCount > 1 ? `${c.label}: ` : '';
+      const verb = c.to > c.from ? 'added' : 'removed';
+      notes.push({
+        up: c.to > c.from, // picks the chart-up/-down anchor at render time
+        text: `SuperProcure ${verb} ${Math.abs(c.to - c.from)} branch${Math.abs(c.to - c.from) === 1 ? '' : 'es'} since yesterday (${who}${c.from} to ${c.to})`,
+      });
+    }
+  }
+
+  const lines = [];
+  lines.push(issues.length
+    ? `${EMOJI_WARN} *Bid Command: attention needed* - ${istDisplayDate(now)}`
+    : `${EMOJI_OK} *Bid Command: all systems normal* - ${istDisplayDate(now)}`);
+  if (issues.length) {
+    lines.push('');
+    for (const i of issues) lines.push(`- ${i}`);
+  }
+  if (notes.length) {
+    lines.push('');
+    for (const n of notes) lines.push(`${n.up ? EMOJI_UP : EMOJI_DOWN} Note - ${n.text}`);
+  }
+
+  // Standing status lines - kept to one line each so the whole message stays one
+  // phone-screen tall on a normal day.
+  lines.push('');
+  if (a && a.ok) {
+    const who = a.expectedCount > 1 ? `${a.liveCount} of ${a.expectedCount} connected` : (a.liveCount ? 'connected' : 'not connected');
+    lines.push(`*Accounts* - ${who}, ${a.totalBranches} branch${a.totalBranches === 1 ? '' : 'es'}`);
+  }
+  if (s && s.ok) {
+    lines.push(`*WhatsApp alerts* - ${!s.configured ? 'not set up (dashboard only)' : (s.healthy === false ? 'DOWN' : 'working')}`);
+  }
+  // Standing membership + settings lines, only on the clean fully-read audit (their problem states
+  // already spoke under the verdict). Emoji-free like the Accounts / WhatsApp-alerts status lines.
+  if (mem.status) lines.push(mem.status);
+  if (mem.settingsStatus) lines.push(mem.settingsStatus);
+  // Standing server line: one line of the box's vitals - storage use, the app's log footprint,
+  // process memory, and uptime. Emoji-free like the Accounts / WhatsApp-alerts / membership status
+  // lines, so it costs nothing against the sparse-emoji budget. Only the facts that were actually
+  // read appear (a probe field that came back null is skipped), and the reader-facing wording is
+  // "storage" (not disk) and "uptime" (not up). Absent/not-wired renders nothing.
+  if (sv && sv.ok && sv.wired) {
+    const parts = [];
+    if (sv.storagePct != null) parts.push(`storage ${sv.storagePct}% used`);
+    const ls = fmtSize(sv.logsBytes);
+    if (ls) parts.push(`logs ${ls}`);
+    if (sv.rssMb != null) parts.push(`memory ${sv.rssMb} MB`);
+    const up = fmtUptime(sv.uptimeSec);
+    if (up) parts.push(`uptime ${up}`);
+    if (parts.length) lines.push(`*Server* - ${parts.join(', ')}`);
+  }
+
+  if (f && f.ok) {
+    const yesterday = istDisplayDate(now - DAY_MS);
+    lines.push('');
+    if (!f.discovered && !f.bidsPlaced && !(f.won + f.lost + (f.closedUnknown || 0))) {
+      lines.push(`${EMOJI_YDAY} *Yesterday (${yesterday})* - no bidding activity`);
+    } else {
+      lines.push(`${EMOJI_YDAY} *Yesterday (${yesterday})*`);
+      lines.push(`- New loads found - ${f.discovered}`);
+      if (f.discovered) {
+        lines.push(`- Priced in time - ${f.priced}`);
+        if (f.missedCutoff) lines.push(`- Missed the pricing cutoff - ${f.missedCutoff}`);
+        if (f.declined) lines.push(`- Declined by the team - ${f.declined}`);
+      }
+      lines.push(`- Bids placed - ${f.bidsPlaced}${f.loadsBid ? ` (on ${f.loadsBid} load${f.loadsBid === 1 ? '' : 's'})` : ''}`);
+      if (f.rejected) lines.push(`- Rejected by the portal - ${f.rejected} (being looked into)`);
+      lines.push(`- Won ${f.won}, lost ${f.lost}`);
+      // Only when there are any, and on its own line rather than folded into either number - the
+      // point of the class is that it belongs to neither.
+      if (f.closedUnknown) lines.push(`- Closed without a result we could see - ${f.closedUnknown}`);
+    }
+  }
+
+  if (t && t.ok) {
+    lines.push('');
+    const today = [];
+    if (t.armedToday) today.push(`${t.armedToday} auction${t.armedToday === 1 ? '' : 's'} armed and ready`);
+    if (t.armedLater) today.push(`${t.armedLater} more armed for later days`);
+    if (t.awaiting) today.push(`${t.awaiting} load${t.awaiting === 1 ? '' : 's'} still waiting for a price`);
+    lines.push(today.length ? `${EMOJI_TODAY} *Today* - ${today.join(', ')}` : `${EMOJI_TODAY} *Today* - nothing armed yet`);
+  }
+
+  lines.push('');
+  // The dead-man's switch, spelled out for the reader: the absence of this message
+  // is the one signal the bot cannot send about itself.
+  lines.push('_Daily self-check from Bid Command. If this message ever stops arriving, it needs attention._');
+  return lines.join('\n');
+}
+
+// ---- recipients ------------------------------------------------------------------
+
+// A config entry that is a raw target rather than a person id: a group JID or a
+// phone-number-looking string (digits with optional +/spaces/dashes). Anything
+// else is treated as a personId and looked up in the people collection.
+function looksLikeTarget(e) {
+  return isGroupJid(e) || /^\+?[\d][\d\s-]{7,}$/.test(String(e));
+}
+
+/**
+ * Resolve who gets the heartbeat. config.heartbeat.recipients (person ids or raw
+ * phones/JIDs) wins when set; with nothing configured, the default resolves EVERY
+ * person record whose NAME contains any of the comma-separated fragments in
+ * config.heartbeat.defaultRecipientName ('Suyashh,Sushant,Siddharth'). The brief is a
+ * standing health check for the whole operating trio - the director, BRL's IT owner,
+ * and the developer who fixes the bot - all of whom act on an "attention needed"
+ * morning, so a single-name default silently under-served the two people who actually
+ * respond to it. Each match is an individual DM by definition, so the default path
+ * skips group JIDs (a group can still be targeted EXPLICITLY via the env list) and
+ * dedupes on phone so a name matching two fragments still yields one message. A
+ * fragment that matches nobody contributes nobody - one absent person never costs the
+ * rest their message, the same fail-soft stance the explicit-list path takes.
+ * Resolution failures are logged per-entry and skipped - a typo'd id must not cost the
+ * other recipients their message.
+ */
+async function resolveRecipients({ config, personStore }) {
+  const entries = (config.heartbeat && config.heartbeat.recipients) || [];
+  const out = [];
+  if (entries.length) {
+    for (const e of entries) {
+      if (looksLikeTarget(e)) { out.push({ name: null, phone: e }); continue; }
+      const p = await personStore.get(e).catch(() => null);
+      if (p && p.enabled !== false && p.phone) out.push({ name: p.name || null, phone: p.phone });
+      else log.warn(`heartbeat recipient '${e}' not found in people (or disabled) - skipped`, { entry: e });
+    }
+    return out;
+  }
+  const fragments = String((config.heartbeat && config.heartbeat.defaultRecipientName) || 'Suyashh')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const people = await personStore.list().catch(() => []);
+  const seen = new Set();
+  for (const p of people || []) {
+    if (!p || p.enabled === false || !p.phone || isGroupJid(p.phone)) continue;
+    const name = String(p.name || '').toLowerCase();
+    if (!fragments.some((frag) => name.includes(frag))) continue;
+    if (seen.has(p.phone)) continue;   // one person, one message, even when two fragments hit the name
+    seen.add(p.phone);
+    out.push({ name: p.name || null, phone: p.phone });
+  }
+  if (out.length) return out;
+  log.error(`heartbeat default recipients (${fragments.join(', ') || 'none'}) matched no one in people and SP_HEARTBEAT_RECIPIENTS is unset - the heartbeat has nowhere to go`);
+  return [];
+}
+
+// ---- run + schedule ------------------------------------------------------------------
+
+/**
+ * One heartbeat run: gather -> render -> send -> remember. The layered fallbacks
+ * are the point (a silent heartbeat is the one failure mode this feature exists
+ * to prevent):
+ *   - a failed SECTION already degraded inside collectHeartbeat;
+ *   - a failure of the gather/render step itself still sends a minimal "could not
+ *     read its records" message;
+ *   - a failed send is logged loudly and sentDate is NOT written, so the boot
+ *     catch-up window can retry after a restart;
+ *   - state-doc persistence failing never blocks the send (it already happened).
+ * `collect` is injectable for tests only; production always uses collectHeartbeat.
+ */
+async function runHeartbeat(deps, { collect = collectHeartbeat } = {}) {
+  const now = deps.now != null ? deps.now : Date.now();
+  let sections = null;
+  let message;
+  try {
+    sections = await collect(Object.assign({}, deps, { now }));
+    message = renderHeartbeat(sections, now);
+  } catch (e) {
+    log.error('heartbeat could not gather data - sending the degraded message', { err: e });
+    message = [
+      `${EMOJI_WARN} *Bid Command: attention needed* - ${istDisplayDate(now)}`,
+      '',
+      '- the morning self-check could not read Bid Command\'s records, so there is no summary today',
+      '- bidding itself may still be running normally - please have it checked',
+      '',
+      '_Daily self-check from Bid Command. If this message ever stops arriving, it needs attention._',
+    ].join('\n');
+  }
+
+  const recipients = await resolveRecipients(deps).catch((e) => {
+    log.error('heartbeat recipient resolution failed', { err: e });
+    return [];
+  });
+  if (!recipients.length) {
+    // Nothing to send TO is the one gap the message itself can't cover - so make it
+    // unmissable in pm2 logs, where the sender-health monitor's operator lives too.
+    log.error('heartbeat has NO resolvable recipient - nothing was sent (set SP_HEARTBEAT_RECIPIENTS or add the default person)');
+    return { sent: 0, recipients: 0, message };
+  }
+  let sent = 0;
+  for (const r of recipients) {
+    const res = await deps.notifier.sendDirect(r.phone, message, { kind: 'heartbeat', name: r.name });
+    if (res && res.ok) sent += 1;
+  }
+  if (!sent) log.error(`heartbeat send failed for all ${recipients.length} recipient(s) - the morning message did NOT go out`, { recipients: recipients.length });
+  else log.info(`heartbeat sent to ${sent}/${recipients.length} recipient(s)`, { sent, recipients: recipients.length });
+
+  try {
+    const patch = { lastRunAt: now };
+    if (sections && sections.accounts && sections.accounts.ok) patch.branchCounts = sections.accounts.branchCounts;
+    if (sent > 0) patch.sentDate = istDayStamp(now);
+    await deps.store.patchDoc(COLLECTION, STATE_KEY, patch);
+  } catch (e) {
+    log.error('heartbeat could not persist its state (branch-count comparison may repeat tomorrow)', { err: e });
+  }
+  return { sent, recipients: recipients.length, message };
+}
+
+/**
+ * Start the daily schedule via the shared daily-IST rail (dailyTask.js): a
+ * self-rescheduling unref'd setTimeout aimed at the next HH:MM IST, plus a boot
+ * catch-up - a deploy or PM2 restart that swallowed the 08:00 fire sends within
+ * the hour, deduped on the state doc's sentDate so a restart AFTER a successful
+ * send never double-sends. Returns { stop() }; null when disabled.
+ */
+function startDailyHeartbeat(deps) {
+  const cfg = (deps.config && deps.config.heartbeat) || {};
+  return startDailyISTTask({
+    label: 'heartbeat',
+    enabled: !!cfg.enabled,
+    timeIST: cfg.timeIST,
+    defaultTime: { h: 8, m: 0 },
+    alreadyDoneToday: async (now) => {
+      const state = await deps.store.getDoc(COLLECTION, STATE_KEY).catch(() => null);
+      return !!(state && state.sentDate === istDayStamp(now));
+    },
+    run: () => runHeartbeat(deps),
+  });
+}
+
+module.exports = {
+  COLLECTION, STATE_KEY, TOKEN_WARN_DAYS, CATCHUP_WINDOW_MS,
+  // time helpers re-exported from dailyTask.js (moved, not changed - callers/tests keep working)
+  istMidnight, istDayStamp, istDisplayDate, parseTimeIST, nextRunAt,
+  collectAccounts, collectSender, collectFunnel, collectToday, collectMembership, collectServer, collectGoComet, collectHeartbeat,
+  canonicalNumber, canonicalPhoneKey, displayNumber, membershipReport, CORE_ADMINS,
+  fmtSize, fmtUptime,
+  renderHeartbeat, resolveRecipients, runHeartbeat, startDailyHeartbeat,
+};

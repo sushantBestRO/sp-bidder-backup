@@ -1,0 +1,218 @@
+{
+  "SPA-0001": {
+    "auctionId": "SPA-0001",
+    "lane": {
+      "origin": "Chakan, MH",
+      "destination": "Bawal, HR"
+    },
+    "equipment": "20ft container",
+    "units": 2,
+    "shipper": "Syngenta",
+    "cost": null,
+    "costFloor": 32734,
+    "floor": 32734,
+    "ladder": [
+      43724,
+      43284,
+      41966,
+      39768,
+      36690,
+      32734
+    ],
+    "marginsPct": null,
+    "minMarginPct": null,
+    "armedAt": 1782558479613,
+    "ourBids": [
+      {
+        "price": 43724,
+        "rungIndex": 0,
+        "rank": 4,
+        "ts": 1782561037544,
+        "dryRun": false,
+        "latencyMs": 77
+      },
+      {
+        "price": 43284,
+        "rungIndex": 1,
+        "rank": 4,
+        "ts": 1782561038782,
+        "dryRun": false,
+        "latencyMs": 37
+      },
+      {
+        "price": 41966,
+        "rungIndex": 2,
+        "rank": 4,
+        "ts": 1782561040046,
+        "dryRun": false,
+        "latencyMs": 64
+      },
+      {
+        "price": 39768,
+        "rungIndex": 3,
+        "rank": 4,
+        "ts": 1782561041420,
+        "dryRun": false,
+        "latencyMs": 81
+      },
+      {
+        "price": 36690,
+        "rungIndex": 4,
+        "rank": 1,
+        "ts": 1782561042730,
+        "dryRun": false,
+        "latencyMs": 77
+      }
+    ],
+    "lastBidPrice": 36690,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1782561062415,
+    "status": "closed"
+  },
+  "SPA-0002": {
+    "auctionId": "SPA-0002",
+    "lane": {
+      "origin": "Mundra, GJ",
+      "destination": "Bhiwandi, MH"
+    },
+    "equipment": "40ft container",
+    "units": 1,
+    "shipper": "Syngenta",
+    "cost": null,
+    "costFloor": 59079,
+    "floor": 59079,
+    "ladder": [
+      78912,
+      78119,
+      75739,
+      71772,
+      66219,
+      59079
+    ],
+    "marginsPct": null,
+    "minMarginPct": null,
+    "armedAt": 1782558479616,
+    "ourBids": [
+      {
+        "price": 78912,
+        "rungIndex": 0,
+        "rank": 6,
+        "ts": 1782560437771,
+        "dryRun": false,
+        "latencyMs": 41
+      },
+      {
+        "price": 78119,
+        "rungIndex": 1,
+        "rank": 6,
+        "ts": 1782560439057,
+        "dryRun": false,
+        "latencyMs": 92
+      },
+      {
+        "price": 75739,
+        "rungIndex": 2,
+        "rank": 6,
+        "ts": 1782560440436,
+        "dryRun": false,
+        "latencyMs": 105
+      },
+      {
+        "price": 71772,
+        "rungIndex": 3,
+        "rank": 1,
+        "ts": 1782560441779,
+        "dryRun": false,
+        "latencyMs": 79
+      }
+    ],
+    "lastBidPrice": 71772,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1782560462546,
+    "status": "closed"
+  },
+  "SPA-0003": {
+    "auctionId": "SPA-0003",
+    "lane": {
+      "origin": "Hosur, TN",
+      "destination": "Pantnagar, UK"
+    },
+    "equipment": "32ft MXL",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": null,
+    "costFloor": 73455,
+    "floor": 73455,
+    "ladder": [
+      98116,
+      97130,
+      94170,
+      89238,
+      82333,
+      73455
+    ],
+    "marginsPct": null,
+    "minMarginPct": null,
+    "armedAt": 1782558479618,
+    "ourBids": [
+      {
+        "price": 99805,
+        "rungIndex": 0,
+        "rank": 1,
+        "ts": 1782558479819,
+        "dryRun": false,
+        "latencyMs": 73
+      },
+      {
+        "price": 98802,
+        "rungIndex": 1,
+        "rank": 3,
+        "ts": 1782558510079,
+        "dryRun": false,
+        "latencyMs": 41
+      },
+      {
+        "price": 95791,
+        "rungIndex": 2,
+        "rank": 3,
+        "ts": 1782558540296,
+        "dryRun": false,
+        "latencyMs": 65
+      },
+      {
+        "price": 90774,
+        "rungIndex": 3,
+        "rank": 3,
+        "ts": 1782558570587,
+        "dryRun": false,
+        "latencyMs": 67
+      },
+      {
+        "price": 83751,
+        "rungIndex": 4,
+        "rank": 1,
+        "ts": 1782558600854,
+        "dryRun": false,
+        "latencyMs": 50
+      },
+      {
+        "price": 73455,
+        "rungIndex": 5,
+        "rank": 1,
+        "ts": 1782561840042,
+        "dryRun": false,
+        "latencyMs": 113
+      }
+    ],
+    "lastBidPrice": 73455,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "soft",
+    "closedAt": 1782561865652,
+    "status": "closed"
+  }
+}

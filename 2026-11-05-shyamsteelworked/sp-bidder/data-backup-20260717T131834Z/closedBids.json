@@ -1,0 +1,6508 @@
+{
+  "22724361": {
+    "auctionId": "22724361",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Ahmedabad",
+      "destination": "Surat"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Ahmedabad, Bareja, Gujarat 382425, India"
+      },
+      {
+        "kind": "drop",
+        "address": "SUNRISE ENTERPRISE - SURAT, Gujarat, India, 395006"
+      }
+    ],
+    "equipment": "19FT-SA-8MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783777512606,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783917643652,
+    "status": "closed"
+  },
+  "22918820": {
+    "auctionId": "22918820",
+    "lane": {
+      "origin": "Ludhiana",
+      "destination": "Derabassi - Barwala Road"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ludhiana, Punjab, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": null,
+    "cost": 100000,
+    "costFloor": null,
+    "floor": 106300,
+    "ladder": [
+      112600,
+      107200,
+      106300
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783415390005,
+    "ourBids": [
+      {
+        "price": 112600,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783416275897,
+        "dryRun": true
+      },
+      {
+        "price": 107200,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783416277102,
+        "dryRun": true
+      },
+      {
+        "price": 106300,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783416297594,
+        "dryRun": true
+      }
+    ],
+    "lastBidPrice": 106300,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783416300205,
+    "status": "closed"
+  },
+  "22923371": {
+    "auctionId": "22923371",
+    "lane": {
+      "origin": "Ludhiana",
+      "destination": "Derabassi - Barwala Road"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ludhiana, Punjab, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": null,
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783422890005,
+    "ourBids": [
+      {
+        "price": 11260,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783423775556,
+        "dryRun": false,
+        "latencyMs": 196
+      }
+    ],
+    "lastBidPrice": 11260,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783423800110,
+    "status": "closed"
+  },
+  "22954131": {
+    "auctionId": "22954131",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "JAIPUR M CORP"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN FURINTURE JAIPUR, JAIPUR M CORP, Rajasthan 302021, in"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47835,
+    "ladder": [
+      50670,
+      48240,
+      47835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783506045963,
+    "ourBids": [
+      {
+        "price": 50670,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783508375187,
+        "dryRun": false,
+        "latencyMs": 137
+      },
+      {
+        "price": 48240,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783508376370,
+        "dryRun": false,
+        "latencyMs": 84
+      }
+    ],
+    "lastBidPrice": 48240,
+    "finalRank": 6,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783508400132,
+    "status": "closed"
+  },
+  "22956349": {
+    "auctionId": "22956349",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Naval Park, Hindustan Shipyard Colony"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "EASTERN NAVAL COMMAND, Naval Park, Hindustan Shipyard Colony, Visakhapatnam, Andhra Pradesh, India, 530014"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 98800,
+    "costFloor": null,
+    "floor": 105024,
+    "ladder": [
+      111249,
+      105914,
+      105024
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783508036558,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": 6,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783511100085,
+    "status": "closed"
+  },
+  "22980487": {
+    "auctionId": "22980487",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "394115",
+      "destination": "Nagpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "394115, Sanjali, Gujarat, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Nagpur, Maharashtra, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 34000,
+    "costFloor": null,
+    "floor": 36142,
+    "ladder": [
+      38284,
+      36448,
+      36142
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783579550006,
+    "ourBids": [
+      {
+        "price": 38284,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783580435875,
+        "dryRun": true
+      },
+      {
+        "price": 36448,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783580436880,
+        "dryRun": true
+      },
+      {
+        "price": 36142,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783580457614,
+        "dryRun": true
+      }
+    ],
+    "lastBidPrice": 36142,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783580460027,
+    "status": "closed"
+  },
+  "22991048": {
+    "auctionId": "22991048",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Wada",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "MAPLE MOLDING WADA, Maharashtra, India, 421303"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 46000,
+    "costFloor": null,
+    "floor": 48898,
+    "ladder": [
+      51796,
+      49312,
+      48898
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783596290007,
+    "ourBids": [
+      {
+        "price": 51796,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783599873243,
+        "latencyMs": 401
+      },
+      {
+        "price": 49312,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783599874478,
+        "latencyMs": 66
+      },
+      {
+        "price": 48898,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783599897657,
+        "latencyMs": 117
+      }
+    ],
+    "lastBidPrice": 48898,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783599900068,
+    "status": "closed"
+  },
+  "22992353": {
+    "auctionId": "22992353",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 65000,
+    "costFloor": null,
+    "floor": 65325,
+    "ladder": [
+      66300,
+      65650,
+      65325
+    ],
+    "marginsPct": [
+      2,
+      1,
+      0.05
+    ],
+    "minMarginPct": 0.5,
+    "armedAt": 1783597910001,
+    "ourBids": [
+      {
+        "price": 66300,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783601496243,
+        "latencyMs": 296
+      }
+    ],
+    "lastBidPrice": 66300,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783601520085,
+    "status": "closed"
+  },
+  "22997477": {
+    "auctionId": "22997477",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Sahibabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Bajaj Finance Limited Off, Pitampura, New Delhi, Delhi, India, 110034"
+      },
+      {
+        "kind": "drop",
+        "address": "Bajaj Finance Limited Unit No, Sahibabad, Uttar Pradesh,India, 201010"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 44000,
+    "costFloor": null,
+    "floor": 46772,
+    "ladder": [
+      49544,
+      47168,
+      46772
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783605082734,
+    "ourBids": [
+      {
+        "price": 49544,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783606652005,
+        "latencyMs": 161
+      }
+    ],
+    "lastBidPrice": 49544,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783606680142,
+    "status": "closed"
+  },
+  "23009139": {
+    "auctionId": "23009139",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Cuttack",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Cuttack, Odisha, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47835,
+    "ladder": [
+      50670,
+      48240,
+      47835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783656198235,
+    "ourBids": [
+      {
+        "price": 50670,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783656871750,
+        "dryRun": false,
+        "latencyMs": 166
+      }
+    ],
+    "lastBidPrice": 50670,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783656900149,
+    "status": "closed"
+  },
+  "23019115": {
+    "auctionId": "23019115",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "LAMDAPURA",
+      "destination": "Manjusar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "LAMDAPURA, Gujarat,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Manjusar, Gujarat, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 4,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 13500,
+    "costFloor": null,
+    "floor": 15795,
+    "ladder": [
+      22505,
+      18347,
+      15795
+    ],
+    "marginsPct": [
+      66.7,
+      35.9,
+      17
+    ],
+    "minMarginPct": 17,
+    "armedAt": 1783679641374,
+    "ourBids": [
+      {
+        "price": 22505,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783680273698,
+        "latencyMs": 121
+      },
+      {
+        "price": 18347,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783680274968,
+        "latencyMs": 66
+      },
+      {
+        "price": 15795,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783680297725,
+        "latencyMs": 206
+      }
+    ],
+    "lastBidPrice": 15795,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783680300143,
+    "status": "closed"
+  },
+  "23030167": {
+    "auctionId": "23030167",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Lucknow",
+      "destination": "SIRSA-125102-HARYANA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Lucknow, Uttar Pradesh, India"
+      },
+      {
+        "kind": "drop",
+        "address": "SIRSA-125102-HARYANA, Haryana , IN"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 18000,
+    "costFloor": null,
+    "floor": 19134,
+    "ladder": [
+      20268,
+      19296,
+      19134
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783741490002,
+    "ourBids": [
+      {
+        "price": 20268,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783742374994,
+        "latencyMs": 130
+      }
+    ],
+    "lastBidPrice": 20268,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783742400107,
+    "status": "closed"
+  },
+  "23030232": {
+    "auctionId": "23030232",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Ghaziabad",
+      "destination": "Lucknow"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ghaziabad, Uttar Pradesh,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Lucknow, Uttar Pradesh, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 37000,
+    "costFloor": null,
+    "floor": 39331,
+    "ladder": [
+      41662,
+      39664,
+      39331
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783741190006,
+    "ourBids": [
+      {
+        "price": 41662,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783742076027,
+        "latencyMs": 130
+      }
+    ],
+    "lastBidPrice": 41662,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783742100106,
+    "status": "closed"
+  },
+  "23030286": {
+    "auctionId": "23030286",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Ghaziabad",
+      "destination": "Nagpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ghaziabad, Uttar Pradesh,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Nagpur, Maharashtra, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 67000,
+    "costFloor": null,
+    "floor": 71221,
+    "ladder": [
+      75442,
+      71824,
+      71221
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783742090002,
+    "ourBids": [
+      {
+        "price": 75442,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783742974763,
+        "latencyMs": 150
+      },
+      {
+        "price": 71824,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783742990573,
+        "latencyMs": 141
+      },
+      {
+        "price": 71221,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783742997720,
+        "latencyMs": 115
+      }
+    ],
+    "lastBidPrice": 71221,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783743000131,
+    "status": "closed"
+  },
+  "23043364": {
+    "auctionId": "23043364",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Vasai East",
+      "destination": "Palghar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "RADHE INDUSTRIES, Vasai East, Maharashtra,India, 401208"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED, Palghar, Maharashtra,India, 401404"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783746751402,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783747560190,
+    "status": "closed"
+  },
+  "23043509": {
+    "auctionId": "23043509",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Wada",
+      "destination": "Sector 62"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India"
+      },
+      {
+        "kind": "drop",
+        "address": "DLF PROJECT OFFICE, Sector 62, Gurugram, Haryana, India, 122011"
+      }
+    ],
+    "equipment": "32 SXL( 7 - 8 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 62000,
+    "costFloor": null,
+    "floor": 65906,
+    "ladder": [
+      69812,
+      66464,
+      65906
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783746290005,
+    "ourBids": [
+      {
+        "price": 69812,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783748074226,
+        "latencyMs": 145
+      },
+      {
+        "price": 66464,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783748075526,
+        "latencyMs": 78
+      },
+      {
+        "price": 65906,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783748097728,
+        "latencyMs": 108
+      }
+    ],
+    "lastBidPrice": 65906,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783748100134,
+    "status": "closed"
+  },
+  "23043635": {
+    "auctionId": "23043635",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Jodhpur",
+      "destination": "Palghar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "SHASHWAT FURNISHING SOLUTIONS LIMITED, Jodhpur, Rajasthan,India"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED, Palghar, Maharashtra,India, 401404"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 32000,
+    "costFloor": null,
+    "floor": 34016,
+    "ladder": [
+      36032,
+      34304,
+      34016
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783746730849,
+    "ourBids": [
+      {
+        "price": 36032,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783748254100,
+        "latencyMs": 139
+      }
+    ],
+    "lastBidPrice": 36032,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783748280191,
+    "status": "closed"
+  },
+  "23049480": {
+    "auctionId": "23049480",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "BANGALORE",
+      "destination": "Haveri"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, BANGALORE, Karnataka 562107, INDIA"
+      },
+      {
+        "kind": "drop",
+        "address": "SRI RENUKA ELECTRICAL - HAVERI, Karnataka,India, 581110"
+      }
+    ],
+    "equipment": "22FT-TB-10MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 24000,
+    "costFloor": null,
+    "floor": 25512,
+    "ladder": [
+      27024,
+      25728,
+      25512
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778816097,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783917644487,
+    "status": "closed"
+  },
+  "23049542": {
+    "auctionId": "23049542",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Bhiwandi",
+      "destination": "Palghar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED UNIT 3,, Palghar ,India, 401404"
+      }
+    ],
+    "equipment": "LPT 14( 2.5 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783760164782,
+    "ourBids": [
+      {
+        "price": 11260,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783761874733,
+        "latencyMs": 234
+      },
+      {
+        "price": 10720,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783761875952,
+        "latencyMs": 78
+      }
+    ],
+    "lastBidPrice": 10720,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783761900152,
+    "status": "closed"
+  },
+  "23049667": {
+    "auctionId": "23049667",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Dera Bassi",
+      "destination": "Jind"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Dera Bassi, Punjab, India, 140507"
+      },
+      {
+        "kind": "drop",
+        "address": "MAHALAXMI SANITARY STORE, Jind, Haryana, India, 126102"
+      },
+      {
+        "kind": "drop",
+        "address": "BHAGWATI SANITARY & HARDWARE STORE, Jind, Haryana, India, 126102"
+      }
+    ],
+    "equipment": "22FT-TB-10MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 12000,
+    "costFloor": null,
+    "floor": 12756,
+    "ladder": [
+      13512,
+      12864,
+      12756
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783780882150,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23049811": {
+    "auctionId": "23049811",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Bagru",
+      "destination": "sojat city"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Bagru, Rajasthan, India, 303007"
+      },
+      {
+        "kind": "drop",
+        "address": "KAVERI SANITATION / 306104 SOJAT CITY, Rajasthan,India"
+      }
+    ],
+    "equipment": "22FT-TB-10MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 18500,
+    "costFloor": null,
+    "floor": 19666,
+    "ladder": [
+      20831,
+      19832,
+      19666
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778820657,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23049812": {
+    "auctionId": "23049812",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Bagru",
+      "destination": "BIKANER"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Bagru, Rajasthan, India, 303007"
+      },
+      {
+        "kind": "drop",
+        "address": "ARORA ENTERPRISES, Bikaner, Rajasthan 334004, India"
+      },
+      {
+        "kind": "drop",
+        "address": "BABA RAMDEV TRADING COMPANY, BIKANER, Rajasthan 334003, India"
+      }
+    ],
+    "equipment": "22FT-TB-10MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 23000,
+    "costFloor": null,
+    "floor": 24449,
+    "ladder": [
+      25898,
+      24656,
+      24449
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778896681,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23051184": {
+    "auctionId": "23051184",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "BANGALORE",
+      "destination": "Washim"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, BANGALORE, Karnataka 562107, INDIA"
+      },
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Jigani, Karnataka, India, 560105"
+      },
+      {
+        "kind": "drop",
+        "address": "VYANKATESH ENTERPRISES-WASHIM, Maharashtra, India, 444505"
+      }
+    ],
+    "equipment": "22FT-SA-6MT (Container)",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 43000,
+    "costFloor": null,
+    "floor": 45709,
+    "ladder": [
+      48418,
+      46096,
+      45709
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778772996,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23052898": {
+    "auctionId": "23052898",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Jammu"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Jammu, Jammu And Kashmir 180010, IN"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 62000,
+    "costFloor": null,
+    "floor": 65906,
+    "ladder": [
+      69812,
+      66464,
+      65906
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783765790006,
+    "ourBids": [
+      {
+        "price": 69812,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783769373393,
+        "latencyMs": 131
+      },
+      {
+        "price": 66464,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783769374601,
+        "latencyMs": 79
+      }
+    ],
+    "lastBidPrice": 66464,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783769400187,
+    "status": "closed"
+  },
+  "23055358": {
+    "auctionId": "23055358",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Bhiwandi",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "NEXUS, Bhiwandi, Amane, Maharashtra 421302, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47835,
+    "ladder": [
+      50670,
+      48240,
+      47835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783768490006,
+    "ourBids": [
+      {
+        "price": 50670,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783771474163,
+        "latencyMs": 117
+      },
+      {
+        "price": 48240,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783771475481,
+        "latencyMs": 79
+      },
+      {
+        "price": 47835,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783771497703,
+        "latencyMs": 126
+      }
+    ],
+    "lastBidPrice": 47835,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783771500112,
+    "status": "closed"
+  },
+  "23057334": {
+    "auctionId": "23057334",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "RANCHI"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Ranchi, Jharkhand 834004, India"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 70000,
+    "costFloor": null,
+    "floor": 74410,
+    "ladder": [
+      78820,
+      75040,
+      74410
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783774790005,
+    "ourBids": [
+      {
+        "price": 78820,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783777771784,
+        "latencyMs": 95
+      },
+      {
+        "price": 74410,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783777797940,
+        "latencyMs": 77
+      }
+    ],
+    "lastBidPrice": 74410,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783777800156,
+    "status": "closed"
+  },
+  "23057351": {
+    "auctionId": "23057351",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Noida"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Noida, Uttar Pradesh, India, 201301"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 44000,
+    "costFloor": null,
+    "floor": 46772,
+    "ladder": [
+      49544,
+      47168,
+      46772
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783774910003,
+    "ourBids": [
+      {
+        "price": 49544,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783777894807,
+        "latencyMs": 78
+      },
+      {
+        "price": 47168,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783777914040,
+        "latencyMs": 87
+      },
+      {
+        "price": 46772,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783777917727,
+        "latencyMs": 73
+      }
+    ],
+    "lastBidPrice": 46772,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783777920138,
+    "status": "closed"
+  },
+  "23057358": {
+    "auctionId": "23057358",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 62000,
+    "costFloor": null,
+    "floor": 65906,
+    "ladder": [
+      69812,
+      66464,
+      65906
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783775030004,
+    "ourBids": [
+      {
+        "price": 69812,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783778013536,
+        "latencyMs": 336
+      }
+    ],
+    "lastBidPrice": 69812,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783778040070,
+    "status": "closed"
+  },
+  "23057405": {
+    "auctionId": "23057405",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Kolkata"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Kolkata, West Bengal 712310, INDIA"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 72000,
+    "costFloor": null,
+    "floor": 76536,
+    "ladder": [
+      81072,
+      77184,
+      76536
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783775150003,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23057528": {
+    "auctionId": "23057528",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Sabbavaram"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "INDIAN MARITIME UNIVERSITY, Sabbavaram, Andhra Pradesh, India, 531035"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 56000,
+    "costFloor": null,
+    "floor": 59528,
+    "ladder": [
+      63056,
+      60032,
+      59528
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783775270005,
+    "ourBids": [
+      {
+        "price": 63056,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783778254181,
+        "latencyMs": 74
+      },
+      {
+        "price": 60032,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783778255359,
+        "latencyMs": 74
+      },
+      {
+        "price": 59528,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783778278476,
+        "latencyMs": 117
+      }
+    ],
+    "lastBidPrice": 59528,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783778280082,
+    "status": "closed"
+  },
+  "23057531": {
+    "auctionId": "23057531",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Naval Park, Hindustan Shipyard Colony"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "EASTERN NAVAL COMMAND VISAKHAPATNAM, Naval Park, Hindustan Shipyard Colony, Visakhapatnam, Andhra Pradesh, India, 530014"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 86000,
+    "costFloor": null,
+    "floor": 91418,
+    "ladder": [
+      96836,
+      92192,
+      91418
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783775390001,
+    "ourBids": [
+      {
+        "price": 96836,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783778375992,
+        "latencyMs": 76
+      },
+      {
+        "price": 92192,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783778377112,
+        "latencyMs": 75
+      },
+      {
+        "price": 91418,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783778397603,
+        "latencyMs": 85
+      }
+    ],
+    "lastBidPrice": 91418,
+    "finalRank": 6,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783778400013,
+    "status": "closed"
+  },
+  "23057767": {
+    "auctionId": "23057767",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JH)"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "National Commission for, NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JH), NISUET LIFESCIENCE PRIVATE LIMITED (RANCHI,JHARKHAND ,India, 834005"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 95000,
+    "costFloor": null,
+    "floor": 100985,
+    "ladder": [
+      106970,
+      101840,
+      100985
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783772030002,
+    "ourBids": [
+      {
+        "price": 106970,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783775013209,
+        "latencyMs": 76
+      },
+      {
+        "price": 101840,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783775029143,
+        "latencyMs": 153
+      },
+      {
+        "price": 100985,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783775038263,
+        "latencyMs": 125
+      }
+    ],
+    "lastBidPrice": 100985,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783775040069,
+    "status": "closed"
+  },
+  "23058113": {
+    "auctionId": "23058113",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Bhiwandi",
+      "destination": "Palghar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED UNIT 3,, Palghar ,India, 401404"
+      }
+    ],
+    "equipment": "LPT 14( 2.5 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783771970005,
+    "ourBids": [
+      {
+        "price": 11260,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783773754007,
+        "latencyMs": 116
+      },
+      {
+        "price": 10720,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783773755288,
+        "latencyMs": 88
+      }
+    ],
+    "lastBidPrice": 10720,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783773780140,
+    "status": "closed"
+  },
+  "23058366": {
+    "auctionId": "23058366",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Bhiwandi",
+      "destination": "Kolkata"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Lila decor &co, Bhiwandi, Amane, Maharashtra 421302, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Kolkata, West Bengal 712310, INDIA"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 95000,
+    "costFloor": null,
+    "floor": 100985,
+    "ladder": [
+      106970,
+      101840,
+      100985
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783772330005,
+    "ourBids": [
+      {
+        "price": 106970,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783774115550,
+        "latencyMs": 68
+      },
+      {
+        "price": 101840,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783774116779,
+        "latencyMs": 70
+      },
+      {
+        "price": 100985,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783774137902,
+        "latencyMs": 124
+      }
+    ],
+    "lastBidPrice": 100985,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783774140114,
+    "status": "closed"
+  },
+  "23061063": {
+    "auctionId": "23061063",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Ahmedabad",
+      "destination": "Sarkhej"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Ahmedabad, Bareja, Gujarat 382425, India"
+      },
+      {
+        "kind": "drop",
+        "address": "TRANSPORT BOOKING - AHMEDABAD DC 1125, Sarkhej, Ahmedabad, Gujarat, India"
+      }
+    ],
+    "equipment": "Bolero Pickup",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 4000,
+    "costFloor": null,
+    "floor": 4252,
+    "ladder": [
+      4504,
+      4288,
+      4252
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778052924,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23062129": {
+    "auctionId": "23062129",
+    "account": {
+      "accountId": "neemrana",
+      "label": "Neemrana"
+    },
+    "lane": {
+      "origin": "Jigani",
+      "destination": "MYSORE"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ashirvad Pipes Pvt Ltd, Jigani, Karnataka, India, 560105"
+      },
+      {
+        "kind": "drop",
+        "address": "NEMINATH PIPE CENTRE - MYSORE, MYSORE, Karnataka 570015, INDIA"
+      }
+    ],
+    "equipment": "14FT-LCV-4 MT",
+    "units": 1,
+    "shipper": "Ashirvad Pipes Pvt Ltd",
+    "cost": 9500,
+    "costFloor": null,
+    "floor": 10099,
+    "ladder": [
+      10697,
+      10184,
+      10099
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783779820412,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": null,
+    "closeModel": null,
+    "closedAt": null,
+    "status": "open"
+  },
+  "23062770": {
+    "auctionId": "23062770",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47835,
+    "ladder": [
+      50670,
+      48240,
+      47835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783778690003,
+    "ourBids": [
+      {
+        "price": 50670,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783781074658,
+        "latencyMs": 189
+      },
+      {
+        "price": 48240,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783781075793,
+        "latencyMs": 91
+      }
+    ],
+    "lastBidPrice": 48240,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783781100188,
+    "status": "closed"
+  },
+  "23063649": {
+    "auctionId": "23063649",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Wada"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+      }
+    ],
+    "equipment": "LPT 22( 10 - 11 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 6000,
+    "costFloor": null,
+    "floor": 6378,
+    "ladder": [
+      6756,
+      6432,
+      6378
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783780790005,
+    "ourBids": [
+      {
+        "price": 6756,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783782575385,
+        "latencyMs": 123
+      }
+    ],
+    "lastBidPrice": 6756,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783782600090,
+    "status": "closed"
+  },
+  "23073266": {
+    "auctionId": "23073266",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Pune",
+      "destination": "Wada"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Amazon wood Pvt Ltd, Nimgaon Bhogi,Pune,Maharashtra,India"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+      }
+    ],
+    "equipment": "LPT 22( 9 - 10 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783831327462,
+    "ourBids": [
+      {
+        "price": 11260,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783831473032,
+        "latencyMs": 183
+      }
+    ],
+    "lastBidPrice": 11260,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783831500187,
+    "status": "closed"
+  },
+  "23075092": {
+    "auctionId": "23075092",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Coimbatore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Coimbatore, TAMIL NADU, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 22Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 70000,
+    "costFloor": null,
+    "floor": 74410,
+    "ladder": [
+      78820,
+      75040,
+      74410
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783838492413,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783838820038,
+    "status": "closed"
+  },
+  "23076538": {
+    "auctionId": "23076538",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Ankleshwar+Vadodara",
+      "destination": "Todapur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Shankar Patel Estate, Ankleshwar+Vadodara, Gujarat,India, 390006"
+      },
+      {
+        "kind": "drop",
+        "address": "IARI CAMPUS, Todapur, New Delhi, Delhi, India, 110012"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47835,
+    "ladder": [
+      50670,
+      48240,
+      47835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783845070087,
+    "ourBids": [
+      {
+        "price": 50670,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783846771909,
+        "latencyMs": 208
+      }
+    ],
+    "lastBidPrice": 50670,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783846800212,
+    "status": "closed"
+  },
+  "23076979": {
+    "auctionId": "23076979",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "PATNA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 74000,
+    "costFloor": null,
+    "floor": 78662,
+    "ladder": [
+      83324,
+      79328,
+      78662
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783850758485,
+    "ourBids": [
+      {
+        "price": 83324,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783852291987,
+        "latencyMs": 110
+      },
+      {
+        "price": 79328,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783852293125,
+        "latencyMs": 71
+      },
+      {
+        "price": 78662,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783852317720,
+        "latencyMs": 109
+      }
+    ],
+    "lastBidPrice": 78662,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783852320130,
+    "status": "closed"
+  },
+  "23088090": {
+    "auctionId": "23088090",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Aurangabad",
+      "destination": "Coimbatore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Aurangabad, Maharashtra, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Coimbatore, TAMIL NADU, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 86000,
+    "costFloor": null,
+    "floor": 91418,
+    "ladder": [
+      96836,
+      92192,
+      91418
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783916990007,
+    "ourBids": [
+      {
+        "price": 96836,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783917873035,
+        "latencyMs": 66
+      },
+      {
+        "price": 92192,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783917897562,
+        "latencyMs": 83
+      }
+    ],
+    "lastBidPrice": 92192,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783917900175,
+    "status": "closed"
+  },
+  "23088369": {
+    "auctionId": "23088369",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Keeranur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "M/s KRR Air Pvt Ltd  Taluk,Pudukottai,Tamilnadu - 622502, Keeranur, Tamil Nadu, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 20,
+    "shipper": "Renewsys India",
+    "cost": 110000,
+    "costFloor": null,
+    "floor": 113960,
+    "ladder": [
+      123860,
+      117920,
+      113960
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1783921490014,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783922100035,
+    "status": "closed"
+  },
+  "23088404": {
+    "auctionId": "23088404",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Dudu"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "SHASHIARUN 303008, Dudu, Rajasthan, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": 95000,
+    "costFloor": null,
+    "floor": 99275,
+    "ladder": [
+      106970,
+      101840,
+      99275
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      4.5
+    ],
+    "minMarginPct": 4.5,
+    "armedAt": 1783921490006,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783923300127,
+    "status": "closed"
+  },
+  "23088465": {
+    "auctionId": "23088465",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Chadi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "RENEWLIFE 342312, Chadi, Rajasthan,India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": 100000,
+    "costFloor": null,
+    "floor": 103600,
+    "ladder": [
+      112600,
+      107200,
+      103600
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1783921790003,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783923600012,
+    "status": "closed"
+  },
+  "23094081": {
+    "auctionId": "23094081",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "JHAGADIA",
+      "destination": "ASSUNDI"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "SIKA INDIA PRIVATE LIMITED, JHAGADIA, Padvaniya, Gujarat 393110, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Quality Trading Company, ASSUNDI, MAHARASHTRA ,India, 442704"
+      }
+    ],
+    "equipment": "AP: Truck flat 25 ton-Open Body",
+    "units": 1,
+    "shipper": "SIKA INDIA PRIVATE LIMITED",
+    "cost": 85000,
+    "costFloor": null,
+    "floor": 90355,
+    "ladder": [
+      95710,
+      91120,
+      90355
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783938239025,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783940400042,
+    "status": "closed"
+  },
+  "23097094": {
+    "auctionId": "23097094",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "GHILOT",
+      "destination": "Sonipat"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Havells India Ltd., Ghilot, Rajasthan 301705, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Sonipat, Haryana, India"
+      }
+    ],
+    "equipment": "PICK UP",
+    "units": 1,
+    "shipper": "Havells India Ltd.",
+    "cost": 7000,
+    "costFloor": null,
+    "floor": 7441,
+    "ladder": [
+      7882,
+      7504,
+      7441
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1783935665135,
+    "ourBids": [],
+    "lastBidPrice": null,
+    "finalRank": null,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783936500051,
+    "status": "closed"
+  },
+  "23101765": {
+    "auctionId": "23101765",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Nagpur",
+      "destination": "Derabassi - Barwala Road"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Nagpur, Maharashtra, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+      }
+    ],
+    "equipment": "32 FT SXL 7 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 55000,
+    "costFloor": null,
+    "floor": 62480,
+    "ladder": [
+      72765,
+      67760,
+      62480
+    ],
+    "marginsPct": [
+      32.3,
+      23.2,
+      13.6
+    ],
+    "minMarginPct": 13.6,
+    "armedAt": 1783944612650,
+    "ourBids": [
+      {
+        "price": 72765,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783944873358,
+        "latencyMs": 147
+      },
+      {
+        "price": 67760,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783944889616,
+        "latencyMs": 116
+      },
+      {
+        "price": 62480,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783944897780,
+        "latencyMs": 130
+      }
+    ],
+    "lastBidPrice": 62480,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1783944900193,
+    "status": "closed"
+  },
+  "23103590": {
+    "auctionId": "23103590",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Coimbatore",
+      "destination": "KOLKATTA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Coimbatore, TAMIL NADU, India"
+      },
+      {
+        "kind": "drop",
+        "address": "KOLKATTA, West Bengal, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 76500,
+    "costFloor": null,
+    "floor": 85527,
+    "ladder": [
+      94554,
+      89582,
+      85527
+    ],
+    "marginsPct": [
+      23.6,
+      17.1,
+      11.8
+    ],
+    "minMarginPct": 11.8,
+    "armedAt": 1783946172063,
+    "ourBids": [
+      {
+        "price": 89582,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783946676042,
+        "latencyMs": 63
+      },
+      {
+        "price": 85527,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783946697749,
+        "latencyMs": 127
+      }
+    ],
+    "lastBidPrice": 85527,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783946700163,
+    "status": "closed"
+  },
+  "23103620": {
+    "auctionId": "23103620",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Ghaziabad",
+      "destination": "Lucknow"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Ghaziabad, Uttar Pradesh,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Lucknow, Uttar Pradesh, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 49500,
+    "costFloor": null,
+    "floor": 55787,
+    "ladder": [
+      61578,
+      57767,
+      55787
+    ],
+    "marginsPct": [
+      24.4,
+      16.7,
+      12.7
+    ],
+    "minMarginPct": 12.7,
+    "armedAt": 1783946308813,
+    "ourBids": [
+      {
+        "price": 61578,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1783947033877,
+        "latencyMs": 132
+      },
+      {
+        "price": 57767,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1783947035150,
+        "latencyMs": 87
+      },
+      {
+        "price": 55787,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1783947057660,
+        "latencyMs": 131
+      }
+    ],
+    "lastBidPrice": 55787,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1783947060072,
+    "status": "closed"
+  },
+  "23127093": {
+    "auctionId": "23127093",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Karnal",
+      "destination": "Bijinor-246761- Asmoli"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Karnal, Haryana, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Bijinor-246761- Asmoli, Uttar Pradesh,India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 40000,
+    "costFloor": null,
+    "floor": 42520,
+    "ladder": [
+      45040,
+      42880,
+      42520
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784017237709,
+    "ourBids": [
+      {
+        "price": 45040,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784017474948,
+        "latencyMs": 128
+      },
+      {
+        "price": 42520,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784017498223,
+        "latencyMs": 162
+      }
+    ],
+    "lastBidPrice": 42520,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784017500035,
+    "status": "closed"
+  },
+  "23138946": {
+    "auctionId": "23138946",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Raipur",
+      "destination": "Nagpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Raipur, Chhattisgarh,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Nagpur, Maharashtra, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 15000,
+    "costFloor": null,
+    "floor": 15945,
+    "ladder": [
+      16890,
+      16080,
+      15945
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784034309588,
+    "ourBids": [
+      {
+        "price": 16890,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784034872871,
+        "latencyMs": 106
+      }
+    ],
+    "lastBidPrice": 16890,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784034900202,
+    "status": "closed"
+  },
+  "23160171": {
+    "auctionId": "23160171",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Afzalpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "Neogreen Power Kalaburagi Karnataka 585301, Afzalpur, Karnataka, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 4,
+    "shipper": "Renewsys India",
+    "cost": 60000,
+    "costFloor": null,
+    "floor": 62160,
+    "ladder": [
+      67560,
+      64320,
+      62160
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784106875866,
+    "ourBids": [
+      {
+        "price": 67560,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784107173388,
+        "latencyMs": 143
+      },
+      {
+        "price": 64320,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784107174541,
+        "latencyMs": 74
+      },
+      {
+        "price": 62160,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784107197765,
+        "latencyMs": 169
+      }
+    ],
+    "lastBidPrice": 62160,
+    "finalRank": 11,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784107200179,
+    "status": "closed"
+  },
+  "23167278": {
+    "auctionId": "23167278",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Irkode"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "FOURTH PARTNER 502114, Irkode, Telangana, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 3,
+    "shipper": "Renewsys India",
+    "cost": 66000,
+    "costFloor": null,
+    "floor": 68376,
+    "ladder": [
+      74316,
+      70752,
+      68376
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784180993036,
+    "ourBids": [
+      {
+        "price": 74316,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181572977,
+        "latencyMs": 154
+      },
+      {
+        "price": 70752,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181597067,
+        "latencyMs": 145
+      },
+      {
+        "price": 68376,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181597747,
+        "latencyMs": 71
+      }
+    ],
+    "lastBidPrice": 68376,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784181600168,
+    "status": "closed"
+  },
+  "23167407": {
+    "auctionId": "23167407",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Irkode"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "FOURTH PARTNER 502114, Irkode, Telangana, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 3,
+    "shipper": "Renewsys India",
+    "cost": 72000,
+    "costFloor": null,
+    "floor": 74592,
+    "ladder": [
+      81072,
+      77184,
+      74592
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784181014870,
+    "ourBids": [
+      {
+        "price": 81072,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181875757,
+        "latencyMs": 158
+      },
+      {
+        "price": 77184,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181877022,
+        "latencyMs": 75
+      },
+      {
+        "price": 74592,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181897698,
+        "latencyMs": 109
+      }
+    ],
+    "lastBidPrice": 74592,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181900106,
+    "status": "closed"
+  },
+  "23175083": {
+    "auctionId": "23175083",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "PATNA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 74000,
+    "costFloor": null,
+    "floor": 77330,
+    "ladder": [
+      83324,
+      79328,
+      77330
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      4.5
+    ],
+    "minMarginPct": 4.5,
+    "armedAt": 1784123079754,
+    "ourBids": [
+      {
+        "price": 83324,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784123973929,
+        "latencyMs": 115
+      },
+      {
+        "price": 79328,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784123975196,
+        "latencyMs": 57
+      },
+      {
+        "price": 77330,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784123997781,
+        "latencyMs": 133
+      }
+    ],
+    "lastBidPrice": 77330,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784124000192,
+    "status": "closed"
+  },
+  "23188358": {
+    "auctionId": "23188358",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Thane",
+      "destination": "Indore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Tata Consumer Product Ltd, Thane, Maharashtra,India, 421302"
+      },
+      {
+        "kind": "drop",
+        "address": "Tata Consumer Product Ltd, Indore, Madhya Pradesh, India, 453771"
+      }
+    ],
+    "equipment": "6.5 MT Closed Body",
+    "units": 1,
+    "shipper": "Tata Consumer Product Ltd",
+    "cost": 30000,
+    "costFloor": null,
+    "floor": 31890,
+    "ladder": [
+      33780,
+      32160,
+      31890
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784179963093,
+    "ourBids": [
+      {
+        "price": 33780,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181392558,
+        "latencyMs": 166
+      },
+      {
+        "price": 32160,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181393864,
+        "latencyMs": 60
+      },
+      {
+        "price": 31890,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181417793,
+        "latencyMs": 121
+      }
+    ],
+    "lastBidPrice": 31890,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181420235,
+    "status": "closed"
+  },
+  "23189088": {
+    "auctionId": "23189088",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Vadodra"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Vadodra, Gujarat, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 14Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 22000,
+    "costFloor": null,
+    "floor": 23386,
+    "ladder": [
+      24772,
+      23584,
+      23386
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784180815074,
+    "ourBids": [
+      {
+        "price": 24772,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181272497,
+        "latencyMs": 152
+      },
+      {
+        "price": 23584,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181273616,
+        "latencyMs": 66
+      },
+      {
+        "price": 23386,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181297792,
+        "latencyMs": 117
+      }
+    ],
+    "lastBidPrice": 23386,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181300204,
+    "status": "closed"
+  },
+  "23189102": {
+    "auctionId": "23189102",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Vadodra"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Vadodra, Gujarat, India"
+      }
+    ],
+    "equipment": "Container 20/22 Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 22000,
+    "costFloor": null,
+    "floor": 23386,
+    "ladder": [
+      24772,
+      23584,
+      23386
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784182169036,
+    "ourBids": [
+      {
+        "price": 24772,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784182472642,
+        "latencyMs": 183
+      },
+      {
+        "price": 23584,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784182473904,
+        "latencyMs": 83
+      },
+      {
+        "price": 23386,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784182497810,
+        "latencyMs": 122
+      }
+    ],
+    "lastBidPrice": 23386,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784182500033,
+    "status": "closed"
+  },
+  "23189215": {
+    "auctionId": "23189215",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 68000,
+    "costFloor": null,
+    "floor": 72284,
+    "ladder": [
+      76568,
+      72896,
+      72284
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784180472609,
+    "ourBids": [
+      {
+        "price": 76568,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181152491,
+        "latencyMs": 150
+      },
+      {
+        "price": 72896,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181153777,
+        "latencyMs": 129
+      },
+      {
+        "price": 72284,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181177797,
+        "latencyMs": 167
+      }
+    ],
+    "lastBidPrice": 72284,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181180015,
+    "status": "closed"
+  },
+  "23189295": {
+    "auctionId": "23189295",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Coimbatore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Coimbatore, TAMIL NADU, India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 118000,
+    "costFloor": null,
+    "floor": 125434,
+    "ladder": [
+      132868,
+      126496,
+      125434
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784180868594,
+    "ourBids": [
+      {
+        "price": 132868,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181392731,
+        "latencyMs": 119
+      },
+      {
+        "price": 126496,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181394060,
+        "latencyMs": 85
+      },
+      {
+        "price": 125434,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181417779,
+        "latencyMs": 194
+      }
+    ],
+    "lastBidPrice": 125434,
+    "finalRank": 5,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181420194,
+    "status": "closed"
+  },
+  "23189355": {
+    "auctionId": "23189355",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Ahmedabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Ahmedabad, Gujarat, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 18000,
+    "costFloor": null,
+    "floor": 19134,
+    "ladder": [
+      20268,
+      19296,
+      19134
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784181210106,
+    "ourBids": [
+      {
+        "price": 20268,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181633768,
+        "latencyMs": 121
+      },
+      {
+        "price": 19296,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181642077,
+        "latencyMs": 155
+      },
+      {
+        "price": 19134,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181658012,
+        "latencyMs": 101
+      }
+    ],
+    "lastBidPrice": 19134,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181660021,
+    "status": "closed"
+  },
+  "23189365": {
+    "auctionId": "23189365",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Kollam"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "A&S MARKETING, Kollam, Kerala, India, 691334"
+      }
+    ],
+    "equipment": "Dala Body LPT - 19Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 85000,
+    "costFloor": null,
+    "floor": 90355,
+    "ladder": [
+      95710,
+      91120,
+      90355
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784181407896,
+    "ourBids": [
+      {
+        "price": 95710,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181753879,
+        "latencyMs": 248
+      },
+      {
+        "price": 91120,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181755146,
+        "latencyMs": 84
+      },
+      {
+        "price": 90355,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181777841,
+        "latencyMs": 150
+      }
+    ],
+    "lastBidPrice": 90355,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181780052,
+    "status": "closed"
+  },
+  "23189370": {
+    "auctionId": "23189370",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Ranchi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "NARAYAN & ASSOCIATES, Ranchi, JHARKHAND, India, 834001"
+      }
+    ],
+    "equipment": "Dala Body LPT - 19Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 55000,
+    "costFloor": null,
+    "floor": 58465,
+    "ladder": [
+      61930,
+      58960,
+      58465
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784181617555,
+    "ourBids": [
+      {
+        "price": 61930,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181875781,
+        "latencyMs": 131
+      },
+      {
+        "price": 58960,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181877043,
+        "latencyMs": 91
+      },
+      {
+        "price": 58465,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784181897715,
+        "latencyMs": 151
+      }
+    ],
+    "lastBidPrice": 58465,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784181900126,
+    "status": "closed"
+  },
+  "23189385": {
+    "auctionId": "23189385",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Dehradun"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Dehradun, Uttarakhand,India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 14Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 19000,
+    "costFloor": null,
+    "floor": 20197,
+    "ladder": [
+      21394,
+      20368,
+      20197
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784181908798,
+    "ourBids": [
+      {
+        "price": 21394,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784181994416,
+        "latencyMs": 187
+      },
+      {
+        "price": 20368,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784181995529,
+        "latencyMs": 76
+      },
+      {
+        "price": 20197,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784182017799,
+        "latencyMs": 258
+      }
+    ],
+    "lastBidPrice": 20197,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784182020212,
+    "status": "closed"
+  },
+  "23189487": {
+    "auctionId": "23189487",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 68000,
+    "costFloor": null,
+    "floor": 72284,
+    "ladder": [
+      76568,
+      72896,
+      72284
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784181961753,
+    "ourBids": [
+      {
+        "price": 76568,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784182113956,
+        "latencyMs": 149
+      },
+      {
+        "price": 72896,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784182115150,
+        "latencyMs": 90
+      },
+      {
+        "price": 72284,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784182137710,
+        "latencyMs": 130
+      }
+    ],
+    "lastBidPrice": 72284,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784182140124,
+    "status": "closed"
+  },
+  "23189599": {
+    "auctionId": "23189599",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Bhiwandi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Bhiwandi, Maharashtra,India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 40000,
+    "costFloor": null,
+    "floor": 42520,
+    "ladder": [
+      45040,
+      42880,
+      42520
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784182060320,
+    "ourBids": [
+      {
+        "price": 45040,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784182234342,
+        "latencyMs": 128
+      },
+      {
+        "price": 42880,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784182235678,
+        "latencyMs": 86
+      },
+      {
+        "price": 42520,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784182257706,
+        "latencyMs": 82
+      }
+    ],
+    "lastBidPrice": 42520,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784182260117,
+    "status": "closed"
+  },
+  "23190901": {
+    "auctionId": "23190901",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "DELHI,"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Delhi, India"
+      }
+    ],
+    "equipment": " Tempo",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 8000,
+    "costFloor": null,
+    "floor": 8504,
+    "ladder": [
+      9008,
+      8576,
+      8504
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784182772482,
+    "ourBids": [
+      {
+        "price": 9008,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784183075355,
+        "latencyMs": 165
+      }
+    ],
+    "lastBidPrice": 9008,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784183100096,
+    "status": "closed"
+  },
+  "23191127": {
+    "auctionId": "23191127",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "302013",
+      "destination": "HISSAR"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Adama India Pvt Limited, 302013, Jaipur, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "ADAMA India Private Limited, HISSAR, Haryana, India, 125001"
+      }
+    ],
+    "equipment": "14 Feet upto 03 MT",
+    "units": 1,
+    "shipper": "ADAMA India Private Limited",
+    "cost": 10000,
+    "costFloor": null,
+    "floor": 10630,
+    "ladder": [
+      11260,
+      10720,
+      10630
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784183989961,
+    "ourBids": [
+      {
+        "price": 11260,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784184275239,
+        "latencyMs": 152
+      },
+      {
+        "price": 10720,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784184279532,
+        "latencyMs": 83
+      }
+    ],
+    "lastBidPrice": 10720,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784184300088,
+    "status": "closed",
+    "rejectedBids": [
+      {
+        "price": 10630,
+        "carrierSent": 2667,
+        "httpStatus": 400,
+        "reason": "Amount is invalid. Amount should be less than or equal to 10620",
+        "body": "Amount is invalid. Amount should be less than or equal to 10620",
+        "rungIndex": 2,
+        "ts": 1784184298279
+      }
+    ]
+  },
+  "23191527": {
+    "auctionId": "23191527",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Kollam"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "A&S MARKETING, Kollam, Kerala, India, 691334"
+      }
+    ],
+    "equipment": "Dala Body LPT - 19Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 80000,
+    "costFloor": null,
+    "floor": 85040,
+    "ladder": [
+      90080,
+      85760,
+      85040
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784182858477,
+    "ourBids": [
+      {
+        "price": 90080,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784183315847,
+        "latencyMs": 143
+      }
+    ],
+    "lastBidPrice": 90080,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784183340019,
+    "status": "closed"
+  },
+  "23191543": {
+    "auctionId": "23191543",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "MUMBAI"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "MUMBAI, Maharashtra ,India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 50000,
+    "costFloor": null,
+    "floor": 51350,
+    "ladder": [
+      56300,
+      53600,
+      51350
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      2.7
+    ],
+    "minMarginPct": 2.7,
+    "armedAt": 1784182841912,
+    "ourBids": [
+      {
+        "price": 56300,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784183433062,
+        "latencyMs": 166
+      }
+    ],
+    "lastBidPrice": 56300,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784183460066,
+    "status": "closed"
+  },
+  "23191838": {
+    "auctionId": "23191838",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Vadodra"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Vadodra, Gujarat, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 17Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 19000,
+    "costFloor": null,
+    "floor": 20197,
+    "ladder": [
+      21394,
+      20368,
+      20197
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784183265650,
+    "ourBids": [
+      {
+        "price": 21394,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784183792906,
+        "latencyMs": 165
+      },
+      {
+        "price": 20197,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784183818560,
+        "latencyMs": 137
+      }
+    ],
+    "lastBidPrice": 20197,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784183820174,
+    "status": "closed"
+  },
+  "23192842": {
+    "auctionId": "23192842",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "Lamba"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "Mahadev Agro Jhunjhunu rajasthan 333023, Lamba, Rajasthan, India"
+      }
+    ],
+    "equipment": "Trailer 40'",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": 112000,
+    "costFloor": null,
+    "floor": 115360,
+    "ladder": [
+      126112,
+      120064,
+      115360
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3
+    ],
+    "minMarginPct": 3,
+    "armedAt": 1784192388843,
+    "ourBids": [
+      {
+        "price": 126112,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784193572172,
+        "latencyMs": 213
+      },
+      {
+        "price": 120064,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784193573308,
+        "latencyMs": 97
+      },
+      {
+        "price": 115360,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784193597668,
+        "latencyMs": 113
+      }
+    ],
+    "lastBidPrice": 115360,
+    "finalRank": 6,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784193600083,
+    "status": "closed"
+  },
+  "23194344": {
+    "auctionId": "23194344",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Karegaon",
+      "destination": "Palghar"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "AMAZON WOOD PVT LTD, Karegaon, Maharashtra, India, 412220"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED WAREHOUSE NEHROLI WADA, Maharashtra, India, 421303"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LTD UNIT-4, Palghar ,India, 401404"
+      }
+    ],
+    "equipment": "LPT 19( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 15000,
+    "costFloor": null,
+    "floor": 15945,
+    "ladder": [
+      19590,
+      18105,
+      15945
+    ],
+    "marginsPct": [
+      30.6,
+      20.7,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784189239447,
+    "ourBids": [
+      {
+        "price": 19590,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784191293040,
+        "latencyMs": 116
+      },
+      {
+        "price": 18105,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784191294122,
+        "latencyMs": 63
+      },
+      {
+        "price": 15945,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784191317648,
+        "latencyMs": 113
+      }
+    ],
+    "lastBidPrice": 15945,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784191320069,
+    "status": "closed"
+  },
+  "23194713": {
+    "auctionId": "23194713",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Bhiwandi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Bhiwandi, Maharashtra,India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 39000,
+    "costFloor": null,
+    "floor": 41457,
+    "ladder": [
+      43914,
+      41808,
+      41457
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784189084714,
+    "ourBids": [
+      {
+        "price": 43914,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784189435381,
+        "latencyMs": 143
+      },
+      {
+        "price": 41808,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784189457321,
+        "latencyMs": 78
+      },
+      {
+        "price": 41457,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784189457609,
+        "latencyMs": 82
+      }
+    ],
+    "lastBidPrice": 41457,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784189460025,
+    "status": "closed"
+  },
+  "23198748": {
+    "auctionId": "23198748",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "HYDERABAD"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, Hyderabad, Telangana 500081, India"
+      }
+    ],
+    "equipment": "32 SXL( 7 - 8 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 60000,
+    "costFloor": null,
+    "floor": 61800,
+    "ladder": [
+      67560,
+      64320,
+      61800
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3
+    ],
+    "minMarginPct": 3,
+    "armedAt": 1784196144440,
+    "ourBids": [
+      {
+        "price": 67560,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784199574701,
+        "latencyMs": 151
+      },
+      {
+        "price": 64320,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784199575942,
+        "latencyMs": 86
+      },
+      {
+        "price": 61800,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784199597696,
+        "latencyMs": 90
+      }
+    ],
+    "lastBidPrice": 61800,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784199600109,
+    "status": "closed"
+  },
+  "23198760": {
+    "auctionId": "23198760",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "BHUBANESHWAR"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, BHUBANESHWAR, Odisha 751002, IN"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 75000,
+    "costFloor": null,
+    "floor": 79725,
+    "ladder": [
+      84450,
+      80400,
+      79725
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784196525900,
+    "ourBids": [
+      {
+        "price": 84450,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784199691883,
+        "latencyMs": 142
+      },
+      {
+        "price": 80400,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784199693135,
+        "latencyMs": 85
+      },
+      {
+        "price": 79725,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784199717820,
+        "latencyMs": 144
+      }
+    ],
+    "lastBidPrice": 79725,
+    "finalRank": 6,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784199720037,
+    "status": "closed"
+  },
+  "23198768": {
+    "auctionId": "23198768",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 47000,
+    "costFloor": null,
+    "floor": 48692,
+    "ladder": [
+      52922,
+      50384,
+      48692
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784196468291,
+    "ourBids": [
+      {
+        "price": 52922,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784199815917,
+        "latencyMs": 138
+      },
+      {
+        "price": 50384,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784199817146,
+        "latencyMs": 82
+      },
+      {
+        "price": 48692,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784199837833,
+        "latencyMs": 128
+      }
+    ],
+    "lastBidPrice": 48692,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784199840050,
+    "status": "closed"
+  },
+  "23203974": {
+    "auctionId": "23203974",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Jodhpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Arun Agenices,, Jodhpur, Rajasthan,India, 342003"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 50000,
+    "costFloor": null,
+    "floor": 53150,
+    "ladder": [
+      56300,
+      53600,
+      53150
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784203508820,
+    "ourBids": [
+      {
+        "price": 56300,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784204972733,
+        "latencyMs": 182
+      }
+    ],
+    "lastBidPrice": 56300,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784205000128,
+    "status": "closed"
+  },
+  "23204428": {
+    "auctionId": "23204428",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "Nagour Choraha"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Airforce Mess O MESS, Nagour Choraha, Phalodi, Rajasthan, 342301"
+      }
+    ],
+    "equipment": "20( 6 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 40000,
+    "costFloor": null,
+    "floor": 42520,
+    "ladder": [
+      45040,
+      42880,
+      42520
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784203535537,
+    "ourBids": [
+      {
+        "price": 45040,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784205574690,
+        "latencyMs": 142
+      }
+    ],
+    "lastBidPrice": 45040,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784205600161,
+    "status": "closed"
+  },
+  "23206204": {
+    "auctionId": "23206204",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "PATNA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "DURIAN INDUSTRIES LIMITED PATNA PROJECT GODOWN, Akilpur, Bihar 801503, India"
+      }
+    ],
+    "equipment": "32 SXL( 7 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 100000,
+    "costFloor": null,
+    "floor": 103600,
+    "ladder": [
+      112600,
+      107200,
+      103600
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784205544320,
+    "ourBids": [
+      {
+        "price": 112600,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784207373033,
+        "latencyMs": 254
+      },
+      {
+        "price": 107200,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784207374108,
+        "latencyMs": 68
+      },
+      {
+        "price": 103600,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784207397703,
+        "latencyMs": 162
+      }
+    ],
+    "lastBidPrice": 103600,
+    "finalRank": 4,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784207400118,
+    "status": "closed"
+  },
+  "23208755": {
+    "auctionId": "23208755",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Ahmedabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Ahmedabad, Gujarat, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 26000,
+    "costFloor": null,
+    "floor": 27638,
+    "ladder": [
+      29276,
+      27872,
+      27638
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784208407424,
+    "ourBids": [
+      {
+        "price": 29276,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784208574665,
+        "latencyMs": 180
+      },
+      {
+        "price": 27872,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784208575852,
+        "latencyMs": 98
+      },
+      {
+        "price": 27638,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784208597746,
+        "latencyMs": 153
+      }
+    ],
+    "lastBidPrice": 27638,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784208600162,
+    "status": "closed"
+  },
+  "23212996": {
+    "auctionId": "23212996",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Palghar",
+      "destination": "New Delhi"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "DURIAN INDUSTRIES LTD, Palghar ,India, 401404"
+      },
+      {
+        "kind": "drop",
+        "address": "Durian Industries Ltd, New Delhi, Delhi, India, 110015"
+      }
+    ],
+    "equipment": "32 SXL( 8 - 9 MT)",
+    "units": 1,
+    "shipper": "Durian Industries Ltd",
+    "cost": 70000,
+    "costFloor": null,
+    "floor": 70140,
+    "ladder": [
+      78820,
+      75040,
+      70140
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      0.2
+    ],
+    "minMarginPct": 0.2,
+    "armedAt": 1784215458370,
+    "ourBids": [
+      {
+        "price": 78820,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784216972886,
+        "latencyMs": 147
+      }
+    ],
+    "lastBidPrice": 78820,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784217000082,
+    "status": "closed"
+  },
+  "23223194": {
+    "auctionId": "23223194",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Coimbatore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Coimbatore, TAMIL NADU, India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 115000,
+    "costFloor": null,
+    "floor": 122245,
+    "ladder": [
+      129490,
+      123280,
+      122245
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784266640895,
+    "ourBids": [
+      {
+        "price": 129490,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784267075138,
+        "latencyMs": 135
+      },
+      {
+        "price": 123280,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784267076408,
+        "latencyMs": 73
+      },
+      {
+        "price": 122245,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784267097889,
+        "latencyMs": 177
+      }
+    ],
+    "lastBidPrice": 122245,
+    "finalRank": 5,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784267100103,
+    "status": "closed"
+  },
+  "23223203": {
+    "auctionId": "23223203",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "MUMBAI"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "MUMBAI, Maharashtra ,India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 50000,
+    "costFloor": null,
+    "floor": 53150,
+    "ladder": [
+      56300,
+      53600,
+      53150
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784266606780,
+    "ourBids": [
+      {
+        "price": 56300,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784267193218,
+        "latencyMs": 144
+      }
+    ],
+    "lastBidPrice": 56300,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784267220209,
+    "status": "closed"
+  },
+  "23223430": {
+    "auctionId": "23223430",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Gurgaon Rural"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Gurgaon Rural, Haryana, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 14Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 9000,
+    "costFloor": null,
+    "floor": 9567,
+    "ladder": [
+      10134,
+      9648,
+      9567
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784266622413,
+    "ourBids": [
+      {
+        "price": 10134,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784267314022,
+        "latencyMs": 151
+      },
+      {
+        "price": 9648,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784267333895,
+        "latencyMs": 151
+      }
+    ],
+    "lastBidPrice": 9648,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784267340027,
+    "status": "closed",
+    "rejectedBids": [
+      {
+        "price": 9567,
+        "carrierSent": 4441,
+        "httpStatus": 400,
+        "reason": "Amount is invalid. Amount should be less than or equal to 9548",
+        "body": "Amount is invalid. Amount should be less than or equal to 9548",
+        "rungIndex": 2,
+        "ts": 1784267339618
+      }
+    ]
+  },
+  "23224609": {
+    "auctionId": "23224609",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "AGARTALA"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "S.S.ENTERPRISE, AGARTALA, Tripura,India, 799001"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 106000,
+    "costFloor": null,
+    "floor": 112678,
+    "ladder": [
+      119356,
+      113632,
+      112678
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267040504,
+    "ourBids": [
+      {
+        "price": 119356,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784267551920,
+        "latencyMs": 149
+      }
+    ],
+    "lastBidPrice": 119356,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784267580165,
+    "status": "closed"
+  },
+  "23224706": {
+    "auctionId": "23224706",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Barasat"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "SHRI RAM APPLIANCES, Barasat, WEST BENGAL, India, 700127"
+      }
+    ],
+    "equipment": "Dala Body LPT - 19Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 64000,
+    "costFloor": null,
+    "floor": 68032,
+    "ladder": [
+      72064,
+      68608,
+      68032
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267082899,
+    "ourBids": [
+      {
+        "price": 72064,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784267793751,
+        "latencyMs": 212
+      },
+      {
+        "price": 68608,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784267794873,
+        "latencyMs": 75
+      },
+      {
+        "price": 68032,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784267817855,
+        "latencyMs": 144
+      }
+    ],
+    "lastBidPrice": 68032,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784267820067,
+    "status": "closed"
+  },
+  "23224855": {
+    "auctionId": "23224855",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Nagpur"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Nagpur, Maharashtra, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 19Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 40000,
+    "costFloor": null,
+    "floor": 42520,
+    "ladder": [
+      45040,
+      42880,
+      42520
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267356018,
+    "ourBids": [
+      {
+        "price": 45040,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268035176,
+        "latencyMs": 154
+      },
+      {
+        "price": 42880,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784268044556,
+        "latencyMs": 117
+      },
+      {
+        "price": 42520,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784268058819,
+        "latencyMs": 111
+      }
+    ],
+    "lastBidPrice": 42520,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784268060025,
+    "status": "closed"
+  },
+  "23224867": {
+    "auctionId": "23224867",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Bhopal"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Bhopal, Madhya Pradesh, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 14Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 22000,
+    "costFloor": null,
+    "floor": 23386,
+    "ladder": [
+      24772,
+      23584,
+      23386
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267401979,
+    "ourBids": [
+      {
+        "price": 24772,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268152994,
+        "latencyMs": 174
+      },
+      {
+        "price": 23584,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784268154326,
+        "latencyMs": 77
+      },
+      {
+        "price": 23386,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784268177711,
+        "latencyMs": 142
+      }
+    ],
+    "lastBidPrice": 23386,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784268180126,
+    "status": "closed"
+  },
+  "23224954": {
+    "auctionId": "23224954",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Bangalore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Bangalore, Karnataka, India"
+      }
+    ],
+    "equipment": "Container 20/22 Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 58499,
+    "costFloor": null,
+    "floor": 62184,
+    "ladder": [
+      65870,
+      62711,
+      62184
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267848510,
+    "ourBids": [
+      {
+        "price": 65870,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268275582,
+        "latencyMs": 145
+      },
+      {
+        "price": 62711,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784268276915,
+        "latencyMs": 79
+      },
+      {
+        "price": 62184,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784268297688,
+        "latencyMs": 126
+      }
+    ],
+    "lastBidPrice": 62184,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784268300103,
+    "status": "closed"
+  },
+  "23224959": {
+    "auctionId": "23224959",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Ahmedabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Ahmedabad, Gujarat, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 21000,
+    "costFloor": null,
+    "floor": 22323,
+    "ladder": [
+      23646,
+      22512,
+      22323
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267794531,
+    "ourBids": [
+      {
+        "price": 23646,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268392969,
+        "latencyMs": 180
+      },
+      {
+        "price": 22512,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784268402310,
+        "latencyMs": 163
+      },
+      {
+        "price": 22323,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784268417751,
+        "latencyMs": 175
+      }
+    ],
+    "lastBidPrice": 22323,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784268420162,
+    "status": "closed"
+  },
+  "23224971": {
+    "auctionId": "23224971",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "Container 7MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 63000,
+    "costFloor": null,
+    "floor": 65835,
+    "ladder": [
+      70938,
+      67536,
+      65835
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      4.5
+    ],
+    "minMarginPct": 4.5,
+    "armedAt": 1784267765843,
+    "ourBids": [
+      {
+        "price": 70938,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268515360,
+        "latencyMs": 119
+      },
+      {
+        "price": 67536,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784268516490,
+        "latencyMs": 87
+      },
+      {
+        "price": 65835,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784268537792,
+        "latencyMs": 137
+      }
+    ],
+    "lastBidPrice": 65835,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784268540206,
+    "status": "closed"
+  },
+  "23225475": {
+    "auctionId": "23225475",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "Gurgaon Rural"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Gurgaon Rural, Haryana, India"
+      }
+    ],
+    "equipment": "Dala Body LPT - 14Ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 6000,
+    "costFloor": null,
+    "floor": 6378,
+    "ladder": [
+      6756,
+      6432,
+      6378
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784267967062,
+    "ourBids": [
+      {
+        "price": 6756,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784268752490,
+        "latencyMs": 170
+      }
+    ],
+    "lastBidPrice": 6756,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784268780098,
+    "status": "closed"
+  },
+  "23225649": {
+    "auctionId": "23225649",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "SREERAMPORE"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "SREERAMPORE, West Bengal 712203, India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 79999,
+    "costFloor": null,
+    "floor": 82159,
+    "ladder": [
+      90079,
+      85759,
+      82159
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      2.7
+    ],
+    "minMarginPct": 2.7,
+    "armedAt": 1784268490383,
+    "ourBids": [
+      {
+        "price": 90079,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784269231873,
+        "latencyMs": 135
+      },
+      {
+        "price": 82159,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784269257992,
+        "latencyMs": 116
+      }
+    ],
+    "lastBidPrice": 82159,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784269260205,
+    "status": "closed"
+  },
+  "23228406": {
+    "auctionId": "23228406",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Thane",
+      "destination": "Pune"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Tata Consumer Product Ltd, Thane, Maharashtra,India, 421302"
+      },
+      {
+        "kind": "drop",
+        "address": "Tata Consumer Product Ltd, Pune, Maharashtra, India"
+      }
+    ],
+    "equipment": "6.5 MT Closed Body",
+    "units": 1,
+    "shipper": "Tata Consumer Product Ltd",
+    "cost": 12000,
+    "costFloor": null,
+    "floor": 12756,
+    "ladder": [
+      13512,
+      12864,
+      12756
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784274576372,
+    "ourBids": [
+      {
+        "price": 13512,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784281413992,
+        "latencyMs": 161
+      }
+    ],
+    "lastBidPrice": 13512,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784281440093,
+    "status": "closed"
+  },
+  "23229173": {
+    "auctionId": "23229173",
+    "account": {
+      "accountId": "master",
+      "label": "Best Roadways (Master)"
+    },
+    "lane": {
+      "origin": "Nagpur",
+      "destination": "Dahej"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "ADAMA India Private Limited, Nagpur, Maharashtra, India, 440023"
+      },
+      {
+        "kind": "drop",
+        "address": "ADAMA India Private Limited, Dahej, Gujarat,India, 392130"
+      }
+    ],
+    "equipment": "NA",
+    "units": 1,
+    "shipper": "ADAMA India Private Limited",
+    "cost": 20000,
+    "costFloor": null,
+    "floor": 20660,
+    "ladder": [
+      22520,
+      21440,
+      20660
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.3
+    ],
+    "minMarginPct": 3.3,
+    "armedAt": 1784277689670,
+    "ourBids": [
+      {
+        "price": 22520,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784277875244,
+        "latencyMs": 134
+      }
+    ],
+    "lastBidPrice": 22520,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784277900107,
+    "status": "closed"
+  },
+  "23229214": {
+    "auctionId": "23229214",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Jaipur",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Jaipur, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 85000,
+    "costFloor": null,
+    "floor": 90355,
+    "ladder": [
+      95710,
+      91120,
+      90355
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784278910073,
+    "ourBids": [
+      {
+        "price": 95710,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784279672795,
+        "latencyMs": 131
+      },
+      {
+        "price": 90355,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784279697786,
+        "latencyMs": 147
+      }
+    ],
+    "lastBidPrice": 90355,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784279700200,
+    "status": "closed"
+  },
+  "23230042": {
+    "auctionId": "23230042",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Aurangabad",
+      "destination": "Coimbatore"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Aurangabad, Maharashtra, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Coimbatore, TAMIL NADU, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 87000,
+    "costFloor": null,
+    "floor": 93438,
+    "ladder": [
+      99963,
+      95265,
+      93438
+    ],
+    "marginsPct": [
+      14.9,
+      9.5,
+      7.4
+    ],
+    "minMarginPct": 7.4,
+    "armedAt": 1784281293863,
+    "ourBids": [
+      {
+        "price": 99963,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784281472836,
+        "latencyMs": 159
+      },
+      {
+        "price": 95265,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784281474149,
+        "latencyMs": 95
+      },
+      {
+        "price": 93438,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784281497808,
+        "latencyMs": 113
+      }
+    ],
+    "lastBidPrice": 93438,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784281500023,
+    "status": "closed"
+  },
+  "23230501": {
+    "auctionId": "23230501",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "SREERAMPORE"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "SREERAMPORE, West Bengal 712203, India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 94000,
+    "costFloor": null,
+    "floor": 96820,
+    "ladder": [
+      105844,
+      100768,
+      96820
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3
+    ],
+    "minMarginPct": 3,
+    "armedAt": 1784279110618,
+    "ourBids": [
+      {
+        "price": 105844,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784279912168,
+        "latencyMs": 121
+      },
+      {
+        "price": 100768,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784279913454,
+        "latencyMs": 91
+      },
+      {
+        "price": 96820,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784279937738,
+        "latencyMs": 114
+      }
+    ],
+    "lastBidPrice": 96820,
+    "finalRank": 3,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784279940155,
+    "status": "closed"
+  },
+  "23230541": {
+    "auctionId": "23230541",
+    "account": {
+      "accountId": "sameer-ambdaskar",
+      "label": "Sameer Ambdaskar"
+    },
+    "lane": {
+      "origin": "Govindgarh",
+      "destination": "MUMBAI"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "BG, Govindgarh, Rajasthan, India"
+      },
+      {
+        "kind": "drop",
+        "address": "MUMBAI, Maharashtra ,India"
+      }
+    ],
+    "equipment": "Container 14 MT 32ft",
+    "units": 1,
+    "shipper": "BG",
+    "cost": 60000,
+    "costFloor": null,
+    "floor": 63780,
+    "ladder": [
+      67560,
+      64320,
+      63780
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      6.3
+    ],
+    "minMarginPct": 6.3,
+    "armedAt": 1784279291631,
+    "ourBids": [
+      {
+        "price": 67560,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784280035233,
+        "latencyMs": 173
+      },
+      {
+        "price": 64320,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784280036541,
+        "latencyMs": 107
+      },
+      {
+        "price": 63780,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784280057620,
+        "latencyMs": 97
+      }
+    ],
+    "lastBidPrice": 63780,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784280060032,
+    "status": "closed"
+  },
+  "23231529": {
+    "auctionId": "23231529",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Cuttak",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Cuttak, Odisha,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 45000,
+    "costFloor": null,
+    "floor": 47430,
+    "ladder": [
+      54315,
+      51885,
+      47430
+    ],
+    "marginsPct": [
+      20.7,
+      15.3,
+      5.4
+    ],
+    "minMarginPct": 5.4,
+    "armedAt": 1784282209960,
+    "ourBids": [
+      {
+        "price": 54315,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784282972551,
+        "latencyMs": 170
+      },
+      {
+        "price": 51885,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784282990732,
+        "latencyMs": 103
+      },
+      {
+        "price": 47430,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784282997892,
+        "latencyMs": 132
+      }
+    ],
+    "lastBidPrice": 47430,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784283000103,
+    "status": "closed"
+  },
+  "23234562": {
+    "auctionId": "23234562",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "KOLKATTA",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "KOLKATTA, West Bengal, India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "32 FT MXL 18 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 70000,
+    "costFloor": null,
+    "floor": 71890,
+    "ladder": [
+      78820,
+      75040,
+      71890
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      2.7
+    ],
+    "minMarginPct": 2.7,
+    "armedAt": 1784288100035,
+    "ourBids": [
+      {
+        "price": 78820,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784288672694,
+        "latencyMs": 112
+      },
+      {
+        "price": 75040,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784288691276,
+        "latencyMs": 251
+      },
+      {
+        "price": 71890,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784288697794,
+        "latencyMs": 91
+      }
+    ],
+    "lastBidPrice": 71890,
+    "finalRank": 2,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784288700210,
+    "status": "closed"
+  },
+  "23234598": {
+    "auctionId": "23234598",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "683503"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "AXIS POWER 683503, Kochi, Kerala, India"
+      }
+    ],
+    "equipment": "Trailer 20'",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": 83000,
+    "costFloor": null,
+    "floor": 85241,
+    "ladder": [
+      93458,
+      88976,
+      85241
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      2.7
+    ],
+    "minMarginPct": 2.7,
+    "armedAt": 1784286329717,
+    "ourBids": [
+      {
+        "price": 93458,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784286875433,
+        "latencyMs": 148
+      },
+      {
+        "price": 88976,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784286882342,
+        "latencyMs": 114
+      },
+      {
+        "price": 85241,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784286897769,
+        "latencyMs": 112
+      }
+    ],
+    "lastBidPrice": 85241,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784286900179,
+    "status": "closed"
+  },
+  "23239096": {
+    "auctionId": "23239096",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Khopoli",
+      "destination": "683503"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+      },
+      {
+        "kind": "drop",
+        "address": "AXIS POWER 683503, Kochi, Kerala, India"
+      }
+    ],
+    "equipment": "Trailer 20'",
+    "units": 1,
+    "shipper": "Renewsys India",
+    "cost": 83000,
+    "costFloor": null,
+    "floor": 85988,
+    "ladder": [
+      93458,
+      88976,
+      85988
+    ],
+    "marginsPct": [
+      12.6,
+      7.2,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784290940951,
+    "ourBids": [
+      {
+        "price": 93458,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784291972512,
+        "latencyMs": 163
+      },
+      {
+        "price": 88976,
+        "rungIndex": 1,
+        "rank": null,
+        "ts": 1784291973814,
+        "latencyMs": 62
+      },
+      {
+        "price": 85988,
+        "rungIndex": 2,
+        "rank": null,
+        "ts": 1784291997850,
+        "latencyMs": 141
+      }
+    ],
+    "lastBidPrice": 85988,
+    "finalRank": 8,
+    "won": false,
+    "closeModel": "hard",
+    "closedAt": 1784292000064,
+    "status": "closed"
+  },
+  "23240397": {
+    "auctionId": "23240397",
+    "account": {
+      "accountId": "primary",
+      "label": "Primary"
+    },
+    "lane": {
+      "origin": "Raipur",
+      "destination": "Hyderabad"
+    },
+    "points": [
+      {
+        "kind": "pickup",
+        "address": "Raipur, Chhattisgarh,India"
+      },
+      {
+        "kind": "drop",
+        "address": "Hyderabad, Telangana, India"
+      }
+    ],
+    "equipment": "20 FT 6.5 MT",
+    "units": 1,
+    "shipper": "Syngenta India Pvt Ltd",
+    "cost": 20000,
+    "costFloor": null,
+    "floor": 20720,
+    "ladder": [
+      24860,
+      23060,
+      20720
+    ],
+    "marginsPct": [
+      24.3,
+      15.3,
+      3.6
+    ],
+    "minMarginPct": 3.6,
+    "armedAt": 1784293359423,
+    "ourBids": [
+      {
+        "price": 24860,
+        "rungIndex": 0,
+        "rank": null,
+        "ts": 1784294075728,
+        "latencyMs": 109
+      }
+    ],
+    "lastBidPrice": 24860,
+    "finalRank": 1,
+    "won": true,
+    "closeModel": "hard",
+    "closedAt": 1784294100105,
+    "status": "closed"
+  }
+}

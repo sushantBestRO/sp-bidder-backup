@@ -1,0 +1,187 @@
+{
+  "syngenta": {
+    "customerId": "syngenta",
+    "label": "Syngenta",
+    "aliases": [
+      "Syngenta"
+    ],
+    "margin": {
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3
+    },
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783612034208,
+    "updatedBy": null
+  },
+  "durian": {
+    "customerId": "durian",
+    "label": "Durian",
+    "aliases": [
+      "Durian"
+    ],
+    "margin": {
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3
+    },
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783612034210,
+    "updatedBy": null
+  },
+  "ashirvad-pipes-pvt-ltd": {
+    "customerId": "ashirvad-pipes-pvt-ltd",
+    "label": "Ashirvad Pipes Pvt Ltd",
+    "aliases": [
+      "Ashirvad Pipes Pvt Ltd"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": false,
+    "updatedAt": 1784701199927,
+    "updatedBy": "disable-ashirvad-2026-07-22"
+  },
+  "havells": {
+    "customerId": "havells",
+    "label": "Havells",
+    "aliases": [
+      "Havells",
+      "Havells India Ltd."
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728178,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "shriji-polymers": {
+    "customerId": "shriji-polymers",
+    "label": "Shriji Polymers",
+    "aliases": [
+      "Shriji Polymers",
+      "Shriji Polymers India Ltd",
+      "Shriji"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728205,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "kei-industries": {
+    "customerId": "kei-industries",
+    "label": "KEI Industries",
+    "aliases": [
+      "KEI Industries",
+      "KEI Industries Ltd",
+      "KEI"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728222,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "renewsys": {
+    "customerId": "renewsys",
+    "label": "Renewsys",
+    "aliases": [
+      "Renewsys",
+      "Renewsys India"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728236,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "payal-polyplast": {
+    "customerId": "payal-polyplast",
+    "label": "Payal Polyplast",
+    "aliases": [
+      "Payal Polyplast",
+      "Payal Polyplast Pvt Ltd."
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728252,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "epack-prefab": {
+    "customerId": "epack-prefab",
+    "label": "Epack Prefab",
+    "aliases": [
+      "Epack Prefab",
+      "Epack Prefab Technologies Limited",
+      "Epack"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728265,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "tata-consumer": {
+    "customerId": "tata-consumer",
+    "label": "Tata Consumer",
+    "aliases": [
+      "Tata Consumer",
+      "Tata Consumer Product Ltd"
+    ],
+    "margin": null,
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1783924728276,
+    "updatedBy": "sid-ssh-recon"
+  },
+  "adama": {
+    "customerId": "adama",
+    "label": "ADAMA",
+    "aliases": [
+      "ADAMA"
+    ],
+    "margin": {
+      "marginsPct": [
+        12.6,
+        7.2,
+        0
+      ],
+      "minMarginPct": 0
+    },
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1784960676275,
+    "updatedBy": "admin"
+  },
+  "borosil": {
+    "customerId": "borosil",
+    "label": "Borosil",
+    "aliases": [
+      "Borosil",
+      "BG",
+      "BG (BorosilLimited(Govindgarh))",
+      "BorosilLimited"
+    ],
+    "margin": {
+      "marginsPct": [
+        15.3,
+        10.8,
+        7.2
+      ],
+      "minMarginPct": 7
+    },
+    "auction": null,
+    "enabled": true,
+    "updatedAt": 1784889003318,
+    "updatedBy": "admin"
+  }
+}

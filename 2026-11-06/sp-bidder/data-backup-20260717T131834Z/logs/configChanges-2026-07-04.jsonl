@@ -1,0 +1,1 @@
+{"ts":1783158041585,"action":"config_save","actor":"admin","ip":"127.0.0.1","changed":["recipients"],"changes":[{"field":"recipients","before":[],"after":[{"name":"sushant govinde","phone":"+919594963468","alerts":["price_needed","bid_live","outbid","won","lost","error"],"scope":{"origins":[],"shippers":[]}}]}]}

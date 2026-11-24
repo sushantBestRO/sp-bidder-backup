@@ -1,0 +1,248 @@
+'use strict';
+
+/**
+ * RATE HINTS for the price_needed WhatsApp ask: two optional, DISPLAY-ONLY lines under the vehicle.
+ *
+ *   💵 Last quote   - our newest closed quote on this same lane AND vehicle (already computed by
+ *                     bidLogger.routeHistory and carried on data.quotes - this module only picks row 0).
+ *   📊 FR8 guide    - FR8's published rate for the lane + truck type, read from a LOCAL file that
+ *                     scripts/fr8-rates.js refreshes once a night.
+ *
+ * What these are NOT. Neither line is ever used as the cost, a floor, a ceiling or a bid. They are shown to
+ * the desk and nothing reads them back. At SEND time this module only reads a small local JSON file and
+ * never touches the network, so an FR8 outage can never delay or block an ask.
+ *
+ * Fail-quiet by construction: every path that is not 100% sure returns null (no line) - unknown place,
+ * unknown vehicle, per-tonne load, several truck types, stale file, unreadable file, flag off.
+ *
+ * Switches (read at call time from the environment, both default OFF):
+ *   RATE_LINE_LAST_QUOTE=1   show the last-quote line
+ *   RATE_LINE_FR8=1          show the FR8 guide line
+ *   FR8_MAX_AGE_HOURS=72     a route older than this is ignored (never show a stale guide)
+ *   FR8_RATES_FILE=<path>    override data/fr8Rates.json
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const flag = (v) => /^(1|true|yes|on)$/i.test(String(v == null ? '' : v).trim());
+
+// ---------------------------------------------------------------------------------------------------------
+// Places. FR8 publishes route pages for its hub cities. We only ever match a lane end that, after light
+// cleaning, IS exactly a hub name - never a nearby town (a Pune rate must not pose as a Chakan rate).
+// Deliberately NOT listed: Aurangabad (Maharashtra vs Bihar - the lane carries no state to tell them apart).
+// ---------------------------------------------------------------------------------------------------------
+const HUB_SLUG = {
+  ahmedabad: 'ahmedabad', bhiwandi: 'bhiwandi', bhopal: 'bhopal', bhubaneswar: 'bhubaneswar',
+  bangalore: 'bangalore', bengaluru: 'bangalore', chennai: 'chennai', coimbatore: 'coimbatore',
+  delhi: 'delhi', 'new delhi': 'delhi', ghaziabad: 'ghaziabad', gurgaon: 'gurgaon', gurugram: 'gurgaon',
+  guwahati: 'guwahati', hubli: 'hubli', hubballi: 'hubli', hyderabad: 'hyderabad', indore: 'indore',
+  jaipur: 'jaipur', jamshedpur: 'jamshedpur', kanpur: 'kanpur', kolhapur: 'kolhapur', kolkata: 'kolkata',
+  lucknow: 'lucknow', ludhiana: 'ludhiana', madurai: 'madurai', mangalore: 'mangalore', mumbai: 'mumbai',
+  mysore: 'mysuru', mysuru: 'mysuru', nagpur: 'nagpur', nashik: 'nashik', noida: 'noida', panipat: 'panipat',
+  patna: 'patna', pune: 'pune', raipur: 'raipur', rajkot: 'rajkot', ranchi: 'ranchi', salem: 'salem',
+  surat: 'surat', vadodara: 'vadodara', baroda: 'vadodara', vapi: 'vapi', varanasi: 'varanasi',
+  vijayawada: 'vijayawada', visakhapatnam: 'visakhapatnam', vizag: 'visakhapatnam',
+};
+// Words that only qualify the same place ("Gurgaon Rural", "Kanpur UA", "Delhi NCR") and may be dropped.
+const PLACE_NOISE = new Set(['ua', 'rural', 'urban', 'city', 'district', 'dist', 'ncr']);
+
+function normPlace(s) {
+  const words = String(s == null ? '' : s).toLowerCase().replace(/[^a-z ]+/g, ' ').split(/\s+/).filter(Boolean);
+  while (words.length > 1 && PLACE_NOISE.has(words[words.length - 1])) words.pop();
+  return words.join(' ');
+}
+
+/** FR8 hub slug for a lane end, or null when it is not (exactly) an FR8 hub. */
+function hubSlug(place) {
+  const n = normPlace(place);
+  return Object.prototype.hasOwnProperty.call(HUB_SLUG, n) ? HUB_SLUG[n] : null;
+}
+
+// Nearby towns that FR8 prices as a hub (src/notify/nearTowns.js). FR8 guide only; shown in brackets.
+const NEAR_TOWN = require('./nearTowns');
+const titleCase = (s) => String(s).replace(/\b[a-z]/g, (c) => c.toUpperCase());
+function hubMatch(place) {
+  const n = normPlace(place);
+  if (Object.prototype.hasOwnProperty.call(HUB_SLUG, n)) return { slug: HUB_SLUG[n], via: null };
+  if (Object.prototype.hasOwnProperty.call(NEAR_TOWN, n)) return { slug: NEAR_TOWN[n], via: titleCase(n) };
+  return null;
+}
+function hubSlugNear(place) { const m = hubMatch(place); return m ? m.slug : null; }
+
+const routeKey = (fromSlug, toSlug) => `${fromSlug}>${toSlug}`;
+
+function routeUrl(fromSlug, toSlug, base = 'https://www.fr8.in') {
+  return `${String(base).replace(/\/+$/, '')}/transport-service/${fromSlug}-transport-service/${fromSlug}-to-${toSlug}/`;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Vehicles. A load's equipment is free text ("14.5 Ton 32 FT Container", "Dala Body LPT - 19Ft", "Trailer 40'").
+// FR8's route pages price four classes. Anything we cannot place with confidence maps to null (no line).
+//   mxl32       32 ft multi-axle container      sxl32      32 ft single-axle container
+//   cont20_24   20 / 22 / 24 ft container       open19     19 ft open truck
+// ---------------------------------------------------------------------------------------------------------
+function tonnageIn(t) {
+  const m = /(\d+(?:\.\d+)?)\s*(?:tonnes?|tons?|mt|t)\b/.exec(t);
+  return m ? Number(m[1]) : null;
+}
+
+function fr8ClassOf(equipment) {
+  const t = String(equipment == null ? '' : equipment).toLowerCase().replace(/[()]/g, ' ');
+  if (!t.trim()) return null;
+  if (/(?:^|[^\d.])32\s*(?:ft|feet|foot|'|sxl|mxl)/.test(t)) {
+    if (!/container|cont\b|sxl|mxl|\bhq\b|multi.?axle|single.?axle/.test(t)) return null; // not a container
+    if (/\bopen\b/.test(t) && !/container/.test(t)) return null; // "32ft MXL Open body": FR8's 32 ft rates are for CLOSED containers
+    if (/mxl|multi.?axle/.test(t)) return 'mxl32';
+    if (/sxl|single.?axle/.test(t)) return 'sxl32';
+    const w = tonnageIn(t);
+    if (w == null) return null;
+    if (w >= 13) return 'mxl32';
+    if (w <= 10) return 'sxl32';
+    return null; // 10-13 t: could be either, so say nothing
+  }
+  if (/(?:^|[^\d.])(?:20|22|24)\s*(?:ft|feet|foot|')/.test(t) && /container/.test(t)) return 'cont20_24';
+  if (/(?:^|[^\d.])19\s*(?:ft|feet|foot|')/.test(t) && /open|dala|eicher|lpt/.test(t) && !/container/.test(t)) return 'open19';
+  return null;
+}
+
+/** Map a row label on an FR8 page ("32ft MXL Container~Approx") to the same class keys. */
+function fr8LabelKey(label) {
+  const t = String(label == null ? '' : label).toLowerCase();
+  if (/32\s*ft/.test(t) && /mxl/.test(t)) return 'mxl32';
+  if (/32\s*ft/.test(t) && /sxl/.test(t)) return 'sxl32';
+  if (/20/.test(t) && /22/.test(t) && /24/.test(t) && /container/.test(t)) return 'cont20_24';
+  if (/19\s*ft/.test(t) && /open/.test(t)) return 'open19';
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// FR8 route page parser. Tolerant on purpose: it reads any <table>, strips tags/entities, and keeps only rows
+// whose rate sits plausibly inside their own range. A page it cannot read yields { rows: [] } and the caller
+// treats that as "no guide" - never as a guess.
+// ---------------------------------------------------------------------------------------------------------
+const ENTITIES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", ndash: '–', mdash: '—', rupee: '₹' };
+function decodeEntities(s) {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&([a-z]+);/gi, (m, n) => (Object.prototype.hasOwnProperty.call(ENTITIES, n.toLowerCase()) ? ENTITIES[n.toLowerCase()] : m));
+}
+function cellText(html) {
+  return decodeEntities(String(html).replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+}
+function rupees(s) {
+  const out = [];
+  const re = /(?:₹|rs\.?|inr)?\s*(\d[\d,]*)/gi;
+  let m;
+  while ((m = re.exec(String(s)))) {
+    const n = Number(m[1].replace(/,/g, ''));
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
+}
+
+function parseFr8Page(html) {
+  const src = String(html == null ? '' : html)
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  const kmM = /\(\s*~?\s*([\d,]+)\s*km\s*\)/i.exec(cellText(src));
+  const km = kmM ? Number(kmM[1].replace(/,/g, '')) : null;
+  const rows = [];
+  const tables = src.match(/<table[\s\S]*?<\/table>/gi) || [];
+  for (const table of tables) {
+    for (const tr of table.match(/<tr[\s\S]*?<\/tr>/gi) || []) {
+      const cells = (tr.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(cellText);
+      if (cells.length < 3) continue;
+      if (/^truck type$/i.test(cells[0]) || /^rate$/i.test(cells[2] || '')) continue; // header row
+      const label = cells[0];
+      const approx = /approx/i.test(label);
+      const key = fr8LabelKey(label);
+      const rate = rupees(cells[2])[0];
+      const range = cells[3] ? rupees(cells[3]) : [];
+      if (!key || !Number.isFinite(rate) || rate < 1000 || rate > 1000000) continue;
+      let low = null; let high = null;
+      if (range.length >= 2) { low = Math.min(range[0], range[1]); high = Math.max(range[0], range[1]); }
+      // A range that does not bracket its own rate means we misread a column - drop the whole row.
+      if (low != null && (rate < low * 0.8 || rate > high * 1.2)) continue;
+      rows.push({
+        key, label: label.replace(/~?\s*approx\.?/i, '').trim(), payload: cells[1] || null, approx, rate, low, high,
+      });
+    }
+  }
+  return { km, rows };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Local rate file (written by scripts/fr8-rates.js). Re-read only when its mtime changes.
+// ---------------------------------------------------------------------------------------------------------
+function dataDir() {
+  return process.env.SP_DATA_DIR ? path.resolve(process.env.SP_DATA_DIR) : path.join(__dirname, '..', '..', 'data');
+}
+function ratesFile() {
+  return process.env.FR8_RATES_FILE ? path.resolve(process.env.FR8_RATES_FILE) : path.join(dataDir(), 'fr8Rates.json');
+}
+
+const cache = { file: null, mtimeMs: -1, doc: null };
+function loadRates() {
+  const file = ratesFile();
+  let st;
+  try { st = fs.statSync(file); } catch (e) { cache.file = file; cache.mtimeMs = -1; cache.doc = null; return null; }
+  if (cache.file === file && cache.mtimeMs === st.mtimeMs) return cache.doc;
+  let doc = null;
+  try { doc = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { doc = null; }
+  cache.file = file; cache.mtimeMs = st.mtimeMs; cache.doc = doc && typeof doc === 'object' ? doc : null;
+  return cache.doc;
+}
+
+/** FR8 guide for one load, or null. Never throws. */
+function fr8Hint(load, data, now = Date.now()) {
+  try {
+    const L = load || {};
+    if (!L.lane || (data && (data.pmtBasis || data.cargoTypes))) return null; // per-tonne / multi-type: one truck figure does not apply
+    const fm = hubMatch(L.lane.origin);
+    const tm = hubMatch(L.lane.destination);
+    if (!fm || !tm) return null;
+    const from = fm.slug;
+    const to = tm.slug;
+    if (!from || !to || from === to) return null;
+    const via = [fm, tm].filter((m) => m.via).map((m) => m.via + ' → ' + titleCase(m.slug));
+    const cls = fr8ClassOf(L.equipment);
+    if (!cls) return null;
+    const doc = loadRates();
+    const route = doc && doc.routes && doc.routes[routeKey(from, to)];
+    if (!route || !Array.isArray(route.rows)) return null;
+    const maxAgeMs = (Number(process.env.FR8_MAX_AGE_HOURS) || 72) * 3600 * 1000;
+    const at = Number(route.fetchedAt);
+    if (!Number.isFinite(at) || now - at > maxAgeMs || at - now > 3600 * 1000) return null;
+    const row = route.rows.find((r) => r && r.key === cls);
+    if (!row || !Number.isFinite(row.rate)) return null;
+    return { rate: row.rate, low: row.low != null ? row.low : null, high: row.high != null ? row.high : null, approx: !!row.approx, asOf: at, via };
+  } catch (e) { return null; }
+}
+
+/**
+ * The structured hints for one ask: { lastQuote?, fr8? } or null. `data` is the price_needed payload as
+ * built by Notifier._priceNeededData (data.quotes is the routeHistory result when a provider is wired).
+ * Formatting lives in waTemplates.rateHintLines so numbers and dates render exactly like the rest of the ask.
+ */
+function hintsFor(request, data, now = Date.now()) {
+  const out = {};
+  try {
+    if (flag(process.env.RATE_LINE_LAST_QUOTE) && data && Array.isArray(data.quotes) && data.quotes.length) {
+      const q = data.quotes[0];
+      if (q && (q.amount != null || q.rate != null || q.bid != null)) out.lastQuote = q;
+    }
+  } catch (e) { /* no line */ }
+  if (flag(process.env.RATE_LINE_FR8)) {
+    const f = fr8Hint(request && request.load, data, now);
+    if (f) out.fr8 = f;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+module.exports = {
+  hintsFor, fr8Hint, fr8ClassOf, fr8LabelKey, hubSlug, normPlace, routeKey, routeUrl, parseFr8Page,
+  HUB_SLUG, loadRates, ratesFile, flag, hubMatch, hubSlugNear, NEAR_TOWN,
+};

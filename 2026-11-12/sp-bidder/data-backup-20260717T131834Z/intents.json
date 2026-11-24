@@ -1,0 +1,1085 @@
+{
+  "savedAt": 1784294100103,
+  "intents": [
+    {
+      "createdAt": 1783413573252,
+      "auctionId": "22918820",
+      "lane": {
+        "origin": "Ludhiana",
+        "destination": "Derabassi - Barwala Road"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ludhiana, Punjab, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+        }
+      ],
+      "startsAt": 1783415400000,
+      "closesAt": 1783416300000,
+      "cost": 100000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        112600,
+        107200,
+        106300
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783416300204
+    },
+    {
+      "createdAt": 1783421865432,
+      "auctionId": "22923371",
+      "lane": {
+        "origin": "Ludhiana",
+        "destination": "Derabassi - Barwala Road"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ludhiana, Punjab, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+        }
+      ],
+      "startsAt": 1783422900000,
+      "closesAt": 1783423800000,
+      "cost": 10000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        11260,
+        10720,
+        10630
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783423800109,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783577948999,
+      "auctionId": "22980487",
+      "lane": {
+        "origin": "394115",
+        "destination": "Nagpur"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "394115, Sanjali, Gujarat, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Nagpur, Maharashtra, India"
+        }
+      ],
+      "startsAt": 1783579560000,
+      "closesAt": 1783580460000,
+      "cost": 34000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        38284,
+        36448,
+        36142
+      ],
+      "status": "closed",
+      "firedRungs": [],
+      "finalRank": null,
+      "won": false,
+      "updatedAt": 1783580460026
+    },
+    {
+      "createdAt": 1783656198233,
+      "auctionId": "23009139",
+      "lane": {
+        "origin": "Cuttack",
+        "destination": "Hyderabad"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Cuttack, Odisha, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1783656900000,
+      "cost": 45000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        50670,
+        48240,
+        47835
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783656900147,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783679641373,
+      "auctionId": "23019115",
+      "lane": {
+        "origin": "LAMDAPURA",
+        "destination": "Manjusar"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 4,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "LAMDAPURA, Gujarat,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Manjusar, Gujarat, India"
+        }
+      ],
+      "closesAt": 1783680300000,
+      "cost": 13500,
+      "marginsPct": [
+        66.7,
+        35.9,
+        17
+      ],
+      "minMarginPct": 17,
+      "ladder": [
+        22505,
+        18347,
+        15795
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783680300141,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783697145055,
+      "auctionId": "23030167",
+      "lane": {
+        "origin": "Lucknow",
+        "destination": "SIRSA-125102-HARYANA"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Lucknow, Uttar Pradesh, India"
+        },
+        {
+          "kind": "drop",
+          "address": "SIRSA-125102-HARYANA, Haryana , IN"
+        }
+      ],
+      "startsAt": 1783741500000,
+      "closesAt": 1783742400000,
+      "cost": 18000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        20268,
+        19296,
+        19134
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783742400106,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783697233646,
+      "auctionId": "23030232",
+      "lane": {
+        "origin": "Ghaziabad",
+        "destination": "Lucknow"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ghaziabad, Uttar Pradesh,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Lucknow, Uttar Pradesh, India"
+        }
+      ],
+      "startsAt": 1783741200000,
+      "closesAt": 1783742100000,
+      "cost": 37000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        41662,
+        39664,
+        39331
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783742100104,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1783697288708,
+      "auctionId": "23030286",
+      "lane": {
+        "origin": "Ghaziabad",
+        "destination": "Nagpur"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ghaziabad, Uttar Pradesh,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Nagpur, Maharashtra, India"
+        }
+      ],
+      "startsAt": 1783742100000,
+      "closesAt": 1783743000000,
+      "cost": 67000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        75442,
+        71824,
+        71221
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783743000130,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783915084182,
+      "auctionId": "23088090",
+      "lane": {
+        "origin": "Aurangabad",
+        "destination": "Coimbatore"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Aurangabad, Maharashtra, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Coimbatore, TAMIL NADU, India"
+        }
+      ],
+      "startsAt": 1783917000000,
+      "closesAt": 1783917900000,
+      "cost": 86000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        96836,
+        92192,
+        91418
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783917900174,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783944612649,
+      "auctionId": "23101765",
+      "lane": {
+        "origin": "Nagpur",
+        "destination": "Derabassi - Barwala Road"
+      },
+      "equipment": "32 FT SXL 7 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Nagpur, Maharashtra, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Derabassi - Barwala Road, Bhagat Singh Nagar, Dera Bassi, Punjab, India"
+        }
+      ],
+      "closesAt": 1783944900000,
+      "cost": 55000,
+      "marginsPct": [
+        32.3,
+        23.2,
+        13.6
+      ],
+      "minMarginPct": 13.6,
+      "ladder": [
+        72765,
+        67760,
+        62480
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1783944900192,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1783946172061,
+      "auctionId": "23103590",
+      "lane": {
+        "origin": "Coimbatore",
+        "destination": "KOLKATTA"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Coimbatore, TAMIL NADU, India"
+        },
+        {
+          "kind": "drop",
+          "address": "KOLKATTA, West Bengal, India"
+        }
+      ],
+      "closesAt": 1783946700000,
+      "cost": 76500,
+      "marginsPct": [
+        23.6,
+        17.1,
+        11.8
+      ],
+      "minMarginPct": 11.8,
+      "ladder": [
+        94554,
+        89582,
+        85527
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783946700160,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1783946308812,
+      "auctionId": "23103620",
+      "lane": {
+        "origin": "Ghaziabad",
+        "destination": "Lucknow"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Ghaziabad, Uttar Pradesh,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Lucknow, Uttar Pradesh, India"
+        }
+      ],
+      "closesAt": 1783947060000,
+      "cost": 49500,
+      "marginsPct": [
+        24.4,
+        16.7,
+        12.7
+      ],
+      "minMarginPct": 12.7,
+      "ladder": [
+        61578,
+        57767,
+        55787
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1783947060071,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784017237706,
+      "auctionId": "23127093",
+      "lane": {
+        "origin": "Karnal",
+        "destination": "Bijinor-246761- Asmoli"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Karnal, Haryana, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Bijinor-246761- Asmoli, Uttar Pradesh,India"
+        }
+      ],
+      "closesAt": 1784017500000,
+      "cost": 40000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        45040,
+        42880,
+        42520
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784017500034,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784034309586,
+      "auctionId": "23138946",
+      "lane": {
+        "origin": "Raipur",
+        "destination": "Nagpur"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Raipur, Chhattisgarh,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Nagpur, Maharashtra, India"
+        }
+      ],
+      "closesAt": 1784034900000,
+      "cost": 15000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        16890,
+        16080,
+        15945
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784034900200,
+      "revisionsLeft": 2
+    },
+    {
+      "createdAt": 1784106875864,
+      "auctionId": "23160171",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Afzalpur"
+      },
+      "equipment": "Trailer 40'",
+      "units": 4,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "Neogreen Power Kalaburagi Karnataka 585301, Afzalpur, Karnataka, India"
+        }
+      ],
+      "closesAt": 1784107200000,
+      "cost": 60000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        67560,
+        64320,
+        62160
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 11,
+      "won": false,
+      "updatedAt": 1784107200178,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784180993034,
+      "auctionId": "23167278",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Irkode"
+      },
+      "equipment": "Trailer 40'",
+      "units": 3,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "FOURTH PARTNER 502114, Irkode, Telangana, India"
+        }
+      ],
+      "closesAt": 1784181600000,
+      "cost": 66000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        74316,
+        70752,
+        68376
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784181600165,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784181014868,
+      "auctionId": "23167407",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Irkode"
+      },
+      "equipment": "Trailer 40'",
+      "units": 3,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "FOURTH PARTNER 502114, Irkode, Telangana, India"
+        }
+      ],
+      "closesAt": 1784181900000,
+      "cost": 72000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        81072,
+        77184,
+        74592
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 3,
+      "won": false,
+      "updatedAt": 1784181900105,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784192388840,
+      "auctionId": "23192842",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "Lamba"
+      },
+      "equipment": "Trailer 40'",
+      "units": 1,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "Mahadev Agro Jhunjhunu rajasthan 333023, Lamba, Rajasthan, India"
+        }
+      ],
+      "closesAt": 1784193600000,
+      "cost": 112000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3
+      ],
+      "minMarginPct": 3,
+      "ladder": [
+        126112,
+        120064,
+        115360
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 6,
+      "won": false,
+      "updatedAt": 1784193600082,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784278910072,
+      "auctionId": "23229214",
+      "lane": {
+        "origin": "Jaipur",
+        "destination": "Hyderabad"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Jaipur, Rajasthan, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784279700000,
+      "cost": 85000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        6.3
+      ],
+      "minMarginPct": 6.3,
+      "ladder": [
+        95710,
+        91120,
+        90355
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784279700199,
+      "revisionsLeft": 1
+    },
+    {
+      "createdAt": 1784281293860,
+      "auctionId": "23230042",
+      "lane": {
+        "origin": "Aurangabad",
+        "destination": "Coimbatore"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Aurangabad, Maharashtra, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Coimbatore, TAMIL NADU, India"
+        }
+      ],
+      "closesAt": 1784281500000,
+      "cost": 87000,
+      "marginsPct": [
+        14.9,
+        9.5,
+        7.4
+      ],
+      "minMarginPct": 7.4,
+      "ladder": [
+        99963,
+        95265,
+        93438
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784281500021,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784282209959,
+      "auctionId": "23231529",
+      "lane": {
+        "origin": "Cuttak",
+        "destination": "Hyderabad"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Cuttak, Odisha,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784283000000,
+      "cost": 45000,
+      "marginsPct": [
+        20.7,
+        15.3,
+        5.4
+      ],
+      "minMarginPct": 5.4,
+      "ladder": [
+        54315,
+        51885,
+        47430
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784283000102,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784286329715,
+      "auctionId": "23234598",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "683503"
+      },
+      "equipment": "Trailer 20'",
+      "units": 1,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "AXIS POWER 683503, Kochi, Kerala, India"
+        }
+      ],
+      "closesAt": 1784286900000,
+      "cost": 83000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        2.7
+      ],
+      "minMarginPct": 2.7,
+      "ladder": [
+        93458,
+        88976,
+        85241
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784286900178,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784288100032,
+      "auctionId": "23234562",
+      "lane": {
+        "origin": "KOLKATTA",
+        "destination": "Hyderabad"
+      },
+      "equipment": "32 FT MXL 18 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "KOLKATTA, West Bengal, India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784288700000,
+      "cost": 70000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        2.7
+      ],
+      "minMarginPct": 2.7,
+      "ladder": [
+        78820,
+        75040,
+        71890
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 2,
+      "won": false,
+      "updatedAt": 1784288700207,
+      "revisionsLeft": 0
+    },
+    {
+      "createdAt": 1784290940948,
+      "auctionId": "23239096",
+      "lane": {
+        "origin": "Khopoli",
+        "destination": "683503"
+      },
+      "equipment": "Trailer 20'",
+      "units": 1,
+      "companyName": "Renewsys India",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Renewsys India, Khopoli, Maharashtra, India, 410203"
+        },
+        {
+          "kind": "drop",
+          "address": "AXIS POWER 683503, Kochi, Kerala, India"
+        }
+      ],
+      "closesAt": 1784292000000,
+      "cost": 83000,
+      "marginsPct": [
+        12.6,
+        7.2,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        93458,
+        88976,
+        85988
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0,
+        1,
+        2
+      ],
+      "finalRank": 8,
+      "won": false,
+      "updatedAt": 1784292000063,
+      "revisionsLeft": 27
+    },
+    {
+      "createdAt": 1784293359422,
+      "auctionId": "23240397",
+      "lane": {
+        "origin": "Raipur",
+        "destination": "Hyderabad"
+      },
+      "equipment": "20 FT 6.5 MT",
+      "units": 1,
+      "companyName": "Syngenta India Pvt Ltd",
+      "points": [
+        {
+          "kind": "pickup",
+          "address": "Raipur, Chhattisgarh,India"
+        },
+        {
+          "kind": "drop",
+          "address": "Hyderabad, Telangana, India"
+        }
+      ],
+      "closesAt": 1784294100000,
+      "cost": 20000,
+      "marginsPct": [
+        24.3,
+        15.3,
+        3.6
+      ],
+      "minMarginPct": 3.6,
+      "ladder": [
+        24860,
+        23060,
+        20720
+      ],
+      "status": "closed",
+      "firedRungs": [
+        0
+      ],
+      "finalRank": 1,
+      "won": true,
+      "updatedAt": 1784294100103,
+      "revisionsLeft": 2
+    }
+  ]
+}

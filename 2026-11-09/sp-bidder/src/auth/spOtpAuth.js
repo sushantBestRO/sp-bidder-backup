@@ -1,0 +1,175 @@
+'use strict';
+
+/**
+ * Server-side proxy for SuperProcure's OTP re-auth (reverse-engineered 2026-07-09).
+ * Two plain JSON POSTs on the auth host - no headless browser:
+ *   1. requestOtp({phone,countryCode}) -> {sessionId}   (SP: /api/v2/auth/phone -> data.id)
+ *   2. verifyOtp({sessionId,otp})       -> {token}       (SP: /api/v1/auth/validate/otp -> token in data)
+ *
+ * Runs ONLY on the server so the minted token never touches the browser. `fetchImpl` is
+ * injectable so the reconnect routes can be tested against a mock transport (no live SP).
+ * The success envelope is {error,message,data}; the token's exact location in `data` is
+ * inferred (not yet seen on a real 200) so extractToken() reads it defensively - confirm
+ * against the first genuine success and tighten if needed.
+ *
+ * ---- WHITE-LABEL TENANTS ---------------------------------------------------------------------
+ * SuperProcure ships the same product on a customer's own host, with its own auth host, and an
+ * account record carries that as `authBaseUrl` / `webOrigin` (see auth/accounts.js). Passing
+ * `authBaseUrl` switches BOTH calls onto the tenant, which is not just a host swap - the two
+ * deployments disagree on the OTP-request wire shape, and getting that wrong is a silent failure
+ * that reads as "the tenant is down":
+ *
+ *   SP main   POST /api/v2/auth/phone   {phone: '9XXXXXXXXX', countryCode: '+91'}
+ *   tenant    POST /api/v1/auth/phone   {phone: '919XXXXXXXXX'}          (country code inlined)
+ *
+ * The verify call agrees across both (/api/v1/auth/validate/otp, same five fields) and differs
+ * only in `redirectUrl`, which follows the tenant's own web origin.
+ *
+ * The tenant shape is read from a captured Rallis session (logistics-auth.tatachemicals.com,
+ * 2026-08-05); SP main's is the 2026-07-09 reverse-engineering. Both are single-tenant evidence,
+ * so a SECOND white-label tenant that disagrees needs its shape proven from its own capture
+ * rather than assumed to match this one.
+ */
+
+const AUTH_API = 'https://auth-api.superprocure.com';
+const SP_MAIN_REDIRECT = 'https://app.superprocure.com';
+
+function digits(s) { return String(s == null ? '' : s).replace(/\D/g, ''); }
+
+const trimSlash = (s) => String(s).replace(/\/+$/, '');
+
+/**
+ * Resolve the wire contract for one account. No authBaseUrl means SP main, which is what every
+ * existing account normalises to (validateAccount stores an absent tenant field as null), so the
+ * default path stays byte-identical to what shipped.
+ */
+function authProfile({ authBaseUrl = null, webOrigin = null } = {}) {
+  if (!authBaseUrl) {
+    return {
+      base: AUTH_API,
+      otpPath: '/api/v2/auth/phone',
+      redirectUrl: SP_MAIN_REDIRECT,
+      otpBody: (phone, countryCode) => ({ phone: digits(phone), countryCode }),
+    };
+  }
+  const base = trimSlash(authBaseUrl);
+  return {
+    base,
+    otpPath: '/api/v1/auth/phone',
+    redirectUrl: `${webOrigin ? trimSlash(webOrigin) : base}/`,
+    otpBody: (phone, countryCode) => ({ phone: digits(countryCode) + digits(phone) }),
+  };
+}
+
+async function requestOtp({ phone, email = null, countryCode = '+91', authBaseUrl = null, webOrigin = null, fetchImpl = fetch }) {
+  const p = authProfile({ authBaseUrl, webOrigin });
+  // Email login (docs/runbooks/sp-token-capture.md): POST /api/v1/auth/email {email} -> {data:{id}}
+  // and the 6-digit code arrives by email. Same session id and validate/otp leg as the mobile login.
+  const byEmail = email != null && String(email).trim() !== '';
+  const otpPath = byEmail ? '/api/v1/auth/email' : p.otpPath;
+  const r = await fetchImpl(`${p.base}${otpPath}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(byEmail ? { email: String(email).trim() } : p.otpBody(phone, countryCode)),
+  });
+  const j = await r.json().catch(() => null);
+  // SP returns 404 {error:"AUTH-001",message:"Phone number not found."} when the mobile is not on
+  // any SP account - a user-fixable mistake (wrong number), not a server fault.
+  //
+  // The BARE-404 half of that rule holds only on SP main, where it was observed. On a tenant a 404
+  // is far more likely to be its plainest meaning - no such route - which is what a mistyped or
+  // stale authBaseUrl produces, and reporting that as "your mobile isn't registered" sends the
+  // operator to re-key phone numbers during an outage caused by one wrong URL. So a tenant must
+  // say AUTH-001 explicitly; a bare tenant 404 falls through and names the URL it actually called.
+  if ((j && j.error === 'AUTH-001') || (r.status === 404 && !authBaseUrl)) {
+    const e = new Error(byEmail
+      ? "That email isn't registered on SuperProcure. Enter the email the account's SP login is under."
+      : "That mobile isn't registered on SuperProcure. Enter the number the account's SP login is under.");
+    e.code = byEmail ? 'EMAIL_NOT_FOUND' : 'PHONE_NOT_FOUND';
+    throw e;
+  }
+  if (r.status !== 200 || !j || !j.data || !j.data.id) {
+    // On a tenant the URL goes in the message unconditionally, even when the portal supplied its
+    // own text: the likeliest cause of a failure here is a wrong authBaseUrl, and the portal's
+    // wording ("Cannot POST /api/v1/auth/phone") never names the host that rejected it. SP main's
+    // message is left exactly as it shipped.
+    const e = new Error(authBaseUrl
+      ? `Could not send the code from ${p.base}${otpPath} - ${(j && j.message) || `HTTP ${r.status}`}. Check the account's authBaseUrl.`
+      : ((j && j.message) || `Could not send the code (HTTP ${r.status}).`));
+    e.code = 'OTP_START_FAILED';
+    throw e;
+  }
+  return { sessionId: String(j.data.id) };
+}
+
+async function verifyOtp({ sessionId, otp, selection = null, allowPicker = false, authBaseUrl = null, webOrigin = null, fetchImpl = fetch }) {
+  const p = authProfile({ authBaseUrl, webOrigin });
+  const r = await fetchImpl(`${p.base}/api/v1/auth/validate/otp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      id: String(sessionId), otp: String(otp),
+      redirectUrl: p.redirectUrl, selection: selection || null, ssoLogin: '',
+    }),
+  });
+  const j = await r.json().catch(() => null);
+  const token = extractToken(j);
+  const accounts = j && j.data && Array.isArray(j.data.accounts) ? j.data.accounts : null;
+
+  // A mobile mapped to more than one carrier account gets an account PICKER instead of a token:
+  // a 200 carrying data.accounts[], each with its own 15-minute `selection` token to be replayed
+  // into a second call on this endpoint. That second leg is not built - the bidder binds one
+  // account per record and there is no operator surface to choose from - so it is refused
+  // explicitly, because otherwise the operator is told the far less useful "could not verify".
+  //
+  // Two orderings are load-bearing here and both were got wrong first time round:
+  //   - it is checked BEFORE the `j.error` catch-all below, which converts any truthy `error` into
+  //     "OTP is incorrect." If a picker envelope carries an error code (this API already uses
+  //     AUTH-001/AUTH-003, and no tenant picker response has ever been captured), the catch-all
+  //     would win and the operator would be told to retype a code that was right all along.
+  //   - it requires there to be NO usable token. SP main's success envelope has never been seen on
+  //     a real 200, so an envelope carrying the resolved account list ALONGSIDE the token is a
+  //     live possibility; refusing on the mere presence of accounts[] would break every SP-main
+  //     reconnect. A token, if there is one, always wins.
+  // Gated on 200 so a genuine 401 can never be reported as a picker.
+  if (r.status === 200 && !token && accounts && accounts.length) {
+    // A caller that can show a chooser gets each account's own `selection` token back (replayed with the
+    // same id + otp within ~15 minutes). Entries without one are unusable and dropped. Callers that pass
+    // nothing keep the old behaviour: refuse, below.
+    if (allowPicker) {
+      const choices = accounts
+        .filter((a) => a && typeof a.selection === 'string' && a.selection)
+        .map((a) => ({ selection: a.selection, id: a.id != null ? a.id : null, username: String(a.username || ''), description: String(a.description || '') }));
+      if (choices.length) return { picker: choices };
+    }
+    const e = new Error('That mobile is registered against more than one account on this portal, so it cannot be reconnected automatically. Use a mobile tied to a single account.');
+    e.code = 'OTP_ACCOUNT_PICKER';
+    throw e;
+  }
+  // SP returns {error:"AUTH-003",message:"OTP is incorrect.",data:null} with a 401 on a bad code.
+  if (r.status === 401 || (j && j.error)) {
+    const e = new Error((j && j.message) || 'OTP is incorrect.');
+    e.code = 'OTP_INCORRECT';
+    throw e;
+  }
+  if (r.status !== 200 || !token) {
+    const e = new Error((j && j.message) || `Could not verify the OTP (HTTP ${r.status}).`);
+    e.code = 'OTP_VERIFY_FAILED';
+    throw e;
+  }
+  return { token: String(token).replace(/^Bearer\s+/i, '').trim() };
+}
+
+/** Read the JWT from the success envelope's `data` defensively (exact key inferred). */
+function extractToken(j) {
+  if (!j) return null;
+  const d = j.data != null ? j.data : j;
+  if (typeof d === 'string' && d) return d;
+  if (d && typeof d === 'object') {
+    return d.token || d.authToken || d.accessToken || d.jwt || d.access_token
+      || (d.user && (d.user.token || d.user.authToken)) || null;
+  }
+  return null;
+}
+
+module.exports = { requestOtp, verifyOtp, extractToken, authProfile, AUTH_API, SP_MAIN_REDIRECT };

@@ -1,0 +1,12 @@
+{"ts":1783580435878,"kind":"would_bid","auctionId":"22980487","price":38284,"rungIndex":0,"rank":null,"latencyMs":null}
+{"ts":1783580436881,"kind":"would_bid","auctionId":"22980487","price":36448,"rungIndex":1,"rank":null,"latencyMs":null}
+{"ts":1783580457616,"kind":"would_bid","auctionId":"22980487","price":36142,"rungIndex":2,"rank":null,"latencyMs":null}
+{"ts":1783580460034,"kind":"auction_result","auctionId":"22980487","won":false,"finalRank":null}
+{"ts":1783599873246,"kind":"bid_placed","auctionId":"22991048","price":51796,"rungIndex":0,"rank":null,"latencyMs":401}
+{"ts":1783599874482,"kind":"bid_placed","auctionId":"22991048","price":49312,"rungIndex":1,"rank":null,"latencyMs":66}
+{"ts":1783599897659,"kind":"bid_placed","auctionId":"22991048","price":48898,"rungIndex":2,"rank":null,"latencyMs":117}
+{"ts":1783599900071,"kind":"auction_result","auctionId":"22991048","won":false,"finalRank":3}
+{"ts":1783601496245,"kind":"bid_placed","auctionId":"22992353","price":66300,"rungIndex":0,"rank":null,"latencyMs":296}
+{"ts":1783601520087,"kind":"auction_result","auctionId":"22992353","won":true,"finalRank":1}
+{"ts":1783606652008,"kind":"bid_placed","auctionId":"22997477","price":49544,"rungIndex":0,"rank":null,"latencyMs":161}
+{"ts":1783606680144,"kind":"auction_result","auctionId":"22997477","won":true,"finalRank":1}

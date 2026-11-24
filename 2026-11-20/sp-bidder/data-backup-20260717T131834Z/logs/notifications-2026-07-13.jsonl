@@ -1,0 +1,530 @@
+{"ts":1783914791538,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"5dd3f3f0-7e6e-11f1-9f81-f36d74cca6b7"}
+{"ts":1783914791817,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"5e2bd7f0-7e6e-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783914792097,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"5e5558f0-7e6e-11f1-80a9-6d47cec618d5"}
+{"ts":1783914792378,"kind":"price_needed","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"5e814af0-7e6e-11f1-9f81-f36d74cca6b7"}
+{"ts":1783914792650,"kind":"price_needed","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"5eaaa4e0-7e6e-11f1-8cfe-49518a68576a"}
+{"ts":1783914792944,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"5ed5d390-7e6e-11f1-be98-155b146553a6"}
+{"ts":1783914793219,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"5f015060-7e6e-11f1-a710-3172296a0ba5"}
+{"ts":1783914793952,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"5f2c5800-7e6e-11f1-8cfe-49518a68576a"}
+{"ts":1783914794706,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"5f9ad140-7e6e-11f1-b2fb-67429ee1792b"}
+{"ts":1783915084600,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"0cb145d0-7e6f-11f1-aff3-b547e5d3b12b"}
+{"ts":1783915084921,"kind":"price_submitted","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"0ce1cbb0-7e6f-11f1-be98-155b146553a6"}
+{"ts":1783915085192,"kind":"price_submitted","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"0d0902c0-7e6f-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783915085467,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0d3569f0-7e6f-11f1-a710-3172296a0ba5"}
+{"ts":1783915085754,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0d60bfb0-7e6f-11f1-b2fb-67429ee1792b"}
+{"ts":1783915086023,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"0d8b0400-7e6f-11f1-9f81-f36d74cca6b7"}
+{"ts":1783915086298,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"0db45df0-7e6f-11f1-9f81-f36d74cca6b7"}
+{"ts":1783915743059,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"95298840-7e70-11f1-aff3-b547e5d3b12b"}
+{"ts":1783915743323,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9551f7d0-7e70-11f1-a710-3172296a0ba5"}
+{"ts":1783915743588,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"957a4050-7e70-11f1-8cfe-49518a68576a"}
+{"ts":1783915743846,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"95a23ab0-7e70-11f1-8cfe-49518a68576a"}
+{"ts":1783915744134,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"95cb6d90-7e70-11f1-9f81-f36d74cca6b7"}
+{"ts":1783915744398,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"95f64e20-7e70-11f1-afa4-8587cec21c48"}
+{"ts":1783915744654,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"961e4880-7e70-11f1-9f81-f36d74cca6b7"}
+{"ts":1783915842996,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"d0bcff40-7e70-11f1-afa4-8587cec21c48"}
+{"ts":1783915843263,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"d0e4f9a0-7e70-11f1-aff3-b547e5d3b12b"}
+{"ts":1783915843532,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"d10ea1b0-7e70-11f1-b2fb-67429ee1792b"}
+{"ts":1783915843798,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"d1373850-7e70-11f1-9f81-f36d74cca6b7"}
+{"ts":1783915844063,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"d1606b31-7e70-11f1-be98-155b146553a6"}
+{"ts":1783915844331,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"d188dac0-7e70-11f1-afa4-8587cec21c48"}
+{"ts":1783915844599,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"d1b0ae10-7e70-11f1-aff3-b547e5d3b12b"}
+{"ts":1783916093020,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"65c1f410-7e71-11f1-afa4-8587cec21c48"}
+{"ts":1783916093291,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"65ea8ab0-7e71-11f1-80a9-6d47cec618d5"}
+{"ts":1783916093564,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"661480e0-7e71-11f1-aff3-b547e5d3b12b"}
+{"ts":1783916093836,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"663ddad0-7e71-11f1-afa4-8587cec21c48"}
+{"ts":1783916094110,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"666782e0-7e71-11f1-8cfe-49518a68576a"}
+{"ts":1783916094383,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"66917910-7e71-11f1-9f81-f36d74cca6b7"}
+{"ts":1783916094655,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"66ba84e0-7e71-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917644321,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"0268ebe0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917644629,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"0293a560-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917644921,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"02c515a0-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917644985,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"02ce1650-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917645199,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"02efcf20-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917645297,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"02fca060-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917645477,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"03199e40-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917645601,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"03270bc0-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917645763,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"03447ed0-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917645890,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0358ca20-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917646050,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"0370bef0-7e75-11f1-b2fb-67429ee1792b"}
+{"ts":1783917646179,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0384e330-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917646459,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"03b038f0-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917646820,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"03e66420-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917647771,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"0477ceb0-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917647796,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"047a8dd0-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917648029,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"049fc910-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917648036,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"04a03e40-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917648055,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"04a1c4e0-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917648070,"kind":"error","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"04a2fd60-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917648106,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04a85490-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917648114,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04a96600-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917648367,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04d298e0-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917648373,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04d3aa50-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917648410,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04d753d0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917648423,"kind":"error","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"04d86540-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917648431,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"04dc5ce0-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917648452,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"04e05480-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917648675,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"05019820-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917648691,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"05040920-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917648727,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"05089d00-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917648749,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"050c6d91-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917648752,"kind":"error","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"05098760-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917648755,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"050c4681-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917648988,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"05324510-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917649006,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0533cbb0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917649040,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0538d4c0-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917649055,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"053a0d40-7e75-11f1-b2fb-67429ee1792b"}
+{"ts":1783917649061,"kind":"error","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"053b45c0-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917649068,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"053af7a0-7e75-11f1-b2fb-67429ee1792b"}
+{"ts":1783917649267,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"055c3b40-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783917649275,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"055d73c0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917649313,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0562caf0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917649317,"kind":"error","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0562caf0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917649325,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"0564edd0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917649336,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"05642a80-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917649518,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"05837250-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917649533,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"0584aad0-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917649574,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"058bafb0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917649585,"kind":"error","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"058bafb0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917649587,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"058ce830-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917649613,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"058df9a0-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917649773,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"05a922c0-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917649791,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"05ac5710-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917649844,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"05b35bf0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917649861,"kind":"error","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"05b6de60-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917873479,"kind":"bid_live","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"8b0107d0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917873751,"kind":"bid_live","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"8b297760-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917874002,"kind":"bid_live","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"8b514ab0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917874270,"kind":"bid_live","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"8b78cfe0-7e75-11f1-8cfe-49518a68576a"}
+{"ts":1783917874528,"kind":"bid_live","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"8ba05510-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917874781,"kind":"bid_live","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"8bc76510-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917875034,"kind":"bid_live","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"8bed8ab0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917875284,"kind":"bid_live","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"8c149ab0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917875540,"kind":"bid_live","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"8c3a2410-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917897900,"kind":"outbid","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"998e4fb0-7e75-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783917898162,"kind":"outbid","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"99b73470-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917898437,"kind":"outbid","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"99dda830-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917898696,"kind":"outbid","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"9a08fdf0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917898966,"kind":"outbid","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"9a2f2390-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917899227,"kind":"outbid","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9a58cba0-7e75-11f1-be98-155b146553a6"}
+{"ts":1783917899483,"kind":"outbid","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"9a8050d0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917899753,"kind":"outbid","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9aa9aac0-7e75-11f1-afa4-8587cec21c48"}
+{"ts":1783917900201,"kind":"outbid","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"9aeb47a0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917900629,"kind":"won","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"9b2ce480-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917900901,"kind":"won","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9b57ec20-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917901168,"kind":"won","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"9b80f7f0-7e75-11f1-aff3-b547e5d3b12b"}
+{"ts":1783917901425,"kind":"won","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"9ba8cb40-7e75-11f1-80a9-6d47cec618d5"}
+{"ts":1783917901717,"kind":"won","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"9bd188f0-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917902022,"kind":"won","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9bff76c1-7e75-11f1-a710-3172296a0ba5"}
+{"ts":1783917902302,"kind":"won","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"9c2d8ba0-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917902570,"kind":"won","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9c55d420-7e75-11f1-8163-53034a1d3d2a"}
+{"ts":1783917902877,"kind":"won","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"9c8325b0-7e75-11f1-9f81-f36d74cca6b7"}
+{"ts":1783919157292,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"88366ec0-7e78-11f1-b2fb-67429ee1792b"}
+{"ts":1783919157556,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"885f0560-7e78-11f1-aff3-b547e5d3b12b"}
+{"ts":1783919157821,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"8886d8b0-7e78-11f1-80a9-6d47cec618d5"}
+{"ts":1783919158083,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"88afbd70-7e78-11f1-9f81-f36d74cca6b7"}
+{"ts":1783919158355,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"88d98c90-7e78-11f1-be98-155b146553a6"}
+{"ts":1783919188801,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9afe5310-7e78-11f1-afa4-8587cec21c48"}
+{"ts":1783919189124,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9b27d410-7e78-11f1-afa4-8587cec21c48"}
+{"ts":1783919189401,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"9b596b60-7e78-11f1-9f81-f36d74cca6b7"}
+{"ts":1783919189675,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9b83fdd0-7e78-11f1-8cfe-49518a68576a"}
+{"ts":1783919189949,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"9bad57c0-7e78-11f1-afa4-8587cec21c48"}
+{"ts":1783919212939,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"a95c4d90-7e78-11f1-afa4-8587cec21c48"}
+{"ts":1783919213221,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"a98a6270-7e78-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783919213504,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"a9b5df40-7e78-11f1-be98-155b146553a6"}
+{"ts":1783919213800,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"a9e0e6e0-7e78-11f1-80a9-6d47cec618d5"}
+{"ts":1783919214087,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"aa0eada0-7e78-11f1-8cfe-49518a68576a"}
+{"ts":1783921490546,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"f6ed61c0-7e7d-11f1-be98-155b146553a6"}
+{"ts":1783921490825,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"f71905a0-7e7d-11f1-9f81-f36d74cca6b7"}
+{"ts":1783921491112,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"f7437100-7e7d-11f1-b2fb-67429ee1792b"}
+{"ts":1783921491385,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"f76e9fb0-7e7d-11f1-a710-3172296a0ba5"}
+{"ts":1783921491661,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"f798bcf0-7e7d-11f1-afa4-8587cec21c48"}
+{"ts":1783921491937,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"f7c37670-7e7d-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783921492220,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"f7ed93b0-7e7d-11f1-8163-53034a1d3d2a"}
+{"ts":1783921790494,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"a9b73010-7e7e-11f1-8cfe-49518a68576a"}
+{"ts":1783921790761,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"a9e285d0-7e7e-11f1-b2fb-67429ee1792b"}
+{"ts":1783921791025,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"aa0a8030-7e7e-11f1-9f81-f36d74cca6b7"}
+{"ts":1783921791280,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"aa320560-7e7e-11f1-be98-155b146553a6"}
+{"ts":1783921791536,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"aa593c71-7e7e-11f1-be98-155b146553a6"}
+{"ts":1783921791797,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"aa807380-7e7e-11f1-aff3-b547e5d3b12b"}
+{"ts":1783921792059,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"aaa894f0-7e7e-11f1-afa4-8587cec21c48"}
+{"ts":1783922100587,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"6286bde0-7e7f-11f1-afa4-8587cec21c48"}
+{"ts":1783922100871,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"62b63251-7e7f-11f1-be98-155b146553a6"}
+{"ts":1783922101158,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"62e27270-7e7f-11f1-9f81-f36d74cca6b7"}
+{"ts":1783922101445,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"630da120-7e7f-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783922101736,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"633a5670-7e7f-11f1-b2fb-67429ee1792b"}
+{"ts":1783922102069,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"63686b50-7e7f-11f1-9f81-f36d74cca6b7"}
+{"ts":1783922102380,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"639a50c0-7e7f-11f1-8cfe-49518a68576a"}
+{"ts":1783922421382,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"21b74a90-7e80-11f1-b2fb-67429ee1792b"}
+{"ts":1783922421736,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"21f11f40-7e80-11f1-8163-53034a1d3d2a"}
+{"ts":1783922422117,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"2226d540-7e80-11f1-aff3-b547e5d3b12b"}
+{"ts":1783922422460,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"225d0070-7e80-11f1-a710-3172296a0ba5"}
+{"ts":1783922422915,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"2292dd80-7e80-11f1-a710-3172296a0ba5"}
+{"ts":1783922423354,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"22d6c450-7e80-11f1-afa4-8587cec21c48"}
+{"ts":1783922423671,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"231d6a40-7e80-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783922571151,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"7b089630-7e80-11f1-9f81-f36d74cca6b7"}
+{"ts":1783922571439,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"7b330190-7e80-11f1-8cfe-49518a68576a"}
+{"ts":1783922571713,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"7b5e7e60-7e80-11f1-80a9-6d47cec618d5"}
+{"ts":1783922571982,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"7b86c6e0-7e80-11f1-aff3-b547e5d3b12b"}
+{"ts":1783922572276,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"7bb047e0-7e80-11f1-b2fb-67429ee1792b"}
+{"ts":1783922572753,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"7bdd4b50-7e80-11f1-a710-3172296a0ba5"}
+{"ts":1783922573052,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"7c261420-7e80-11f1-8163-53034a1d3d2a"}
+{"ts":1783923621165,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"ece25460-7e82-11f1-be98-155b146553a6"}
+{"ts":1783923621438,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"ed0b6030-7e82-11f1-afa4-8587cec21c48"}
+{"ts":1783923621712,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ed3619b0-7e82-11f1-a710-3172296a0ba5"}
+{"ts":1783923621974,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ed5e1410-7e82-11f1-9f81-f36d74cca6b7"}
+{"ts":1783923622253,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"ed880a40-7e82-11f1-8cfe-49518a68576a"}
+{"ts":1783923622548,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"edb2ead0-7e82-11f1-aff3-b547e5d3b12b"}
+{"ts":1783923622814,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"eddf03e1-7e82-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783926025750,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"86152220-7e88-11f1-b2fb-67429ee1792b"}
+{"ts":1783926026169,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"864a14d0-7e88-11f1-8cfe-49518a68576a"}
+{"ts":1783926026487,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"868d3850-7e88-11f1-afa4-8587cec21c48"}
+{"ts":1783926026986,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"86c893a0-7e88-11f1-b2fb-67429ee1792b"}
+{"ts":1783926027355,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"870b41f0-7e88-11f1-a710-3172296a0ba5"}
+{"ts":1783926027692,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"8740f7f0-7e88-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783926028229,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"877638c0-7e88-11f1-80a9-6d47cec618d5"}
+{"ts":1783926028645,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"87d17820-7e88-11f1-9f81-f36d74cca6b7"}
+{"ts":1783926028966,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"8806e000-7e88-11f1-b2fb-67429ee1792b"}
+{"ts":1783926029298,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"8837b400-7e88-11f1-be98-155b146553a6"}
+{"ts":1783926029603,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"88697260-7e88-11f1-a710-3172296a0ba5"}
+{"ts":1783926030144,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"8897fc70-7e88-11f1-b2fb-67429ee1792b"}
+{"ts":1783926030597,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"88ec36f0-7e88-11f1-8cfe-49518a68576a"}
+{"ts":1783926030909,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"89306be0-7e88-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783926625130,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"eb574360-7e89-11f1-9f81-f36d74cca6b7"}
+{"ts":1783926625507,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"eb8dbcb0-7e89-11f1-afa4-8587cec21c48"}
+{"ts":1783926625772,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ebc60ac0-7e89-11f1-a710-3172296a0ba5"}
+{"ts":1783926626045,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ebef64b0-7e89-11f1-80a9-6d47cec618d5"}
+{"ts":1783926626315,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"ec17d440-7e89-11f1-be98-155b146553a6"}
+{"ts":1783926626600,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"ec43c640-7e89-11f1-afa4-8587cec21c48"}
+{"ts":1783926626868,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ec6cab00-7e89-11f1-b2fb-67429ee1792b"}
+{"ts":1783926925414,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"9e1e79a0-7e8a-11f1-a710-3172296a0ba5"}
+{"ts":1783926926143,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9e88ad20-7e8a-11f1-aff3-b547e5d3b12b"}
+{"ts":1783926926443,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"9efbe150-7e8a-11f1-a710-3172296a0ba5"}
+{"ts":1783926926723,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9f271000-7e8a-11f1-b2fb-67429ee1792b"}
+{"ts":1783926926985,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"9f4fa6a0-7e8a-11f1-be98-155b146553a6"}
+{"ts":1783926927281,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9f77ef20-7e8a-11f1-afa4-8587cec21c48"}
+{"ts":1783926927550,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"9fa519a0-7e8a-11f1-a710-3172296a0ba5"}
+{"ts":1783927225477,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"5123f160-7e8b-11f1-8163-53034a1d3d2a"}
+{"ts":1783927225744,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"5163b980-7e8b-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783927226032,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"518f8470-7e8b-11f1-80a9-6d47cec618d5"}
+{"ts":1783927226337,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"51bd7240-7e8b-11f1-8cfe-49518a68576a"}
+{"ts":1783927226633,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"51e9d970-7e8b-11f1-be98-155b146553a6"}
+{"ts":1783927226905,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"5214ba00-7e8b-11f1-80a9-6d47cec618d5"}
+{"ts":1783927227179,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"523f2560-7e8b-11f1-80a9-6d47cec618d5"}
+{"ts":1783927825223,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"b6b2d310-7e8c-11f1-8cfe-49518a68576a"}
+{"ts":1783927825498,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"b6de01c0-7e8c-11f1-a710-3172296a0ba5"}
+{"ts":1783927825793,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"b7075bb0-7e8c-11f1-8163-53034a1d3d2a"}
+{"ts":1783927826164,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"b7341100-7e8c-11f1-b2fb-67429ee1792b"}
+{"ts":1783927826605,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"b76de5b0-7e8c-11f1-be98-155b146553a6"}
+{"ts":1783927826881,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"b7b10930-7e8c-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783927827164,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"b7da8a30-7e8c-11f1-be98-155b146553a6"}
+{"ts":1783929624095,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"e6e95dc0-7e90-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783929624383,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"e71576d0-7e90-11f1-afa4-8587cec21c48"}
+{"ts":1783929624660,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"e73f1ee0-7e90-11f1-9f81-f36d74cca6b7"}
+{"ts":1783929624939,"kind":"price_needed","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"e7693c20-7e90-11f1-aff3-b547e5d3b12b"}
+{"ts":1783929625240,"kind":"price_needed","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"e7946ad0-7e90-11f1-a710-3172296a0ba5"}
+{"ts":1783929625507,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"e7c0f910-7e90-11f1-a710-3172296a0ba5"}
+{"ts":1783929625811,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"e7edae60-7e90-11f1-afa4-8587cec21c48"}
+{"ts":1783929626101,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"e81b2700-7e90-11f1-8cfe-49518a68576a"}
+{"ts":1783929626427,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"e84c7030-7e90-11f1-8cfe-49518a68576a"}
+{"ts":1783929627366,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"e8d8d1b0-7e90-11f1-aff3-b547e5d3b12b"}
+{"ts":1783929627650,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"e9075bc0-7e90-11f1-b2fb-67429ee1792b"}
+{"ts":1783929627941,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"e9312ae0-7e90-11f1-8163-53034a1d3d2a"}
+{"ts":1783929628231,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"e95fb4f0-7e90-11f1-8cfe-49518a68576a"}
+{"ts":1783929628504,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"e98a4760-7e90-11f1-8163-53034a1d3d2a"}
+{"ts":1783929628770,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"e9b3c860-7e90-11f1-aff3-b547e5d3b12b"}
+{"ts":1783929629049,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"e9dcfb40-7e90-11f1-8163-53034a1d3d2a"}
+{"ts":1783929629356,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"ea0bd370-7e90-11f1-80a9-6d47cec618d5"}
+{"ts":1783929629646,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"ea372930-7e90-11f1-aff3-b547e5d3b12b"}
+{"ts":1783929629924,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ea631b30-7e90-11f1-afa4-8587cec21c48"}
+{"ts":1783929630196,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ea8bd8e0-7e90-11f1-a710-3172296a0ba5"}
+{"ts":1783929630460,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"eab44870-7e90-11f1-80a9-6d47cec618d5"}
+{"ts":1783929630747,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"eae01360-7e90-11f1-9f81-f36d74cca6b7"}
+{"ts":1783929631050,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"eb0a30a0-7e90-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783929631360,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"eb3bc7f0-7e90-11f1-b2fb-67429ee1792b"}
+{"ts":1783929631839,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"eb68a450-7e90-11f1-80a9-6d47cec618d5"}
+{"ts":1783929632115,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ebb0a9d0-7e90-11f1-afa4-8587cec21c48"}
+{"ts":1783929632380,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ebd98e90-7e90-11f1-80a9-6d47cec618d5"}
+{"ts":1783929632656,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"ec03f9f0-7e90-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783929632930,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"ec2e8c60-7e90-11f1-8cfe-49518a68576a"}
+{"ts":1783929633199,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ec55c370-7e90-11f1-9f81-f36d74cca6b7"}
+{"ts":1783929633497,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"ec83d850-7e90-11f1-9f81-f36d74cca6b7"}
+{"ts":1783929633767,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"ecadf590-7e90-11f1-aff3-b547e5d3b12b"}
+{"ts":1783929634074,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ecd97260-7e90-11f1-8cfe-49518a68576a"}
+{"ts":1783929634359,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ed06eb01-7e90-11f1-be98-155b146553a6"}
+{"ts":1783929634625,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"ed2fcfc0-7e90-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783929634898,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"ed59c5f0-7e90-11f1-b2fb-67429ee1792b"}
+{"ts":1783929635341,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ed9b89e1-7e90-11f1-be98-155b146553a6"}
+{"ts":1783931425120,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"18673580-7e95-11f1-9f81-f36d74cca6b7"}
+{"ts":1783931425388,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"18906860-7e95-11f1-9f81-f36d74cca6b7"}
+{"ts":1783931425662,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"18b9e960-7e95-11f1-aff3-b547e5d3b12b"}
+{"ts":1783931425938,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"18e3df90-7e95-11f1-80a9-6d47cec618d5"}
+{"ts":1783931426228,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"190dd5c0-7e95-11f1-8cfe-49518a68576a"}
+{"ts":1783931426500,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"193a15e0-7e95-11f1-afa4-8587cec21c48"}
+{"ts":1783931426772,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"196396e0-7e95-11f1-b2fb-67429ee1792b"}
+{"ts":1783932624112,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"e30e1b30-7e97-11f1-aff3-b547e5d3b12b"}
+{"ts":1783932624393,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"e3385f80-7e97-11f1-aff3-b547e5d3b12b"}
+{"ts":1783932624672,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"e3634010-7e97-11f1-b2fb-67429ee1792b"}
+{"ts":1783932624954,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"e38e95d0-7e97-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783932625258,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"e3b99d70-7e97-11f1-afa4-8587cec21c48"}
+{"ts":1783932625543,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"e3e78b40-7e97-11f1-aff3-b547e5d3b12b"}
+{"ts":1783932625824,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"e413a450-7e97-11f1-afa4-8587cec21c48"}
+{"ts":1783932626133,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"e44366e0-7e97-11f1-80a9-6d47cec618d5"}
+{"ts":1783932626425,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"e46f31d0-7e97-11f1-80a9-6d47cec618d5"}
+{"ts":1783932626705,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"e4997620-7e97-11f1-8163-53034a1d3d2a"}
+{"ts":1783932626984,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"e4c40890-7e97-11f1-8cfe-49518a68576a"}
+{"ts":1783932627308,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"e4f06fc0-7e97-11f1-afa4-8587cec21c48"}
+{"ts":1783932627583,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"e520a780-7e97-11f1-80a9-6d47cec618d5"}
+{"ts":1783932627862,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"e54a76a0-7e97-11f1-afa4-8587cec21c48"}
+{"ts":1783933225179,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"494cebf0-7e99-11f1-8163-53034a1d3d2a"}
+{"ts":1783933225476,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"497868c0-7e99-11f1-aff3-b547e5d3b12b"}
+{"ts":1783933225760,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"49a7b620-7e99-11f1-8cfe-49518a68576a"}
+{"ts":1783933226075,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"49d66740-7e99-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783933226375,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"4a047c20-7e99-11f1-80a9-6d47cec618d5"}
+{"ts":1783933226658,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"4a2f35a0-7e99-11f1-8163-53034a1d3d2a"}
+{"ts":1783933226944,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"4a5e0dd0-7e99-11f1-be98-155b146553a6"}
+{"ts":1783935625142,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"dfcd1cd0-7e9e-11f1-80a9-6d47cec618d5"}
+{"ts":1783935625411,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"dff8c0b0-7e9e-11f1-8cfe-49518a68576a"}
+{"ts":1783935625695,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"e0230500-7e9e-11f1-80a9-6d47cec618d5"}
+{"ts":1783935625970,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"e04c5ef0-7e9e-11f1-afa4-8587cec21c48"}
+{"ts":1783935626275,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"e078c620-7e9e-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783935626616,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"e0a861a0-7e9e-11f1-80a9-6d47cec618d5"}
+{"ts":1783935626911,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"e0d9f8f0-7e9e-11f1-8cfe-49518a68576a"}
+{"ts":1783935665585,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"f7e9c020-7e9e-11f1-be98-155b146553a6"}
+{"ts":1783935665843,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"f8131a10-7e9e-11f1-80a9-6d47cec618d5"}
+{"ts":1783935666103,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"f83a9f40-7e9e-11f1-8163-53034a1d3d2a"}
+{"ts":1783935666359,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"f861af40-7e9e-11f1-a710-3172296a0ba5"}
+{"ts":1783935666624,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"f888bf40-7e9e-11f1-afa4-8587cec21c48"}
+{"ts":1783936125142,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"09d5cdf0-7ea0-11f1-afa4-8587cec21c48"}
+{"ts":1783936125412,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"09ffc420-7ea0-11f1-80a9-6d47cec618d5"}
+{"ts":1783936125690,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"0a2a5690-7ea0-11f1-9f81-f36d74cca6b7"}
+{"ts":1783936125955,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0a52c620-7ea0-11f1-80a9-6d47cec618d5"}
+{"ts":1783936126236,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0a7c6e30-7ea0-11f1-afa4-8587cec21c48"}
+{"ts":1783936126522,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"0aa8ae50-7ea0-11f1-a710-3172296a0ba5"}
+{"ts":1783936126795,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"0ad1e130-7ea0-11f1-aff3-b547e5d3b12b"}
+{"ts":1783936500753,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"e9b42340-7ea0-11f1-80a9-6d47cec618d5"}
+{"ts":1783936501027,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"e9df7900-7ea0-11f1-be98-155b146553a6"}
+{"ts":1783936501322,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ea0ca380-7ea0-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783936501611,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"ea386e70-7ea0-11f1-afa4-8587cec21c48"}
+{"ts":1783936501888,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"ea628bb0-7ea0-11f1-b2fb-67429ee1792b"}
+{"ts":1783936502179,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"ea8f6810-7ea0-11f1-be98-155b146553a6"}
+{"ts":1783936502452,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"eab93730-7ea0-11f1-80a9-6d47cec618d5"}
+{"ts":1783936825142,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"ab10dec0-7ea1-11f1-afa4-8587cec21c48"}
+{"ts":1783936825634,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"ab3a5fc0-7ea1-11f1-b2fb-67429ee1792b"}
+{"ts":1783936825897,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"ab859990-7ea1-11f1-9f81-f36d74cca6b7"}
+{"ts":1783936826295,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"abaf41a0-7ea1-11f1-8163-53034a1d3d2a"}
+{"ts":1783936826561,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"abe98b80-7ea1-11f1-b2fb-67429ee1792b"}
+{"ts":1783936826815,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"ac11fb10-7ea1-11f1-8cfe-49518a68576a"}
+{"ts":1783936827069,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ac3895e0-7ea1-11f1-afa4-8587cec21c48"}
+{"ts":1783938239530,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"f618e900-7ea4-11f1-a710-3172296a0ba5"}
+{"ts":1783938239805,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"f6432d50-7ea4-11f1-8163-53034a1d3d2a"}
+{"ts":1783938240259,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"f688e8e0-7ea4-11f1-afa4-8587cec21c48"}
+{"ts":1783938240546,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"f6b43ea0-7ea4-11f1-be98-155b146553a6"}
+{"ts":1783938240832,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"f6dfe280-7ea4-11f1-a710-3172296a0ba5"}
+{"ts":1783938624324,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"db6d40f0-7ea5-11f1-8163-53034a1d3d2a"}
+{"ts":1783938624685,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"dba67960-7ea5-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783938625220,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"dbd7e9a0-7ea5-11f1-80a9-6d47cec618d5"}
+{"ts":1783938625549,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"dc2b39c0-7ea5-11f1-b2fb-67429ee1792b"}
+{"ts":1783938625912,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"dc5cf820-7ea5-11f1-a710-3172296a0ba5"}
+{"ts":1783938626246,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"dc945bd1-7ea5-11f1-b2fb-67429ee1792b"}
+{"ts":1783938626571,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"dcc6dd80-7ea5-11f1-80a9-6d47cec618d5"}
+{"ts":1783940400506,"kind":"won","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"fe261f00-7ea9-11f1-be98-155b146553a6"}
+{"ts":1783940400765,"kind":"won","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"fe4da430-7ea9-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783940401028,"kind":"won","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"fe75ecb0-7ea9-11f1-80a9-6d47cec618d5"}
+{"ts":1783940401306,"kind":"won","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"fe9f1f90-7ea9-11f1-a710-3172296a0ba5"}
+{"ts":1783940401629,"kind":"won","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"fec8a090-7ea9-11f1-b2fb-67429ee1792b"}
+{"ts":1783940402257,"kind":"won","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"fefb7060-7ea9-11f1-be98-155b146553a6"}
+{"ts":1783940402630,"kind":"won","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ff5eed20-7ea9-11f1-8163-53034a1d3d2a"}
+{"ts":1783940425332,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"0ced89b0-7eaa-11f1-80a9-6d47cec618d5"}
+{"ts":1783940425626,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"0d1b0250-7eaa-11f1-a710-3172296a0ba5"}
+{"ts":1783940425916,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"0d471b60-7eaa-11f1-a710-3172296a0ba5"}
+{"ts":1783940426216,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"0d741ed0-7eaa-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783940426497,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"0da0ad10-7eaa-11f1-8cfe-49518a68576a"}
+{"ts":1783940426789,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"0dcc02d0-7eaa-11f1-afa4-8587cec21c48"}
+{"ts":1783940427080,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"0df89110-7eaa-11f1-b2fb-67429ee1792b"}
+{"ts":1783941625379,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"d8398900-7eac-11f1-80a9-6d47cec618d5"}
+{"ts":1783941625667,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"d864b7b0-7eac-11f1-aff3-b547e5d3b12b"}
+{"ts":1783941625946,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"d88f7130-7eac-11f1-8163-53034a1d3d2a"}
+{"ts":1783941626230,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"d8bbd861-7eac-11f1-be98-155b146553a6"}
+{"ts":1783941626523,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"d8e8dbd0-7eac-11f1-8cfe-49518a68576a"}
+{"ts":1783941626811,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"d913e370-7eac-11f1-aff3-b547e5d3b12b"}
+{"ts":1783941627144,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"d9474f80-7eac-11f1-a710-3172296a0ba5"}
+{"ts":1783942025509,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"c68f5440-7ead-11f1-9f81-f36d74cca6b7"}
+{"ts":1783942026303,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"c6e340a0-7ead-11f1-a710-3172296a0ba5"}
+{"ts":1783942026570,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"c75cdd70-7ead-11f1-8163-53034a1d3d2a"}
+{"ts":1783942027671,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"c79e7a50-7ead-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783942028648,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"c82d9af0-7ead-11f1-afa4-8587cec21c48"}
+{"ts":1783942028914,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"c8c34b40-7ead-11f1-aff3-b547e5d3b12b"}
+{"ts":1783942029179,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"c8eb93c0-7ead-11f1-aff3-b547e5d3b12b"}
+{"ts":1783942225264,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"3dca3f70-7eae-11f1-aff3-b547e5d3b12b"}
+{"ts":1783942225549,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"3df5e350-7eae-11f1-9f81-f36d74cca6b7"}
+{"ts":1783942225906,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"3e235bf0-7eae-11f1-aff3-b547e5d3b12b"}
+{"ts":1783942226399,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"3e55b690-7eae-11f1-b2fb-67429ee1792b"}
+{"ts":1783942226665,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"3ea201d0-7eae-11f1-8cfe-49518a68576a"}
+{"ts":1783942227066,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"3ec89ca0-7eae-11f1-b2fb-67429ee1792b"}
+{"ts":1783942227324,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"3f0668f0-7eae-11f1-80a9-6d47cec618d5"}
+{"ts":1783943425273,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"090d8c30-7eb1-11f1-8163-53034a1d3d2a"}
+{"ts":1783943425564,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"093a8fa0-7eb1-11f1-8cfe-49518a68576a"}
+{"ts":1783943425835,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"0963e990-7eb1-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783943426097,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"098c3210-7eb1-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783943426375,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"09b6eb90-7eb1-11f1-be98-155b146553a6"}
+{"ts":1783943426640,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"09debee0-7eb1-11f1-be98-155b146553a6"}
+{"ts":1783943426907,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"0a07cab0-7eb1-11f1-8163-53034a1d3d2a"}
+{"ts":1783944024339,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"6e1a6ca0-7eb2-11f1-b2fb-67429ee1792b"}
+{"ts":1783944024838,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"6e5356f0-7eb2-11f1-be98-155b146553a6"}
+{"ts":1783944025137,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"6e93e260-7eb2-11f1-9f81-f36d74cca6b7"}
+{"ts":1783944025428,"kind":"price_needed","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"6ec579b0-7eb2-11f1-afa4-8587cec21c48"}
+{"ts":1783944025716,"kind":"price_needed","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"6eefbe00-7eb2-11f1-a710-3172296a0ba5"}
+{"ts":1783944026027,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"6f201cd0-7eb2-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783944026291,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"6f48da80-7eb2-11f1-80a9-6d47cec618d5"}
+{"ts":1783944026561,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"6f72f7c0-7eb2-11f1-afa4-8587cec21c48"}
+{"ts":1783944026835,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"6f9bdc80-7eb2-11f1-8cfe-49518a68576a"}
+{"ts":1783944613157,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"cd149540-7eb3-11f1-8163-53034a1d3d2a"}
+{"ts":1783944613449,"kind":"price_submitted","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"cd425c00-7eb3-11f1-be98-155b146553a6"}
+{"ts":1783944613725,"kind":"price_submitted","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"cd6c7940-7eb3-11f1-9f81-f36d74cca6b7"}
+{"ts":1783944614016,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"cd992e90-7eb3-11f1-9f81-f36d74cca6b7"}
+{"ts":1783944614300,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"cdc2d6a0-7eb3-11f1-a710-3172296a0ba5"}
+{"ts":1783944614577,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"cdee0550-7eb3-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783944614873,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"ce18e5e0-7eb3-11f1-a710-3172296a0ba5"}
+{"ts":1783944873805,"kind":"bid_live","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"6871fd71-7eb4-11f1-be98-155b146553a6"}
+{"ts":1783944874087,"kind":"bid_live","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"689abb20-7eb4-11f1-a710-3172296a0ba5"}
+{"ts":1783944874424,"kind":"bid_live","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"68c46330-7eb4-11f1-b2fb-67429ee1792b"}
+{"ts":1783944874696,"kind":"bid_live","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"68f9a400-7eb4-11f1-be98-155b146553a6"}
+{"ts":1783944874956,"kind":"bid_live","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"69210220-7eb4-11f1-8cfe-49518a68576a"}
+{"ts":1783944875242,"kind":"bid_live","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"694bbba0-7eb4-11f1-afa4-8587cec21c48"}
+{"ts":1783944875498,"kind":"bid_live","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"69747950-7eb4-11f1-8cfe-49518a68576a"}
+{"ts":1783944875780,"kind":"bid_live","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"699dfa50-7eb4-11f1-80a9-6d47cec618d5"}
+{"ts":1783944876044,"kind":"bid_live","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"69c642d0-7eb4-11f1-aff3-b547e5d3b12b"}
+{"ts":1783944889918,"kind":"outbid","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"720cca90-7eb4-11f1-be98-155b146553a6"}
+{"ts":1783944890219,"kind":"outbid","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"7235d660-7eb4-11f1-9f81-f36d74cca6b7"}
+{"ts":1783944890485,"kind":"outbid","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"726327f0-7eb4-11f1-b2fb-67429ee1792b"}
+{"ts":1783944890750,"kind":"outbid","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"728c0cb0-7eb4-11f1-80a9-6d47cec618d5"}
+{"ts":1783944891016,"kind":"outbid","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"72b42e20-7eb4-11f1-b2fb-67429ee1792b"}
+{"ts":1783944891322,"kind":"outbid","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"72dfaaf0-7eb4-11f1-afa4-8587cec21c48"}
+{"ts":1783944891587,"kind":"outbid","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"730b75e0-7eb4-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783944891858,"kind":"outbid","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"73334930-7eb4-11f1-a710-3172296a0ba5"}
+{"ts":1783944892127,"kind":"outbid","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"735d3f60-7eb4-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783944900705,"kind":"won","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"78762de0-7eb4-11f1-a710-3172296a0ba5"}
+{"ts":1783944900989,"kind":"won","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"78a37f70-7eb4-11f1-aff3-b547e5d3b12b"}
+{"ts":1783944901286,"kind":"won","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"78d16d40-7eb4-11f1-be98-155b146553a6"}
+{"ts":1783944901577,"kind":"won","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"78fc74e0-7eb4-11f1-80a9-6d47cec618d5"}
+{"ts":1783944901884,"kind":"won","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"792b4d10-7eb4-11f1-8163-53034a1d3d2a"}
+{"ts":1783944902189,"kind":"won","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"795961f0-7eb4-11f1-b2fb-67429ee1792b"}
+{"ts":1783944902496,"kind":"won","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"798701a0-7eb4-11f1-80a9-6d47cec618d5"}
+{"ts":1783944902790,"kind":"won","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"79b64f00-7eb4-11f1-b2fb-67429ee1792b"}
+{"ts":1783944903114,"kind":"won","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"79e26810-7eb4-11f1-aff3-b547e5d3b12b"}
+{"ts":1783945824270,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"9ef79790-7eb6-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783945824535,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9f20a360-7eb6-11f1-be98-155b146553a6"}
+{"ts":1783945824795,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"9f4876b0-7eb6-11f1-b2fb-67429ee1792b"}
+{"ts":1783945825065,"kind":"price_needed","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"9f713460-7eb6-11f1-afa4-8587cec21c48"}
+{"ts":1783945825496,"kind":"price_needed","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"9f9a8e50-7eb6-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783945826053,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9fdc7950-7eb6-11f1-9f81-f36d74cca6b7"}
+{"ts":1783945826347,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"a030b3d0-7eb6-11f1-b2fb-67429ee1792b"}
+{"ts":1783945826645,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"a05e5380-7eb6-11f1-8163-53034a1d3d2a"}
+{"ts":1783945826918,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"a08b2fe0-7eb6-11f1-be98-155b146553a6"}
+{"ts":1783946172662,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"6e8f5c40-7eb7-11f1-8163-53034a1d3d2a"}
+{"ts":1783946172922,"kind":"price_submitted","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"6ec78340-7eb7-11f1-b2fb-67429ee1792b"}
+{"ts":1783946173185,"kind":"price_submitted","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"6eeeba50-7eb7-11f1-8163-53034a1d3d2a"}
+{"ts":1783946173452,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"6f179f10-7eb7-11f1-8cfe-49518a68576a"}
+{"ts":1783946173714,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"6f400ea0-7eb7-11f1-aff3-b547e5d3b12b"}
+{"ts":1783946173980,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"6f68a540-7eb7-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946174250,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"6f907890-7eb7-11f1-8cfe-49518a68576a"}
+{"ts":1783946174268,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"6f942210-7eb7-11f1-80a9-6d47cec618d5"}
+{"ts":1783946174525,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"6fbae3f0-7eb7-11f1-a710-3172296a0ba5"}
+{"ts":1783946174786,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"6fe3c8b0-7eb7-11f1-aff3-b547e5d3b12b"}
+{"ts":1783946175050,"kind":"price_needed","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"700c8660-7eb7-11f1-be98-155b146553a6"}
+{"ts":1783946175313,"kind":"price_needed","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"703459b0-7eb7-11f1-8163-53034a1d3d2a"}
+{"ts":1783946175628,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"705c7b20-7eb7-11f1-afa4-8587cec21c48"}
+{"ts":1783946175887,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"708c16a0-7eb7-11f1-be98-155b146553a6"}
+{"ts":1783946176152,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"70b374c0-7eb7-11f1-aff3-b547e5d3b12b"}
+{"ts":1783946176429,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"70de2e40-7eb7-11f1-a710-3172296a0ba5"}
+{"ts":1783946309301,"kind":"price_submitted","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"c010afb0-7eb7-11f1-8163-53034a1d3d2a"}
+{"ts":1783946309563,"kind":"price_submitted","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"c0399470-7eb7-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783946309833,"kind":"price_submitted","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"c061b5e0-7eb7-11f1-a710-3172296a0ba5"}
+{"ts":1783946310120,"kind":"price_submitted","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"c08e9240-7eb7-11f1-afa4-8587cec21c48"}
+{"ts":1783946310414,"kind":"price_submitted","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"c0b701d0-7eb7-11f1-b2fb-67429ee1792b"}
+{"ts":1783946310681,"kind":"price_submitted","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"c0e3b720-7eb7-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783946310954,"kind":"price_submitted","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"c10d5f30-7eb7-11f1-a710-3172296a0ba5"}
+{"ts":1783946663225,"kind":"outbid","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"930274d0-7eb8-11f1-be98-155b146553a6"}
+{"ts":1783946663491,"kind":"outbid","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"932df1a0-7eb8-11f1-b2fb-67429ee1792b"}
+{"ts":1783946663762,"kind":"outbid","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"9356fd70-7eb8-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946664024,"kind":"outbid","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"937f45f0-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946664286,"kind":"outbid","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"93a78e70-7eb8-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946664551,"kind":"outbid","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"93cf88d0-7eb8-11f1-8163-53034a1d3d2a"}
+{"ts":1783946664828,"kind":"outbid","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"93f7d150-7eb8-11f1-afa4-8587cec21c48"}
+{"ts":1783946665093,"kind":"outbid","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9421c780-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946665357,"kind":"outbid","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"944b2170-7eb8-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946676480,"kind":"bid_live","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"9aed20f0-7eb8-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783946676743,"kind":"bid_live","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"9b14cd30-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946677006,"kind":"bid_live","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"9b3ceea0-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946677275,"kind":"bid_live","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"9b65fa70-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946677536,"kind":"bid_live","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"9b8e42f0-7eb8-11f1-afa4-8587cec21c48"}
+{"ts":1783946677799,"kind":"bid_live","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"9bb66460-7eb8-11f1-8163-53034a1d3d2a"}
+{"ts":1783946678059,"kind":"bid_live","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"9bddc280-7eb8-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946678316,"kind":"bid_live","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"9c0520a0-7eb8-11f1-80a9-6d47cec618d5"}
+{"ts":1783946678579,"kind":"bid_live","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"9c2c7ec0-7eb8-11f1-8cfe-49518a68576a"}
+{"ts":1783946700751,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"a964bdf0-7eb8-11f1-80a9-6d47cec618d5"}
+{"ts":1783946701011,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"a98c1c10-7eb8-11f1-a710-3172296a0ba5"}
+{"ts":1783946701282,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"a9b57600-7eb8-11f1-a710-3172296a0ba5"}
+{"ts":1783946701570,"kind":"lost","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"a9dd9770-7eb8-11f1-be98-155b146553a6"}
+{"ts":1783946701846,"kind":"lost","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"aa0a9ae0-7eb8-11f1-8163-53034a1d3d2a"}
+{"ts":1783946702136,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"aa368ce0-7eb8-11f1-9f81-f36d74cca6b7"}
+{"ts":1783946702403,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"aa60d130-7eb8-11f1-afa4-8587cec21c48"}
+{"ts":1783946702680,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"aa89b5f0-7eb8-11f1-afa4-8587cec21c48"}
+{"ts":1783946702943,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"aab29ab0-7eb8-11f1-8163-53034a1d3d2a"}
+{"ts":1783947034517,"kind":"bid_live","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"705479f1-7eb9-11f1-be98-155b146553a6"}
+{"ts":1783947034789,"kind":"bid_live","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"707d1090-7eb9-11f1-9f81-f36d74cca6b7"}
+{"ts":1783947035050,"kind":"bid_live","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"70a5f550-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947035319,"kind":"bid_live","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"70ce8bf1-7eb9-11f1-be98-155b146553a6"}
+{"ts":1783947035583,"kind":"bid_live","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"70f6fb80-7eb9-11f1-b2fb-67429ee1792b"}
+{"ts":1783947035591,"kind":"bid_live","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"70f7e5e0-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947035857,"kind":"bid_live","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"71202e60-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947035860,"kind":"bid_live","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"71207c80-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947036123,"kind":"bid_live","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"7148ec10-7eb9-11f1-afa4-8587cec21c48"}
+{"ts":1783947036129,"kind":"bid_live","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"71493a30-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947036396,"kind":"bid_live","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"71730950-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947036400,"kind":"bid_live","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"7171a9c0-7eb9-11f1-afa4-8587cec21c48"}
+{"ts":1783947036661,"kind":"bid_live","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"719b51d0-7eb9-11f1-a710-3172296a0ba5"}
+{"ts":1783947036673,"kind":"bid_live","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"719cd870-7eb9-11f1-8163-53034a1d3d2a"}
+{"ts":1783947036951,"kind":"bid_live","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"71c7b900-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947037214,"kind":"bid_live","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"71f04fa0-7eb9-11f1-8163-53034a1d3d2a"}
+{"ts":1783947037485,"kind":"bid_live","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"721822f0-7eb9-11f1-8cfe-49518a68576a"}
+{"ts":1783947037754,"kind":"bid_live","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"7241cb00-7eb9-11f1-9f81-f36d74cca6b7"}
+{"ts":1783947041114,"kind":"outbid","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"744207d0-7eb9-11f1-a710-3172296a0ba5"}
+{"ts":1783947041393,"kind":"outbid","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"746c7330-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947041657,"kind":"outbid","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"7495a611-7eb9-11f1-be98-155b146553a6"}
+{"ts":1783947041930,"kind":"outbid","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"74be3cb0-7eb9-11f1-a710-3172296a0ba5"}
+{"ts":1783947042205,"kind":"outbid","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"74e99270-7eb9-11f1-b2fb-67429ee1792b"}
+{"ts":1783947042471,"kind":"outbid","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"7511daf0-7eb9-11f1-afa4-8587cec21c48"}
+{"ts":1783947042744,"kind":"outbid","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"753ae6c0-7eb9-11f1-b2fb-67429ee1792b"}
+{"ts":1783947043015,"kind":"outbid","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"7564b5e0-7eb9-11f1-a710-3172296a0ba5"}
+{"ts":1783947043284,"kind":"outbid","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"758de8c0-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947060491,"kind":"lost","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"7fd0b5b0-7eb9-11f1-afa4-8587cec21c48"}
+{"ts":1783947060756,"kind":"lost","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"7ff8d720-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947061022,"kind":"lost","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"802194d0-7eb9-11f1-a710-3172296a0ba5"}
+{"ts":1783947061297,"kind":"lost","to":"+919594963428","name":"Sameer AmbadaskaR","ok":true,"error":null,"messageId":"804b15d0-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783947061563,"kind":"lost","to":"+919090707777","name":"Pavan Konda","ok":true,"error":null,"messageId":"8073d380-7eb9-11f1-80a9-6d47cec618d5"}
+{"ts":1783947061849,"kind":"lost","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"809e3ee0-7eb9-11f1-8cfe-49518a68576a"}
+{"ts":1783947062118,"kind":"lost","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"80c88330-7eb9-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783947062383,"kind":"lost","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"80f18f00-7eb9-11f1-8cfe-49518a68576a"}
+{"ts":1783947062666,"kind":"lost","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"811b5e20-7eb9-11f1-aff3-b547e5d3b12b"}
+{"ts":1783949226072,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"89cebf30-7ebe-11f1-8163-53034a1d3d2a"}
+{"ts":1783949226345,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"8ac30a40-7ebe-11f1-a710-3172296a0ba5"}
+{"ts":1783949226616,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"8aec3d20-7ebe-11f1-8163-53034a1d3d2a"}
+{"ts":1783949228546,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"8b16cf90-7ebe-11f1-a710-3172296a0ba5"}
+{"ts":1783949228817,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"8c3cd900-7ebe-11f1-be98-155b146553a6"}
+{"ts":1783949229081,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"8c6596b0-7ebe-11f1-8cfe-49518a68576a"}
+{"ts":1783949230323,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"8c8ccdc1-7ebe-11f1-a710-3172296a0ba5"}
+{"ts":1783950875363,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"61a710d1-7ec2-11f1-be98-155b146553a6"}
+{"ts":1783950875655,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"61d091d0-7ec2-11f1-be98-155b146553a6"}
+{"ts":1783950875954,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"61fc5cc0-7ec2-11f1-99ed-dfcb19e8d6a4"}
+{"ts":1783950876228,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"62293920-7ec2-11f1-be98-155b146553a6"}
+{"ts":1783950876494,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"625467d0-7ec2-11f1-aff3-b547e5d3b12b"}
+{"ts":1783950876759,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"627bed00-7ec2-11f1-b2fb-67429ee1792b"}
+{"ts":1783950877035,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"62a59510-7ec2-11f1-8163-53034a1d3d2a"}
+{"ts":1783958925598,"kind":"price_needed","to":"+919594937777","name":"Suyashh Gupta","ok":true,"error":null,"messageId":"1ff28f80-7ed5-11f1-80a9-6d47cec618d5"}
+{"ts":1783958925897,"kind":"price_needed","to":"+919356252711","name":"Siddharth Rodrigues","ok":true,"error":null,"messageId":"201ef6b0-7ed5-11f1-8163-53034a1d3d2a"}
+{"ts":1783958926201,"kind":"price_needed","to":"+919594963468","name":"sushant govinde","ok":true,"error":null,"messageId":"204ff1c0-7ed5-11f1-80a9-6d47cec618d5"}
+{"ts":1783958926498,"kind":"price_needed","to":"+919982893777","name":"Balkishan Sharma","ok":true,"error":null,"messageId":"207b4780-7ed5-11f1-a710-3172296a0ba5"}
+{"ts":1783958926793,"kind":"price_needed","to":"+917838323242","name":"Gurdeep Singh","ok":true,"error":null,"messageId":"20a89910-7ed5-11f1-aff3-b547e5d3b12b"}
+{"ts":1783958927080,"kind":"price_needed","to":"+919887877477","name":"Key Account Neemrana","ok":true,"error":null,"messageId":"20d4b220-7ed5-11f1-be98-155b146553a6"}
+{"ts":1783958927366,"kind":"price_needed","to":"+919999444060","name":"Rakesh Kapoor","ok":true,"error":null,"messageId":"21014060-7ed5-11f1-aff3-b547e5d3b12b"}
